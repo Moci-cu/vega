@@ -9,6 +9,18 @@ Item {
     property bool showDate: Config.options.bar.verbose
     implicitWidth: rowLayout.implicitWidth + rowLayout.spacing * 10
     implicitHeight: Appearance.sizes.barHeight
+    property color colText: LocalSend.currentTransfer ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1
+
+    Connections {
+        target: LocalSend
+        onCurrentTransferChanged: {
+            if (LocalSend.currentTransfer) {
+                rootItem.toggleHighlight(true)
+            } else {
+                rootItem.toggleHighlight(false)
+            }
+        }
+    }
 
     RowLayout {
         id: rowLayout
@@ -17,21 +29,21 @@ Item {
 
         StyledText {
             font.pixelSize: Appearance.font.pixelSize.large
-            color: Appearance.colors.colOnLayer1
+            color: root.colText
             text: DateTime.time
         }
 
         StyledText {
             visible: root.showDate
             font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.colors.colOnLayer1
+            color: root.colText
             text: "•"
         }
 
         StyledText {
             visible: root.showDate
             font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.colors.colOnLayer1
+            color: root.colText
             text: DateTime.longDate
         }
     }

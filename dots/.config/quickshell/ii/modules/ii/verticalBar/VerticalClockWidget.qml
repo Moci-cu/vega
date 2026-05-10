@@ -10,6 +10,17 @@ Item {
     implicitHeight: clockColumn.implicitHeight + 10
     implicitWidth: Appearance.sizes.verticalBarWidth
 
+    Connections {
+        target: LocalSend
+        onCurrentTransferChanged: {
+            if (LocalSend.currentTransfer) {
+                rootItem.toggleHighlight(true)
+            } else {
+                rootItem.toggleHighlight(false)
+            }
+        }
+    }
+
     ColumnLayout {
         id: clockColumn
         anchors.centerIn: parent
@@ -23,7 +34,7 @@ Item {
                 font.pixelSize: modelData.match(/am|pm/i) ? 
                     Appearance.font.pixelSize.smaller // Smaller "am"/"pm" text
                     : Appearance.font.pixelSize.large
-                color: Appearance.colors.colOnLayer1
+                color: LocalSend.currentTransfer ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurface
                 text: modelData.padStart(2, "0")
             }
         }

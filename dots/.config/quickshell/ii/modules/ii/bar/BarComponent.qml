@@ -17,6 +17,7 @@ Item {
     required property int index
     property var originalIndex: index
     property bool vertical: false
+    property bool highlighted: false
 
     implicitWidth: wrapper.implicitWidth
     implicitHeight: wrapper.implicitHeight
@@ -26,6 +27,10 @@ Item {
         if (barSection == 0) Config.options.bar.layouts.left[originalIndex].visible = visibility
         else if (barSection == 1) Config.options.bar.layouts.center[originalIndex].visible = visibility
         else if (barSection == 2) Config.options.bar.layouts.right[originalIndex].visible = visibility
+    }
+
+    function toggleHighlight(highlight) {
+        rootItem.highlighted = highlight
     }
 
     property var compMap: ({ // [horizontal, vertical]
@@ -45,8 +50,6 @@ Item {
         "policies_panel_button": [policiesPanelButton, policiesPanelButton],
         "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert]
     })
-
-    property list<string> primaryBackgroundComps: ["timer", "record_indicator", "screen_share_indicator"] // components that are mostly indicators
 
     property real startRadius: {
         if (barSection === 0) {
@@ -95,7 +98,7 @@ Item {
         
         startRadius: rootItem.startRadius
         endRadius: rootItem.endRadius
-        colBackground: primaryBackgroundComps.includes(modelData.id) ? rootItem.colBackgroundHighlight : rootItem.colBackground
+        colBackground: rootItem.highlighted ? rootItem.colBackgroundHighlight : rootItem.colBackground
 
         Loader {
             id: itemLoader

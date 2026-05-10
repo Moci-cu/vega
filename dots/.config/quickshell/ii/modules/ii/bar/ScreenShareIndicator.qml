@@ -17,6 +17,7 @@ MouseArea {
     property bool activelyScreenSharing: false
     
     hoverEnabled: true
+    Component.onCompleted: rootItem.toggleHighlight(true)
 
     Process {
         id: screenShareProc
