@@ -18,8 +18,6 @@ Singleton {
     property bool autoStart: Config.options?.localsend?.autoStart ?? false
     property string downloadPath: Config.options?.localsend?.downloadPath
     property bool showNotifications: Config.options?.localsend?.showNotifications ?? true
-    property bool localSendEnabled: Config.options?.policies?.localSend !== 0
-
     // Transfer state
     property var currentTransfer: null
     property list<var> pendingTransfers: []
@@ -32,7 +30,7 @@ Singleton {
     signal serverStopped()
 
     function isReady(): bool {
-        return Config.ready && root.localSendEnabled
+        return Config.ready
     }
 
     // Check if localsend-cli is available
@@ -42,7 +40,7 @@ Singleton {
         command: ["which", "localsend-cli"]
         onExited: (exitCode, exitStatus) => {
             root.available = (exitCode === 0)
-            if (root.available && root.autoStart && root.localSendEnabled) {
+            if (root.available && root.autoStart) {
                 Qt.callLater(() => {
                     root.startServer()
                 })
@@ -202,10 +200,6 @@ Singleton {
             console.warn("[LocalSend] localsend-cli is not available")
             return
         }
-        if (!root.localSendEnabled) {
-            console.log("[LocalSend] LocalSend is disabled in policies")
-            return
-        }
         if (receiveProc.running) {
             console.log("[LocalSend] Server is already running")
             return
@@ -227,7 +221,7 @@ Singleton {
             receiveProc.running = false
             // Wait for process to stop, then start again
             restartDelayTimer.restart()
-        } else if (root.localSendEnabled && root.available) {
+        } else if (root.available) {
             root.startServer()
         }
     }
@@ -260,14 +254,6 @@ Singleton {
 
     function clearPendingTransfers(): void {
         root.pendingTransfers = []
-    }
-
-    onLocalSendEnabledChanged: {
-        if (root.localSendEnabled && root.available && root.autoStart) {
-            root.startServer()
-        } else if (!root.localSendEnabled && receiveProc.running) {
-            root.stopServer()
-        }
     }
 
     onDownloadPathChanged: {

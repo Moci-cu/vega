@@ -205,12 +205,10 @@ LazyLoader {
                 }
             }
 
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.NoButton
-                onContainsMouseChanged: {
-                    root._popupHovered = containsMouse;
+            HoverHandler {
+                id: popupHoverHandler
+                onHoveredChanged: {
+                    root._popupHovered = hovered;
                     root._evaluateStickyState();
                 }
             }

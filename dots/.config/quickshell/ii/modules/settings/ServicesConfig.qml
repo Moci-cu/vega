@@ -191,8 +191,6 @@ ContentPage {
     ContentSection {
         icon: "devices"
         title: Translation.tr("LocalSend")
-        visible: Config.options.policies.localSend !== 0
-
         ConfigSwitch {
             buttonIcon: "power_settings_new"
             text: Translation.tr("Auto-start server")

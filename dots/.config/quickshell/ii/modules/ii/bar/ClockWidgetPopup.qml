@@ -74,6 +74,7 @@ StyledPopup {
             spacing: 12
 
             InfoPill {
+                visible: LocalSend.currentTransfer == null
                 text: root.formattedUptime
 
                 shapeContent: CustomIcon {
@@ -87,6 +88,7 @@ StyledPopup {
             }
 
             InfoPill {
+                visible: LocalSend.currentTransfer == null
                 textContent: Loader {
                     anchors.centerIn: parent
                     sourceComponent: TimerService.pomodoroRunning ? pomodoroText : (TimerService.stopwatchTime > 0 ? stopwatchText : timerOffText)
@@ -99,6 +101,8 @@ StyledPopup {
                 textColor: TimerService.pomodoroBreak ? Appearance.colors.colOnTertiaryContainer : (TimerService.pomodoroRunning || TimerService.stopwatchRunning ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSecondaryContainer)
                 icon: TimerService.pomodoroBreak ? "coffee" : root.stopwatchPaused ? "timer_pause" : TimerService.stopwatchRunning ? "timer_play" : "timer"
             }
+
+            LocalSendPill {}
         }
 
         Component {
@@ -174,17 +178,30 @@ StyledPopup {
             }
         }
 
-        SectionCard {
-            title: Translation.tr("To-Do Tasks")
-            icon: "checklist"
-            subtitle: root.todosSection
+        Loader {
+            Layout.fillWidth: true
+            sourceComponent: LocalSend.currentTransfer !== null ? transferCard : todoSection
+        }
 
-            LoadingPlaceholder {
-                Layout.preferredHeight: 120
-                visible: root.todosEmpty
-                loading: false
-                emptyText: Translation.tr("No pending tasks")
+        Component {
+            id: todoSection
+            SectionCard {
+                title: Translation.tr("To-Do Tasks")
+                icon: "checklist"
+                subtitle: root.todosSection
+
+                LoadingPlaceholder {
+                    Layout.preferredHeight: 120
+                    visible: root.todosEmpty
+                    loading: false
+                    emptyText: Translation.tr("No pending tasks")
+                }
             }
+        }
+
+        Component {
+            id: transferCard
+            LocalSendTransferCard {}
         }
     }
 }
