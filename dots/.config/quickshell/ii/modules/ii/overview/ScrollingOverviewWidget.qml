@@ -483,7 +483,7 @@ Item {
                                 window.Drag.active = false
                                 
                                 if (targetWorkspace !== -1 && targetWorkspace !== windowData?.workspace.id) {
-                                    Hyprland.dispatch(`movetoworkspacesilent ${targetWorkspace}, address:${window.windowData?.address}`)
+                                    Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${window.windowData?.address}" })`)
                                     updateWindowPosition.restart()
                                 } else {
                                     if (!window.windowData.floating) {
@@ -492,7 +492,7 @@ Item {
                                     }
                                     const percentageX = Math.round((window.x - xOffset) / root.workspaceImplicitWidth * 100)
                                     const percentageY = Math.round((window.y - yOffset) / root.workspaceImplicitHeight * 100)
-                                    Hyprland.dispatch(`movewindowpixel exact ${percentageX}% ${percentageY}%, address:${window.windowData?.address}`)
+                                    Hyprland.dispatch(`hl.dsp.window.move({ x = "${percentageX * root.screen.width}", y = "${percentageY * root.screen.height}", window = "address:${window.windowData?.address}" })`)
                                 }
                                 
                             } else if (root.dragDropType === 1) { // Window drop
@@ -507,7 +507,7 @@ Item {
                                     if (root.draggingTargetWorkspace === root.draggingFromWorkspace) { // direct same workspace swap (plugin supports)
                                         Hyprland.dispatch(`layoutmsg swapaddrdir ${targetWindowAdress} ${root.draggingDirection} ${window.windowData?.address} true`)
                                     } else { // different workspace
-                                        Hyprland.dispatch(`movetoworkspacesilent ${targetWorkspace}, address:${root.draggingFromWindowAddress}`)
+                                        Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${targetWorkspace}, follow = false, window = "address:${root.draggingFromWindowAddress}" })`)
                                         Qt.callLater(() => {
                                             Hyprland.dispatch(`layoutmsg swapaddrdir ${targetWindowAdress} ${root.draggingDirection} ${window.windowData?.address} true`)
                                         })
@@ -531,16 +531,16 @@ Item {
 
                             if (event.button === Qt.LeftButton) {
                                 if (!root.hyprscrollingEnabled) {
-                                    Hyprland.dispatch(`focuswindow address:${windowData.address}`)
+                                    Hyprland.dispatch(`hl.dsp.focus({window = "address:${windowData.address}"})`)
                                     GlobalStates.overviewOpen = false; 
                                     return
                                 }
 
-                                Hyprland.dispatch(`focuswindow address:${windowData.address}`)
+                                Hyprland.dispatch(`hl.dsp.focus({window = "address:${windowData.address}"})`)
                                 GlobalStates.overviewOpen = false;
                                 event.accepted = true
                             } else if (event.button === Qt.MiddleButton) {
-                                Hyprland.dispatch(`closewindow address:${windowData.address}`)
+                                Hyprland.dispatch(`hl.dsp.window.close({window = "address:${windowData.address}"})`)
                                 event.accepted = true
                             }
                         }
