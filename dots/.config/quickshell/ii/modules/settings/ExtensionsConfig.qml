@@ -59,7 +59,10 @@ ContentPage {
                 id: searchField
                 Layout.fillWidth: true
                 placeholderText: Translation.tr("Search extensions...")
-                onTextChanged: Qt.callLater(() => page.filter())
+                onTextChanged: {
+                    page.searchText = text
+                    Qt.callLater(() => page.filter())
+                }
             }
 
             RippleButton {
@@ -67,11 +70,13 @@ ContentPage {
                 implicitHeight: 36
                 buttonRadius: Appearance.rounding.full
                 enabled: !ExtensionManager.loading
+                colBackground: Appearance.colors.colSecondaryContainer
+                colBackgroundHover: Appearance.colors.colSecondaryContainerHover
                 contentItem: MaterialSymbol {
                     anchors.centerIn: parent
                     text: ExtensionManager.loading ? "progress_activity" : "refresh"
                     iconSize: 20
-                    color: Appearance.colors.colOnLayer0
+                    color: Appearance.colors.colOnSecondaryContainer
                 }
                 onClicked: ExtensionManager.refreshAvailableExtensions()
                 StyledToolTip { text: Translation.tr("Refresh from GitHub") }
@@ -226,10 +231,14 @@ ContentPage {
                                     Layout.alignment: Qt.AlignRight
                                     implicitWidth: 80
                                     implicitHeight: 28
+                                    padding: 0
                                     buttonRadius: Appearance.rounding.full
                                     colBackground: Appearance.colors.colSecondaryContainer
+                                    colBackgroundHover: Appearance.colors.colSecondaryContainerHover
                                     contentItem: StyledText {
                                         anchors.centerIn: parent
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
                                         text: Translation.tr("Info")
                                         font.pixelSize: Appearance.font.pixelSize.smaller
                                         color: Appearance.colors.colOnSecondaryContainer
@@ -241,16 +250,20 @@ ContentPage {
                                     Layout.alignment: Qt.AlignRight
                                     implicitWidth: 80
                                     implicitHeight: 28
+                                    padding: 0
                                     buttonRadius: Appearance.rounding.full
-                                    colBackground: isInstalled ? Appearance.colors.colErrorContainer : Appearance.colors.colPrimaryContainer
+                                    colBackground: isInstalled ? Appearance.colors.colError : Appearance.colors.colPrimaryContainer
+                                    colBackgroundHover: isInstalled ? Appearance.colors.colErrorHover : Appearance.colors.colPrimaryContainerHover
                                     contentItem: StyledText {
                                         anchors.centerIn: parent
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
                                         text: isInstalled
                                               ? Translation.tr("Remove")
                                               : Translation.tr("Install")
                                         font.pixelSize: Appearance.font.pixelSize.smaller
                                         color: isInstalled
-                                               ? Appearance.colors.colOnErrorContainer
+                                               ? Appearance.colors.colOnError
                                                : Appearance.colors.colOnPrimaryContainer
                                     }
                                     onClicked: {
@@ -380,11 +393,15 @@ ContentPage {
                         RippleButton {
                             implicitWidth: 60
                             implicitHeight: 28
+                            padding: 0
                             buttonRadius: Appearance.rounding.full
                             colBackground: updateAvailable ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer3
+                            colBackgroundHover: updateAvailable ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer3Hover
                             visible: ext.repoUrl && ext.repoUrl.length > 0
                             contentItem: StyledText {
                                 anchors.centerIn: parent
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                                 text: updateChecking
                                       ? "..."
                                       : (updateAvailable ? Translation.tr("Update") : Translation.tr("Check"))
@@ -405,13 +422,17 @@ ContentPage {
                         RippleButton {
                             implicitWidth: 60
                             implicitHeight: 28
+                            padding: 0
                             buttonRadius: Appearance.rounding.full
-                            colBackground: Appearance.colors.colErrorContainer
+                            colBackground: Appearance.colors.colError
+                            colBackgroundHover: Appearance.colors.colErrorHover
                             contentItem: StyledText {
                                 anchors.centerIn: parent
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                                 text: Translation.tr("Remove")
                                 font.pixelSize: Appearance.font.pixelSize.smaller
-                                color: Appearance.colors.colOnErrorContainer
+                                color: Appearance.colors.colOnError
                             }
                             onClicked: ExtensionManager.uninstallExtension(ext.id)
                         }
