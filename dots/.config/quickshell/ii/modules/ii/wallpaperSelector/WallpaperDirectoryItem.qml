@@ -94,8 +94,6 @@ MouseArea {
                         cache: false
                         fillMode: Image.PreserveAspectCrop
                         clip: true
-                        sourceSize.width: wallpaperItemColumnLayout.width
-                        sourceSize.height: wallpaperItemColumnLayout.height - wallpaperItemColumnLayout.spacing - wallpaperItemName.height
 
                         Connections {
                             target: Wallpapers
@@ -165,8 +163,6 @@ MouseArea {
                     anchors.fill: parent
                     sourceComponent: DirectoryIcon {
                         fileModelData: root.fileModelData
-                        sourceSize.width: wallpaperItemColumnLayout.width
-                        sourceSize.height: wallpaperItemColumnLayout.height - wallpaperItemColumnLayout.spacing - wallpaperItemName.height
                     }
                 }
 

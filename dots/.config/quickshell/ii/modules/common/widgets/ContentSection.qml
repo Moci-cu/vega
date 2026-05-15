@@ -11,7 +11,7 @@ ColumnLayout {
     property string icon: ""
     property string tooltip: ""
     property list<string> stringMap: []
-    default property alias data: sectionContent.data
+    default property alias contentData: sectionContent.data
 
     Layout.fillWidth: true
     spacing: 6

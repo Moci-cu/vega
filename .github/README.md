@@ -25,6 +25,19 @@
     <h2>• warning •</h2>
 </div>
 
+> [!WARNING]  
+> Hyprland 0.55 update:
+> If your distro has not shipped Hyprland 0.55 and/or you're not ready for it, you should switch to the Pre-Hyprland Luaification release (or not update yet, if you're going to do that). See the wiki for more info: [Install](https://ii.clsty.link/en/ii-qs/01setup/#automated-installation) | [Update](https://ii.clsty.link/en/ii-qs/01setup/#updating)
+
+<details> 
+  <summary>What this is/isn't</summary>
+
+  - Technically, configuration files
+  - Realistically, mostly the custom graphical shell
+  - NOT a system setup script: no graphic drivers, no zram setup, etc.
+  
+</details>
+
 These dots are based on **illogical-impulse**. You can access original **illogical-impulse** dots from [here](https://github.com/end-4/dots-hyprland)
 
 This dots contains my tweaks to original illogical-impulse dots. It's mostly up to date with original dots and my daily driver. However there may be bugs and stability issues. You can join this [ii-vynx channel](https://discord.com/channels/1393080422245863506/1457739857240653961) in end-4's official discord server to report the bugs and chat about this repository. Use [Github Issues](https://github.com/vaguesyntax/ii-vynx/issues) for real issue though.

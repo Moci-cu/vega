@@ -7,10 +7,10 @@ Item {
     id: root
     property int currentIndex: 0
     property bool expanded: false
-    default property alias data: tabBarColumn.data  
     property bool _isInitialized: false
     Component.onCompleted: _isInitialized = true
 
+    default property alias tabData: tabBarColumn.data  
     implicitHeight: tabBarColumn.implicitHeight
     implicitWidth: tabBarColumn.implicitWidth
     Layout.topMargin: 25
