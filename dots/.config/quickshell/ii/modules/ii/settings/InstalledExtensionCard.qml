@@ -19,10 +19,6 @@ Item {
         anchors.fill: parent
         radius: Appearance.rounding.normal
         color: Appearance.colors.colLayer1
-        border.width: (ext.enabled || (ext.repoUrl && ext.repoUrl.includes("vaguesyntax"))) ? 1 : 0
-        border.color: ext.enabled
-            ? Appearance.colors.colPrimary
-            : ((ext.repoUrl && ext.repoUrl.includes("vaguesyntax")) ? Appearance.colors.colSecondary : "transparent")
 
         RowLayout {
             anchors.fill: parent
@@ -32,14 +28,13 @@ Item {
             MaterialShape {
                 Layout.preferredWidth: 60
                 Layout.preferredHeight: 60
-                //radius: Appearance.rounding.normal
-                color: Appearance.colors.colLayer3
+                color: ext.enabled ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer3
                 randomShape: true
                 MaterialSymbol {
                     anchors.centerIn: parent
                     text: "extension"
                     iconSize: 28
-                    color: Appearance.colors.colSubtext
+                    color: ext.enabled ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
                 }
                 Image {
                     anchors.fill: parent
