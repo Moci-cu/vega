@@ -53,12 +53,22 @@ ContentPage {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 2
 
-            MaterialTextField {
+            ToolbarTextField {
                 id: searchField
                 Layout.fillWidth: true
                 placeholderText: Translation.tr("Search extensions...")
+                
+                background: Rectangle {
+                    color: Appearance.colors.colLayer1
+                    topLeftRadius: Appearance.rounding.full
+                    bottomLeftRadius: Appearance.rounding.full
+                    topRightRadius: Appearance.rounding.verysmall
+                    bottomRightRadius: Appearance.rounding.verysmall
+                }
+                
+
                 onTextChanged: {
                     page.searchText = text
                     Qt.callLater(() => page.filter())
@@ -66,13 +76,19 @@ ContentPage {
             }
 
             RippleButton {
-                implicitWidth: 36
-                implicitHeight: 36
-                buttonRadius: Appearance.rounding.full
+                implicitWidth: 50
+                implicitHeight: 50
+
+                topLeftRadius: Appearance.rounding.verysmall
+                topRightRadius: Appearance.rounding.full
+                bottomLeftRadius: Appearance.rounding.verysmall
+                bottomRightRadius: Appearance.rounding.full
+
                 enabled: !ExtensionManager.loading
                 colBackground: Appearance.colors.colSecondaryContainer
                 colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-                contentItem: MaterialSymbol {
+                colRipple: Appearance.colors.colOnSecondary
+                MaterialSymbol {
                     anchors.centerIn: parent
                     text: ExtensionManager.loading ? "progress_activity" : "refresh"
                     iconSize: 20
@@ -98,6 +114,10 @@ ContentPage {
             text: ExtensionManager.error
             color: Appearance.colors.colError
             wrapMode: Text.Wrap
+        }
+
+        Item {
+            Layout.preferredHeight: 10
         }
 
         ExtensionList {
