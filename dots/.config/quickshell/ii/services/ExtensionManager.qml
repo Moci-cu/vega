@@ -11,7 +11,7 @@ Singleton {
     id: root
 
     property bool loading: false
-    property bool manifestLoading: false
+    property bool extensionJsonLoading: false
     property bool ready: false
     property string error: ""
     property var availableExtensions: []
@@ -24,11 +24,13 @@ Singleton {
         "ii-vynx-test-extension"
     ]
 
+    property var _extensionJsonQueue: []
+
     signal extensionSearchDone()
     signal extensionInstalled(string extId)
     signal extensionRemoved(string extId)
     signal extensionToggled(string extId)
-    signal manifestReady(int repoId)
+    signal extensionJsonReady(int repoId)
     signal updateCheckDone(string extId, bool available, string error)
 
     Component.onCompleted: {
@@ -87,13 +89,15 @@ Singleton {
                 repoUrl: item.clone_url,
                 htmlUrl: item.html_url,
                 defaultBranch: item.default_branch || "main",
-                hasManifest: false,
-                manifest: null,
-                manifestError: null
+                icon: "",
+                hasExtensionJson: false,
+                extensionJson: null,
+                extensionJsonError: null
             }))
             root.saveSearchCache(repos)
             root.availableExtensions = repos
             root.extensionSearchDone()
+            root.startExtensionJsonFetchAll()
         } catch (e) {
             root.error = "Parse error: " + e
             root.loading = false
@@ -102,11 +106,11 @@ Singleton {
         }
     }
 
-    // ── Manifest fetch ──
+    // ── ExtensionJson fetch ──
 
-    function fetchManifest(repoId) {
-        if (root.manifestLoading) return
-        root.manifestLoading = true
+    function fetchExtensionJson(repoId) {
+        if (root.extensionJsonLoading) return
+        root.extensionJsonLoading = true
         root.error = ""
 
         let repo = null
@@ -117,39 +121,49 @@ Singleton {
             }
         }
         if (!repo) {
-            root.manifestLoading = false
+            root.extensionJsonLoading = false
+            root._processExtensionJsonQueue()
             return
         }
 
         let url = "https://raw.githubusercontent.com/" + repo.fullName + "/" + repo.defaultBranch + "/extension.json"
-        fetchManifestProc._pendingRepoId = repoId
-        fetchManifestProc.exec(["curl", "-s", "--connect-timeout", "5", url])
+        fetchExtensionJsonProc._pendingRepoId = repoId
+        fetchExtensionJsonProc.exec(["curl", "-s", "--connect-timeout", "5", url])
     }
 
-    function processFetchedManifest(repoId, jsonText) {
-        root.manifestLoading = false
+    function processFetchedExtensionJson(repoId, jsonText) {
+        root.extensionJsonLoading = false
         if (!jsonText || jsonText.length === 0) {
-            root.updateManifestInList(repoId, null, "Empty response")
+            root.updateExtensionJsonInList(repoId, null, "Empty response")
             return
         }
         try {
-            let manifest = JSON.parse(jsonText)
-            root.updateManifestInList(repoId, manifest, null)
+            let extensionJson = JSON.parse(jsonText)
+            root.updateExtensionJsonInList(repoId, extensionJson, null)
         } catch (e) {
-            root.updateManifestInList(repoId, null, "Invalid JSON: " + e)
+            root.updateExtensionJsonInList(repoId, null, "Invalid JSON: " + e)
         }
     }
 
-    function updateManifestInList(repoId, manifest, error) {
+    function updateExtensionJsonInList(repoId, extensionJson, error) {
         root.availableExtensions = root.availableExtensions.map(r =>
             r.repoId !== repoId ? r : Object.assign({}, r, {
-                hasManifest: !error && !!manifest,
-                manifest: manifest,
-                manifestError: error ?? null
+                hasExtensionJson: !error && !!extensionJson,
+                extensionJson: extensionJson,
+                extensionJsonError: error ?? null,
+                icon: extensionJson && extensionJson.icon || r.icon || "",
+                shapeString: extensionJson && extensionJson.shapeString || r.shapeString || "",
+                description: extensionJson && extensionJson.description || r.description || "",
+                displayName: extensionJson && extensionJson.name || r.name || "",
+                version: extensionJson && extensionJson.version || ""
             })
         )
-        root.manifestLoading = false
-        root.manifestReady(repoId)
+        root.extensionJsonLoading = false
+        root.extensionJsonReady(repoId)
+        if (root._extensionJsonQueue.length === 0) {
+            root.saveSearchCache(root.availableExtensions)
+        }
+        root._processExtensionJsonQueue()
     }
 
     // ── Install / Uninstall ──
@@ -167,20 +181,21 @@ Singleton {
 
     function registerInstalled(extId, dest, repoUrl, defaultBranch, jsonText) {
         try {
-            let manifest = JSON.parse(jsonText)
+            let extensionJson = JSON.parse(jsonText)
             let entry = {
                 id: extId,
-                name: manifest.name || extId,
-                description: manifest.description || "",
-                version: manifest.version || "0.0.0",
-                author: manifest.author || "",
-                coverArt: manifest.coverArt || "",
+                name: extensionJson.name || extId,
+                description: extensionJson.description || "",
+                version: extensionJson.version || "0.0.0",
+                author: extensionJson.author || "",
+                icon: extensionJson.icon || "",
+                shapeString: extensionJson.shapeString || "",
                 enabled: true,
                 installedPath: dest,
                 installedAt: new Date().toISOString(),
                 repoUrl: repoUrl || "",
                 defaultBranch: defaultBranch || "main",
-                contributes: manifest.contributes || {}
+                contributes: extensionJson.contributes || {}
             }
             root.installedExtensions = Object.assign({}, root.installedExtensions, { [extId]: entry })
             root.syncPluginsAdapter()
@@ -320,16 +335,17 @@ Singleton {
 
     function reRegisterUpdated(extId, jsonText) {
         try {
-            let manifest = JSON.parse(jsonText)
+            let extensionJson = JSON.parse(jsonText)
             let existing = root.installedExtensions[extId]
             if (!existing) return
             let updated = Object.assign({}, existing, {
-                name: manifest.name || existing.name,
-                description: manifest.description || existing.description,
-                version: manifest.version || existing.version,
-                author: manifest.author || existing.author,
-                coverArt: manifest.coverArt || existing.coverArt,
-                contributes: manifest.contributes || existing.contributes
+                name: extensionJson.name || existing.name,
+                description: extensionJson.description || existing.description,
+                version: extensionJson.version || existing.version,
+                author: extensionJson.author || existing.author,
+                contributes: extensionJson.contributes || existing.contributes,
+                icon: extensionJson.icon || existing.icon,
+                shapeString: extensionJson.shapeString || existing.shapeString
             })
             root.installedExtensions = Object.assign({}, root.installedExtensions, { [extId]: updated })
             root.syncPluginsAdapter()
@@ -374,6 +390,35 @@ Singleton {
         }
     }
 
+    // ── ExtensionJson auto-fetch queue ──
+
+    function startExtensionJsonFetchAll() {
+        let ids = []
+        for (let i = 0; i < root.availableExtensions.length; i++) {
+            if (!root.availableExtensions[i].hasExtensionJson) {
+                ids.push(root.availableExtensions[i].repoId)
+            }
+        }
+        root._extensionJsonQueue = ids
+        if (ids.length > 0) root._processExtensionJsonQueue()
+    }
+
+    function _processExtensionJsonQueue() {
+        if (root._extensionJsonQueue.length === 0) return
+        if (root.extensionJsonLoading) {
+            extensionJsonQueueTimer.start()
+            return
+        }
+        root.fetchExtensionJson(root._extensionJsonQueue.shift())
+    }
+
+    Timer {
+        id: extensionJsonQueueTimer
+        interval: 500
+        repeat: false
+        onTriggered: root._processExtensionJsonQueue()
+    }
+
     function getContributionPoint(pointName) {
         let result = []
         for (let id in root.installedExtensions) {
@@ -412,13 +457,16 @@ Singleton {
     }
 
     Process {
-        id: fetchManifestProc
+        id: fetchExtensionJsonProc
         property int _pendingRepoId: -1
         stdout: StdioCollector {
-            onStreamFinished: root.processFetchedManifest(fetchManifestProc._pendingRepoId, this.text)
+            onStreamFinished: root.processFetchedExtensionJson(fetchExtensionJsonProc._pendingRepoId, this.text)
         }
         stderr: StdioCollector {
-            onStreamFinished: if (this.text) root.manifestLoading = false
+            onStreamFinished: if (this.text) {
+                root.extensionJsonLoading = false
+                root._processExtensionJsonQueue()
+            }
         }
     }
 
@@ -484,6 +532,7 @@ Singleton {
             if (cache && cache.cachedAt && root.isCacheValid(cache.cachedAt) && cache.results) {
                 root.availableExtensions = cache.results
                 root.extensionSearchDone()
+                root.startExtensionJsonFetchAll()
             }
             root.ready = true
             for (let id in root.installedExtensions) {

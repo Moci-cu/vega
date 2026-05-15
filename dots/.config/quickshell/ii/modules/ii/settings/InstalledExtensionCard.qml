@@ -28,19 +28,13 @@ Item {
             MaterialShape {
                 Layout.preferredWidth: 60
                 Layout.preferredHeight: 60
+                shapeString: ext.shapeString || ""
                 color: ext.enabled ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer3
-                randomShape: true
                 MaterialSymbol {
                     anchors.centerIn: parent
-                    text: "extension"
+                    text: ext.icon || "extension"
                     iconSize: 28
                     color: ext.enabled ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
-                }
-                Image {
-                    anchors.fill: parent
-                    visible: ext.hasManifest && ext.manifest && ext.manifest.coverArt
-                    source: ext.hasManifest && ext.manifest && ext.manifest.coverArt ? ext.manifest.coverArt : ""
-                    fillMode: Image.PreserveAspectCrop
                 }
             }
 

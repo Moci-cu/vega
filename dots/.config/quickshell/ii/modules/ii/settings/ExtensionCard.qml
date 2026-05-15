@@ -40,19 +40,13 @@ Item {
             MaterialShape {
                 Layout.preferredWidth: 60
                 Layout.preferredHeight: 60
-                randomShape: true
+                shapeString: ext.shapeString || ""
                 color: isEnabled ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer3
                 MaterialSymbol {
                     anchors.centerIn: parent
-                    text: "extension"
+                    text: ext.icon || "extension"
                     iconSize: 28
                     color: isEnabled ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
-                }
-                Image {
-                    anchors.fill: parent
-                    visible: ext.hasManifest && ext.manifest && ext.manifest.coverArt
-                    source: ext.hasManifest && ext.manifest && ext.manifest.coverArt ? ext.manifest.coverArt : ""
-                    fillMode: Image.PreserveAspectCrop
                 }
             }
 
@@ -65,7 +59,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: 6
                     StyledText {
-                        text: ext.manifest && ext.manifest.name ? ext.manifest.name : ext.name
+                        text: ext.displayName || ext.name
                         font.pixelSize: Appearance.font.pixelSize.normal
                         font.weight: Font.Medium
                         color: Appearance.colors.colOnLayer0
@@ -117,7 +111,7 @@ Item {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: ext.manifest && ext.manifest.description ? ext.manifest.description : ext.description
+                    text: ext.description || ""
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     color: Appearance.colors.colSubtext
                     elide: Text.ElideRight
@@ -133,14 +127,14 @@ Item {
                         color: Appearance.colors.colTertiary
                     }
                     StyledText {
-                        visible: ext.hasManifest
-                        text: "• " + (ext.manifest ? (ext.manifest.version || "?") : "?")
+                        visible: ext.hasExtensionJson
+                        text: "• " + (ext.version || "?")
                         font.pixelSize: Appearance.font.pixelSize.smallest
                         color: Appearance.colors.colSubtext
                     }
                     StyledText {
-                        visible: ext.manifestError !== null
-                        text: "• " + Translation.tr("No manifest")
+                        visible: ext.extensionJsonError !== null
+                        text: "• " + Translation.tr("No extension.json")
                         font.pixelSize: Appearance.font.pixelSize.smallest
                         color: Appearance.colors.colError
                     }
