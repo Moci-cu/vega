@@ -57,7 +57,7 @@ Item {
         readonly property int fullRadius: Config.options.appearance.sharpMode ? Appearance.rounding.full : height / 2
         radius: fullRadius
         // Animation
-        property Item targetItem: contentItem.children[root.currentIndex]
+        property Item targetItem: contentItem.children[root.currentIndex] || null
         AnimatedTabIndexPair {
             id: leftBound
             idx1Duration: 50

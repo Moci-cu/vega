@@ -70,7 +70,7 @@ Item {
                 id: tabBar
                 Layout.alignment: Qt.AlignHCenter
                 tabButtonList: root.tabButtonList
-                currentIndex: Persistent.states.sidebar.policies.tab
+                currentIndex: Math.min(Persistent.states.sidebar.policies.tab, Math.max(0, root.tabButtonList.length - 1))
                 onCurrentIndexChanged: Persistent.states.sidebar.policies.tab = currentIndex
             }
         }
@@ -87,7 +87,7 @@ Item {
                 id: swipeView
                 anchors.fill: parent
                 spacing: 10
-                currentIndex: Persistent.states.sidebar.policies.tab
+                currentIndex: Math.min(Persistent.states.sidebar.policies.tab, Math.max(0, swipeView.count - 1))
                 onCurrentIndexChanged: Persistent.states.sidebar.policies.tab = currentIndex
 
                 clip: true
@@ -106,7 +106,10 @@ Item {
                     ...((root.tabButtonList.length === 0 || (!root.aiChatEnabled && !root.translatorEnabled && root.animeCloset)) ? [placeholder.createObject()] : []),
                     ...(root.wallpapersEnabled ? [wallpaperBrowser.createObject()] : []),
                     ...(root.animeEnabled ? [anime.createObject()] : []),
-                    ...root.extensionPages.map(p => extPageLoader.createObject(swipeView, {source: "file://" + p.fullPath}))
+                    ...root.extensionPages.map(p => {
+                        var qml = 'import QtQuick; Loader { source: "file://' + p.fullPath + '"; active: true }'
+                        return Qt.createQmlObject(qml, swipeView)
+                    }).filter(item => item)
                 ]
             }
         }
@@ -136,11 +139,6 @@ Item {
                     color: Appearance.colors.colSubtext
                 }
             }
-        }
-
-        Component {
-            id: extPageLoader
-            Loader {}
         }
     }
 }
