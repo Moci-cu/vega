@@ -110,7 +110,7 @@ Item {
                     spacing: 6
                     StyledText {
                         text: "v" + ext.version + " by " + ext.author
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.pixelSize: Appearance.font.pixelSize.smallest
                         color: Appearance.colors.colSubtext
                     }
                     StyledText {
