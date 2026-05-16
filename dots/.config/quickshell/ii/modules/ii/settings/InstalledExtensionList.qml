@@ -21,7 +21,7 @@ ColumnLayout {
         Layout.topMargin: 20
         visible: root.installedList.length > 0
         text: Translation.tr("Installed")
-        font.pixelSize: Appearance.font.pixelSize.normal
+        font.pixelSize: Appearance.font.pixelSize.small
         font.weight: Font.Medium
         color: Appearance.colors.colOnLayer0
     }

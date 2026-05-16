@@ -36,7 +36,18 @@ ContentPage {
     }
 
     function filter() {
+        let installed = ExtensionManager.installedExtensions
         let list = ExtensionManager.availableExtensions
+
+        // Exclude installed extensions
+        let installedIds = {}
+        for (let id in installed) {
+            installedIds[installed[id].name] = true
+            installedIds[installed[id].id] = true
+        }
+        list = list.filter(e => !installedIds[e.name])
+
+        // Filter by search text
         if (page.searchText.trim()) {
             let q = page.searchText.toLowerCase().trim()
             list = list.filter(e =>
@@ -52,51 +63,67 @@ ContentPage {
         icon: "extension"
         title: Translation.tr("Extensions")
 
-        RowLayout {
+        Rectangle {
             Layout.fillWidth: true
-            spacing: 2
+            implicitHeight: 50
+            radius: Appearance.rounding.full
+            color: Appearance.colors.colLayer1
 
-            ToolbarTextField {
-                id: searchField
-                Layout.fillWidth: true
-                placeholderText: Translation.tr("Search extensions...")
-                
-                background: Rectangle {
-                    color: Appearance.colors.colLayer1
-                    topLeftRadius: Appearance.rounding.full
-                    bottomLeftRadius: Appearance.rounding.full
-                    topRightRadius: Appearance.rounding.verysmall
-                    bottomRightRadius: Appearance.rounding.verysmall
-                }
-                
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 4
+                spacing: 8
 
-                onTextChanged: {
-                    page.searchText = text
-                    Qt.callLater(() => page.filter())
-                }
-            }
-
-            RippleButton {
-                implicitWidth: 50
-                implicitHeight: 50
-
-                topLeftRadius: Appearance.rounding.verysmall
-                topRightRadius: Appearance.rounding.full
-                bottomLeftRadius: Appearance.rounding.verysmall
-                bottomRightRadius: Appearance.rounding.full
-
-                enabled: !ExtensionManager.loading
-                colBackground: Appearance.colors.colSecondaryContainer
-                colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-                colRipple: Appearance.colors.colOnSecondary
                 MaterialSymbol {
-                    anchors.centerIn: parent
-                    text: ExtensionManager.loading ? "progress_activity" : "refresh"
+                    text: "search"
                     iconSize: 20
                     color: Appearance.colors.colOnSecondaryContainer
                 }
-                onClicked: ExtensionManager.refreshAvailableExtensions()
-                StyledToolTip { text: Translation.tr("Refresh from GitHub") }
+
+                TextField {
+                    id: searchField
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    placeholderText: Translation.tr("Search extensions...")
+                    placeholderTextColor: Appearance.colors.colSubtext
+                    color: Appearance.colors.colOnLayer1
+                    font {
+                        family: Appearance.font.family.main
+                        pixelSize: Appearance.font.pixelSize.small
+                        hintingPreference: Font.PreferFullHinting
+                        variableAxes: Appearance.font.variableAxes.main
+                    }
+                    renderType: Text.NativeRendering
+                    selectedTextColor: Appearance.colors.colOnSecondaryContainer
+                    selectionColor: Appearance.colors.colSecondaryContainer
+                    background: null
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: 0
+                    rightPadding: 0
+                    topPadding: 0
+                    bottomPadding: 0
+
+                    onTextChanged: {
+                        page.searchText = text
+                        Qt.callLater(() => page.filter())
+                    }
+                }
+
+                RippleButton {
+                    implicitWidth: 42
+                    implicitHeight: 42
+                    buttonRadius: Appearance.rounding.full
+                    enabled: !ExtensionManager.loading
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: ExtensionManager.loading ? "progress_activity" : "refresh"
+                        iconSize: 20
+                        color: ExtensionManager.loading ? Appearance.colors.colSubtext : Appearance.colors.colOnSecondaryContainer
+                    }
+                    onClicked: ExtensionManager.refreshAvailableExtensions()
+                    StyledToolTip { text: Translation.tr("Refresh from GitHub") }
+                }
             }
         }
 
@@ -117,8 +144,16 @@ ContentPage {
             wrapMode: Text.Wrap
         }
 
-        Item {
-            Layout.preferredHeight: 10
+        InstalledExtensionList {}
+
+        StyledText {
+            Layout.fillWidth: true
+            Layout.topMargin: 20
+            visible: page.filteredExtensions.length > 0
+            text: Translation.tr("Browse Extensions")
+            font.pixelSize: Appearance.font.pixelSize.normal
+            font.weight: Font.Medium
+            color: Appearance.colors.colOnLayer0
         }
 
         ExtensionList {
@@ -126,7 +161,5 @@ ContentPage {
             searchText: page.searchText
             loading: ExtensionManager.loading
         }
-
-        InstalledExtensionList {}
     }
 }
