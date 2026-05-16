@@ -7,6 +7,7 @@ Item {
     id: root
     required property var modelData
     required property int index
+    required property int listCount
 
     readonly property var ext: modelData
     readonly property bool isInstalled: {
@@ -24,13 +25,25 @@ Item {
         return false
     }
 
+    property real topRadius: {
+        if (listCount == 1 || index == 0) return Appearance.rounding.large
+        return Appearance.rounding.verysmall
+    }
+    property real bottomRadius: {
+        if (listCount == 1 || index == listCount - 1) return Appearance.rounding.large
+        return Appearance.rounding.verysmall
+    }
+
     Layout.fillWidth: true
     Layout.preferredHeight: 90
     visible: true
 
     Rectangle {
         anchors.fill: parent
-        radius: Appearance.rounding.normal
+        topLeftRadius: topRadius
+        topRightRadius: topRadius
+        bottomLeftRadius: bottomRadius
+        bottomRightRadius: bottomRadius
         color: Appearance.colors.colLayer1
 
         RowLayout {

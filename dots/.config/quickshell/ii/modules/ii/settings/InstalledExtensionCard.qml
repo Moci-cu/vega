@@ -7,17 +7,31 @@ import qs.modules.common.widgets
 Item {
     id: root
     required property var modelData
+    required property int listCount
+    required property int index
     property var ext: modelData
     property var updateState: ExtensionManager.updateStates[ext.id] || {}
     property bool updateChecking: updateState.checking || false
     property bool updateAvailable: updateState.updateAvailable || false
+
+    property real topRadius: {
+        if (listCount == 1 || index == 0) return Appearance.rounding.large
+        return Appearance.rounding.verysmall
+    }
+    property real bottomRadius: {
+        if (listCount == 1 || index == listCount - 1) return Appearance.rounding.large
+        return Appearance.rounding.verysmall
+    }
 
     Layout.fillWidth: true
     Layout.preferredHeight: 80
 
     Rectangle {
         anchors.fill: parent
-        radius: Appearance.rounding.normal
+        topLeftRadius: topRadius
+        topRightRadius: topRadius
+        bottomLeftRadius: bottomRadius
+        bottomRightRadius: bottomRadius
         color: Appearance.colors.colLayer1
 
         RowLayout {

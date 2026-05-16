@@ -8,10 +8,18 @@ import "."
 ColumnLayout {
     id: root
 
+    readonly property var installedList: {
+        let list = []
+        for (let id in ExtensionManager.installedExtensions) {
+            list.push(ExtensionManager.installedExtensions[id])
+        }
+        return list
+    }
+
     StyledText {
         Layout.fillWidth: true
         Layout.topMargin: 20
-        visible: Object.keys(ExtensionManager.installedExtensions).length > 0
+        visible: root.installedList.length > 0
         text: Translation.tr("Installed")
         font.pixelSize: Appearance.font.pixelSize.normal
         font.weight: Font.Medium
@@ -19,13 +27,9 @@ ColumnLayout {
     }
 
     Repeater {
-        model: {
-            let list = []
-            for (let id in ExtensionManager.installedExtensions) {
-                list.push(ExtensionManager.installedExtensions[id])
-            }
-            return list
+        model: root.installedList
+        delegate: InstalledExtensionCard {
+            listCount: root.installedList.length
         }
-        delegate: InstalledExtensionCard {}
     }
 }
