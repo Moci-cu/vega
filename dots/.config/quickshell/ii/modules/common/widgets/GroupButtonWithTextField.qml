@@ -8,14 +8,15 @@ GroupButton {
     id: button
 
     signal textChanged(string text)
+    signal accepted()
 
     property string buttonIcon: ""
     property string buttonText: ""
+    property string textFieldText: ""
 
     baseHeight: 44
     baseWidth: content.implicitWidth + 280
     clickedWidth: baseWidth + 44
-
 
     readonly property int fullRadius: Config.options.appearance.sharpMode ? Appearance.rounding.full : baseHeight / 2
     buttonRadius: fullRadius
@@ -70,7 +71,11 @@ GroupButton {
                 bottomPadding: 0
 
                 onTextChanged: {
+                    button.textFieldText = searchField.text
                     button.textChanged(searchField.text)
+                }
+                onAccepted: {
+                    button.accepted()
                 }
             }
         }        

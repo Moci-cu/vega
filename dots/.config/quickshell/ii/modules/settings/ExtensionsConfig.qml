@@ -15,6 +15,21 @@ ContentPage {
 
     property string searchText: ""
     property var filteredExtensions: []
+    property bool showCustomUrlInput: false
+
+    function installFromUrl() {
+        console.log("Installing from URL: " + customUrlField.textFieldText)
+        let url = customUrlField.textFieldText.trim()
+        if (!url) return
+        // Extract repo name from URL: https://github.com/owner/repo or https://github.com/owner/repo.git
+        let parts = url.replace(/\.git$/, "").split("/")
+        let repoName = parts[parts.length - 1]
+        if (!repoName) return
+        ExtensionManager.installExtension(url, repoName, "main", url)
+        page.showCustomUrlInput = false
+        customUrlField.textFieldText = ""
+    }
+
     Component.onCompleted: {
         if (!ExtensionManager.ready) return
         if (ExtensionManager.availableExtensions.length === 0) {
@@ -68,6 +83,15 @@ ContentPage {
         ButtonGroup {
             Layout.fillWidth: true
 
+            GroupButtonWithIcon {
+                buttonIcon: "link"
+                baseHeight: 44
+                extraWidth: 26
+                onClicked: page.showCustomUrlInput = !page.showCustomUrlInput
+                toggled: page.showCustomUrlInput
+                StyledToolTip { text: Translation.tr("Install from custom URL") }
+            }
+
             GroupButtonWithTextField {
                 buttonIcon: "search"
                 buttonText: Translation.tr("Search extensions...")
@@ -81,12 +105,40 @@ ContentPage {
 
             GroupButtonWithIcon {
                 Layout.fillWidth: true
-                baseHeight: parent.implicitHeight
+                baseHeight: 44
                 extraWidth: 26
                 buttonIcon: ExtensionManager.loading ? "hourglass_bottom" : "refresh"
                 toggled: ExtensionManager.loading
                 onClicked: ExtensionManager.refreshAvailableExtensions()
                 StyledToolTip { text: Translation.tr("Refresh extension list") }
+            }
+        }
+
+        ButtonGroup {
+            id: urlInputLayout
+            clip: true
+            Layout.fillWidth: true
+            implicitHeight: page.showCustomUrlInput ? 44 : 0
+            Behavior on implicitHeight { 
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+
+            GroupButtonWithTextField {
+                id: customUrlField
+                buttonIcon: "add_link"
+                buttonText: Translation.tr("https://github.com/owner/repo")
+                Layout.fillWidth: true
+                
+                onAccepted: page.installFromUrl()
+            }
+
+            GroupButtonWithIcon {
+                Layout.fillWidth: true
+                baseHeight: 44
+                extraWidth: 26
+                buttonIcon: "download"
+                onClicked: page.installFromUrl()
+                StyledToolTip { text: Translation.tr("Install a custom extension") }
             }
         }
 
