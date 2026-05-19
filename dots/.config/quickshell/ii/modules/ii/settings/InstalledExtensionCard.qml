@@ -123,6 +123,46 @@ Item {
                             text: Translation.tr("Recommended by the ii-vynx developer based on user feedback") 
                         }
                     }
+                    Rectangle {
+                        visible: ext.isCustomUrl
+                        radius: 999
+                        color: Appearance.colors.colSecondaryContainer
+                        implicitWidth: childrenRect.width + 20
+                        implicitHeight: childrenRect.height + 8
+                        MaterialSymbol {
+                            text: "link"
+                            iconSize: 14
+                            color: Appearance.colors.colOnSecondaryContainer
+                            anchors.centerIn: parent
+                        }
+                        HoverHandler {
+                            id: hoverCustomUrl
+                        }
+                        StyledToolTip { 
+                            extraVisibleCondition: hoverCustomUrl.hovered
+                            text: Translation.tr("Custom URL — installed from a custom link") 
+                        }
+                    }
+                    Rectangle {
+                        visible: ext.isLocal
+                        radius: 999
+                        color: Appearance.colors.colSecondaryContainer
+                        implicitWidth: childrenRect.width + 20
+                        implicitHeight: childrenRect.height + 8
+                        MaterialSymbol {
+                            text: "folder"
+                            iconSize: 14
+                            color: Appearance.colors.colOnSecondaryContainer
+                            anchors.centerIn: parent
+                        }
+                        HoverHandler {
+                            id: hoverLocal
+                        }
+                        StyledToolTip { 
+                            extraVisibleCondition: hoverLocal.hovered
+                            text: Translation.tr("Local path extension — files linked from your filesystem") 
+                        }
+                    }
                 }
 
                 RowLayout {

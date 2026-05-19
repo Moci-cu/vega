@@ -17,6 +17,20 @@ Item {
         }
         return false
     }
+    readonly property bool isLocalExtension: {
+        let installed = ExtensionManager.installedExtensions
+        for (let id in installed) {
+            if ((installed[id].name === ext.name || installed[id].id === ext.name) && installed[id].isLocal) return true
+        }
+        return false
+    }
+    readonly property bool isCustomUrlExtension: {
+        let installed = ExtensionManager.installedExtensions
+        for (let id in installed) {
+            if ((installed[id].name === ext.name || installed[id].id === ext.name) && installed[id].isCustomUrl) return true
+        }
+        return false
+    }
     readonly property bool isEnabled: {
         let installed = ExtensionManager.installedExtensions
         for (let id in installed) {
@@ -97,6 +111,46 @@ Item {
                         StyledToolTip { 
                             extraVisibleCondition: hoverOff.hovered
                             text: Translation.tr("Created by the ii-vynx developer") 
+                        }
+                    }
+                    Rectangle {
+                        visible: isCustomUrlExtension
+                        radius: Appearance.rounding.full
+                        color: Appearance.colors.colSecondaryContainer
+                        implicitWidth: childrenRect.width + 20
+                        implicitHeight: childrenRect.height + 8
+                        MaterialSymbol {
+                            text: "link"
+                            iconSize: 14
+                            color: Appearance.colors.colOnSecondaryContainer
+                            anchors.centerIn: parent
+                        }
+                        HoverHandler {
+                            id: hoverCustomUrl
+                        }
+                        StyledToolTip { 
+                            extraVisibleCondition: hoverCustomUrl.hovered
+                            text: Translation.tr("Custom URL extension") 
+                        }
+                    }
+                    Rectangle {
+                        visible: isLocalExtension
+                        radius: Appearance.rounding.full
+                        color: Appearance.colors.colSecondaryContainer
+                        implicitWidth: childrenRect.width + 20
+                        implicitHeight: childrenRect.height + 8
+                        MaterialSymbol {
+                            text: "folder"
+                            iconSize: 14
+                            color: Appearance.colors.colOnSecondaryContainer
+                            anchors.centerIn: parent
+                        }
+                        HoverHandler {
+                            id: hoverLocal
+                        }
+                        StyledToolTip { 
+                            extraVisibleCondition: hoverLocal.hovered
+                            text: Translation.tr("Local path extension") 
                         }
                     }
                     Rectangle {

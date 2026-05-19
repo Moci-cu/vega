@@ -28,7 +28,7 @@ ContentPage {
             let parts = url.replace(/\.git$/, "").split("/")
             let repoName = parts[parts.length - 1]
             if (!repoName) return
-            ExtensionManager.installExtension(url, repoName, "main", url)
+            ExtensionManager.installExtension(url, repoName, "main", url, true)
         } else {
             // Local path — register directly
             ExtensionManager.installLocalExtension(input)
@@ -86,7 +86,6 @@ ContentPage {
     ContentSection {
         icon: "extension"
         title: Translation.tr("Extensions")
-
 
         ButtonGroup {
             Layout.fillWidth: true

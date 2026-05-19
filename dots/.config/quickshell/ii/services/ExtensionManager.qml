@@ -189,7 +189,7 @@ Singleton {
 
     // ── Install / Uninstall ──
 
-    function installExtension(repoUrl, extId, defaultBranch, htmlUrl) {
+    function installExtension(repoUrl, extId, defaultBranch, htmlUrl, isCustomUrl) {
         root.loading = true
         root.error = ""
         let dest = Directories.extensionsInstalledPath + "/" + extId
@@ -198,6 +198,7 @@ Singleton {
         installProc._pendingRepoUrl = repoUrl
         installProc._pendingBranch = defaultBranch || "main"
         installProc._pendingHtmlUrl = htmlUrl || ""
+        installProc._pendingIsCustomUrl = !!isCustomUrl
         installProc.exec(["git", "clone", "--depth", "1", repoUrl, dest])
     }
 
@@ -210,7 +211,7 @@ Singleton {
         localReader.reload()
     }
 
-    function registerInstalled(extId, dest, repoUrl, defaultBranch, htmlUrl, jsonText, isLocal) {
+    function registerInstalled(extId, dest, repoUrl, defaultBranch, htmlUrl, jsonText, isLocal, isCustomUrl) {
         try {
             let extensionJson = JSON.parse(jsonText)
             let entry = {
@@ -228,6 +229,7 @@ Singleton {
                 htmlUrl: htmlUrl || "",
                 defaultBranch: defaultBranch || "main",
                 isLocal: isLocal || false,
+                isCustomUrl: isCustomUrl || false,
                 contributes: extensionJson.contributes || {}
             }
             root.installedExtensions = Object.assign({}, root.installedExtensions, { [extId]: entry })
@@ -520,6 +522,7 @@ Singleton {
         property string _pendingRepoUrl: ""
         property string _pendingBranch: "main"
         property string _pendingHtmlUrl: ""
+        property bool _pendingIsCustomUrl: false
         onExited: (exitCode, _) => {
             if (exitCode === 0) {
                 installReader._pendingExtId = installProc._pendingExtId
@@ -527,6 +530,7 @@ Singleton {
                 installReader._pendingRepoUrl = installProc._pendingRepoUrl
                 installReader._pendingBranch = installProc._pendingBranch
                 installReader._pendingHtmlUrl = installProc._pendingHtmlUrl
+                installReader._pendingIsCustomUrl = installProc._pendingIsCustomUrl
                 installReader.path = installProc._pendingDest + "/extension.json"
             } else {
                 root.error = "Git clone failed (exit " + exitCode + ")"
@@ -607,7 +611,8 @@ Singleton {
         property string _pendingRepoUrl: ""
         property string _pendingBranch: "main"
         property string _pendingHtmlUrl: ""
-        onLoaded: root.registerInstalled(installReader._pendingExtId, installReader._pendingDest, installReader._pendingRepoUrl, installReader._pendingBranch, installReader._pendingHtmlUrl, installReader.text())
+        property bool _pendingIsCustomUrl: false
+        onLoaded: root.registerInstalled(installReader._pendingExtId, installReader._pendingDest, installReader._pendingRepoUrl, installReader._pendingBranch, installReader._pendingHtmlUrl, installReader.text(), false, installReader._pendingIsCustomUrl)
         onLoadFailed: {
             root.error = "Installed extension has no extension.json"
             root.loading = false
