@@ -20,8 +20,7 @@ ContentPage {
         "workspaces": workspaces,
         "timer": indicators,
         "record_indicator": indicators,
-        "network_speed": networkSpeed,
-        "updates": updates
+        "network_speed": networkSpeed
     })
 
     function scrollTo(stringId) {
