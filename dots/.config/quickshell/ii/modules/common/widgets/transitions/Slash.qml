@@ -26,24 +26,27 @@ Item {
         let d4 = Math.sqrt((effect.width - cx) * (effect.width - cx) + (effect.height - cy) * (effect.height - cy))
         let targetDiameter = Math.ceil(Math.max(d1, d2, d3, d4)) * 2
 
-        circleMask.width = 0
+        // Divide target by our fixed base width (100)
+        let targetScale = targetDiameter / 100
+
+        circleMask.scale = 0 // Start invisible
         wipeMask.visible = true
 
         revealAnim.from = 0
-        revealAnim.to = targetDiameter
+        revealAnim.to = targetScale
         revealAnim.restart()
     }
 
     function cleanup() {
         wipeMask.visible = false
-        circleMask.width = 0
+        circleMask.scale = 0
         maskContainer.layer.enabled = false
     }
 
     NumberAnimation {
         id: revealAnim
         target: circleMask
-        property: "width"
+        property: "scale" // Animate scale, not width!
         duration: effect.duration
         easing.type: Easing.OutCubic
         onFinished: effect.finished()
@@ -66,10 +69,11 @@ Item {
             Rectangle {
                 id: circleMask
                 anchors.centerIn: parent
-                width: 0
+                width: 100 // Fixed base width
                 height: Math.ceil(Math.sqrt(effect.width * effect.width + effect.height * effect.height)) * 2
                 color: "black"
                 rotation: 45
+                scale: 0 // Controlled by animation
                 transformOrigin: Item.Center
 
                 property real centerX: effect.width / 2
