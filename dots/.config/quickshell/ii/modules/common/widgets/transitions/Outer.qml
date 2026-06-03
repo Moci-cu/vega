@@ -20,22 +20,18 @@ Item {
         circleMask.centerX = cx
         circleMask.centerY = cy
 
-        // DIAMOND MATH: Use Manhattan Distance (|dx| + |dy|) 
-        let d1 = Math.abs(cx) + Math.abs(cy)
-        let d2 = Math.abs(effect.width - cx) + Math.abs(cy)
-        let d3 = Math.abs(cx) + Math.abs(effect.height - cy)
-        let d4 = Math.abs(effect.width - cx) + Math.abs(effect.height - cy)
-        
-        let maxManhattan = Math.max(d1, d2, d3, d4)
+        let d1 = Math.sqrt(cx * cx + cy * cy)
+        let d2 = Math.sqrt((effect.width - cx) * (effect.width - cx) + cy * cy)
+        let d3 = Math.sqrt(cx * cx + (effect.height - cy) * (effect.height - cy))
+        let d4 = Math.sqrt((effect.width - cx) * (effect.width - cx) + (effect.height - cy) * (effect.height - cy))
+        let targetDiameter = Math.ceil(Math.max(d1, d2, d3, d4)) * 2
+        let targetScale = targetDiameter / circleMask.width
 
-        // The exact distance from the center to the edge of a 200x200 diamond is 100 * sqrt(2)
-        let targetScale = maxManhattan / (100 * Math.SQRT2)
-
-        circleMask.scale = 0
+        circleMask.scale = targetScale
         wipeMask.visible = true
 
-        revealAnim.from = 0
-        revealAnim.to = targetScale
+        revealAnim.from = targetScale
+        revealAnim.to = 0
         revealAnim.restart()
     }
 
@@ -66,9 +62,9 @@ Item {
             id: circleMask
             width: 200
             height: 200
+            radius: 100
             color: "black"
             scale: 0
-            rotation: 45
             transformOrigin: Item.Center
 
             property real centerX: effect.width / 2
@@ -85,5 +81,6 @@ Item {
         visible: false
         source: effect.frontImg
         maskSource: maskContainer
+        invert: true
     }
 }
