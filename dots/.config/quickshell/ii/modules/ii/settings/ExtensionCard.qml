@@ -205,6 +205,10 @@ Item {
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: isInstalled ? Appearance.colors.colOnError : Appearance.colors.colOnPrimaryContainer
                     }
+                    StyledToolTip {
+                        extraVisibleCondition: root._auditState !== "trusted"
+                        text: Translation.tr("This extension has not been audited yet. Try not to install this extension without checking the source code.")
+                    }
                     onClicked: {
                         if (isInstalled) {
                             for (let id in ExtensionManager.installedExtensions) {
