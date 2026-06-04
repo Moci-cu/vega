@@ -74,22 +74,22 @@ Item {
                 Layout.preferredWidth: 60
                 Layout.preferredHeight: 60
                 shapeString: ext.shapeString || ""
-                color: isEnabled ? Appearance.colors.colPrimaryContainer : ExtensionManager.recommendedExtensions.includes(ext.name) ? Appearance.colors.colTertiary : Appearance.colors.colLayer3
+                color: isEnabled ? Appearance.colors.colPrimaryContainer : ExtensionManager.isExtensionRecommended(ext.name) ? Appearance.colors.colTertiary : Appearance.colors.colLayer3
                 
                 HoverHandler {
                     id: hover
                 }
 
                 StyledToolTip {
-                    extraVisibleCondition: hover.hovered && ExtensionManager.recommendedExtensions.includes(ext.name)
-                    text: ExtensionManager.recommendedExtensions.includes(ext.name) ? Translation.tr("Recommended by the ii-vynx developer based on user feedback") : ""
+                    extraVisibleCondition: hover.hovered && ExtensionManager.isExtensionRecommended(ext.name)
+                    text: ExtensionManager.isExtensionRecommended(ext.name) ? Translation.tr("Recommended by the ii-vynx developer based on user feedback") : ""
                 }
 
                 MaterialSymbol {
                     anchors.centerIn: parent
                     text: ext.icon || "extension"
                     iconSize: 28
-                    color: isEnabled ? Appearance.colors.colOnPrimaryContainer : ExtensionManager.recommendedExtensions.includes(ext.name) ? Appearance.colors.colOnTertiary : Appearance.colors.colSubtext
+                    color: isEnabled ? Appearance.colors.colOnPrimaryContainer : ExtensionManager.isExtensionRecommended(ext.name) ? Appearance.colors.colOnTertiary : Appearance.colors.colSubtext
                 }
             }
 

@@ -25,14 +25,11 @@ Singleton {
     property var _updateQueue: ({}) // { extId: string, repoUrl: string, branch: string, step: string }
     property var _updateCheckQueue: []
     property bool _updateCheckRunning: false
-    property list<string> recommendedExtensions: [
-        "ii-vynx-test-extension"
-    ]
-
     property bool auditDatabaseReady: false
     property var cachedAuditDb: ({trustedExtensions: [], blockedExtensions: []})
     property var _blockedIds: ({})
     property var _trustedMap: ({})
+    property var _recommendedIds: ({})
     property int _auditDbVersion: 0
 
     onAvailableExtensionsChanged: { root.refreshExtensions() }
@@ -638,6 +635,7 @@ Singleton {
         root.cachedAuditDb = db
         let blocked = {}
         let trusted = {}
+        let recommended = {}
         let blockedList = db["blocked-extensions"] || []
         for (let i = 0; i < blockedList.length; i++) {
             blocked[blockedList[i]["extension-id"]] = blockedList[i].reason || true
@@ -646,13 +644,22 @@ Singleton {
         for (let i = 0; i < trustedList.length; i++) {
             trusted[trustedList[i]["extension-id"]] = { trustedCommit: trustedList[i].trustedCommit }
         }
+        let recommendedList = db["recommended-extensions"] || []
+        for (let i = 0; i < recommendedList.length; i++) {
+            recommended[recommendedList[i]] = true
+        }
         root._blockedIds = blocked
         root._trustedMap = trusted
+        root._recommendedIds = recommended
         root.auditDatabaseReady = true
 
         root.availableExtensions = root.availableExtensions.filter(r => !blocked[r.name])
 
         root._auditDbVersion++
+    }
+
+    function isExtensionRecommended(extId) {
+        return !!root._recommendedIds[extId]
     }
 
     function getExtensionAuditState(extId) {
