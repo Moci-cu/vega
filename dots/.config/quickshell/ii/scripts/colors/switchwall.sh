@@ -170,6 +170,7 @@ switch() {
     type_flag="$3"
     color_flag="$4"
     color="$5"
+    theme_file="$6"
 
     # Start Gemini auto-categorization if enabled
     aiStylingEnabled=$(jq -r '.background.widgets.clock.cookie.aiStyling' "$SHELL_CONFIG_FILE")
@@ -312,12 +313,18 @@ switch() {
         [[ "$term_fg_boost" != "null" && -n "$term_fg_boost" ]] && generate_colors_material_args+=(--term_fg_boost "$term_fg_boost")
     fi
 
-    matugen "${matugen_args[@]}"
-    source "$(eval echo $ILLOGICAL_IMPULSE_VIRTUAL_ENV)/bin/activate"
-    python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
-        > "$STATE_DIR"/user/generated/material_colors.scss
-    deactivate
-    "$SCRIPT_DIR"/applycolor.sh
+    if [[ -n "$theme_file" ]]; then
+        mkdir -p "$(dirname "$STATE_DIR/user/generated/colors.json")"
+        cp "$theme_file" "$STATE_DIR/user/generated/colors.json"
+        echo "[switchwall.sh] Applied theme: $type_flag"
+    else
+        matugen "${matugen_args[@]}"
+        source "$(eval echo $ILLOGICAL_IMPULSE_VIRTUAL_ENV)/bin/activate"
+        python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
+            > "$STATE_DIR"/user/generated/material_colors.scss
+        deactivate
+        "$SCRIPT_DIR"/applycolor.sh
+    fi
 
     # Pass screen width, height, and wallpaper path to post_process
     max_width_desired="$(hyprctl monitors -j | jq '([.[].width] | min)' | xargs)"
@@ -412,9 +419,23 @@ main() {
             break
         fi
     done
+
+    # If type is not a standard scheme variant, check if it's a built-in or custom theme file
+    theme_file=""
     if [[ $valid_type -eq 0 ]]; then
-        echo "[switchwall.sh] Warning: Invalid type '$type_flag', defaulting to 'auto'" >&2
-        type_flag="auto"
+        builtin_theme="$SCRIPT_DIR/../../defaults/themes/${type_flag}.json"
+        custom_theme="$(dirname "$SHELL_CONFIG_FILE")/themes/${type_flag}.json"
+        if [[ -f "$builtin_theme" ]]; then
+            theme_file="$builtin_theme"
+            valid_type=1
+        elif [[ -f "$custom_theme" ]]; then
+            theme_file="$custom_theme"
+            valid_type=1
+        fi
+        if [[ -z "$theme_file" ]]; then
+            echo "[switchwall.sh] Warning: Invalid type '$type_flag', defaulting to 'auto'" >&2
+            type_flag="auto"
+        fi
     fi
 
     # Only prompt for wallpaper if not using --color and not using --noswitch and no imgpath set
@@ -459,7 +480,7 @@ main() {
         fi
     fi
 
-    switch "$imgpath" "$mode_flag" "$type_flag" "$color_flag" "$color"
+    switch "$imgpath" "$mode_flag" "$type_flag" "$color_flag" "$color" "$theme_file"
 }
 
 main "$@"

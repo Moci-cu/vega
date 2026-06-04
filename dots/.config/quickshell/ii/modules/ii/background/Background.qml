@@ -148,7 +148,7 @@ Variants {
 
         property bool mediaModeOpen: mediaModeLoader.active && MprisController.activePlayer
         onMediaModeOpenChanged: {
-            if (!mediaModeOpen) {
+            if (!mediaModeOpen && Config.options.appearance.palette.type.startsWith("scheme")) {
                 Wallpapers.apply(Config.options.background.wallpaperPath)
                 LyricsService.shellColorChanged = false
             }
@@ -237,7 +237,7 @@ Variants {
 
         Component.onCompleted: {
             refreshExtensionBgWidgets()
-            if (!mediaModeOpen) {
+            if (!mediaModeOpen && Config.options.appearance.palette.type.startsWith("scheme")) {
                 Wallpapers.apply(Config.options.background.wallpaperPath)
             }
         }
@@ -265,8 +265,8 @@ Variants {
             // Wallpaper
             TransitionImage {
                 id: wallpaper
-                visible: opacity > 0 && !blurLoader.active && !bgRoot.wallpaperIsVideo
-                opacity: (status === Image.Ready && !bgRoot.wallpaperIsVideo) ? 1 : 0
+                visible: !blurLoader.active
+                opacity: bgRoot.wallpaperIsVideo ? 0 : 1
                 // Range = groups that workspaces span on
                 property int chunkSize: Config?.options.bar.workspaces.shown ?? 10
                 property int lower: Math.floor(bgRoot.firstWorkspaceId / chunkSize) * chunkSize
@@ -298,7 +298,7 @@ Variants {
                 y: -(bgRoot.movableYSpace) - (effectiveValueY - 0.5) * 2 * bgRoot.movableYSpace
 
                 imageSource: bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
-                animated: Config.options.background.animateWallpaperChanges
+                animated: !bgRoot.wallpaperIsVideo
                 fillMode: Image.PreserveAspectCrop
                 Behavior on x {
                     NumberAnimation {

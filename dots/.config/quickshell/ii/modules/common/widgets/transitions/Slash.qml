@@ -13,21 +13,21 @@ Item {
     function start() {
         maskContainer.layer.enabled = true
         
-        let marginX = effect.width * 0.25
-        let marginY = effect.height * 0.25
-        let cx = marginX + Math.random() * (effect.width - marginX * 2)
-        let cy = marginY + Math.random() * (effect.height - marginY * 2)
+        let cx = effect.width / 2
+        let cy = effect.height / 2
         circleMask.centerX = cx
         circleMask.centerY = cy
 
-        let d1 = Math.sqrt(cx * cx + cy * cy)
-        let d2 = Math.sqrt((effect.width - cx) * (effect.width - cx) + cy * cy)
-        let d3 = Math.sqrt(cx * cx + (effect.height - cy) * (effect.height - cy))
-        let d4 = Math.sqrt((effect.width - cx) * (effect.width - cx) + (effect.height - cy) * (effect.height - cy))
-        let targetDiameter = Math.ceil(Math.max(d1, d2, d3, d4)) * 2
+        // SLASH MATH: Use Manhattan Distance (|dx| + |dy|) 
+        let d1 = Math.abs(cx) + Math.abs(cy)
+        let d2 = Math.abs(effect.width - cx) + Math.abs(cy)
+        let d3 = Math.abs(cx) + Math.abs(effect.height - cy)
+        let d4 = Math.abs(effect.width - cx) + Math.abs(effect.height - cy)
+        
+        let maxManhattan = Math.max(d1, d2, d3, d4)
 
-        // Divide target by our fixed base width (100)
-        let targetScale = targetDiameter / 100
+        // The exact distance from the center to the edge of a 100px wide slash is 50 * sqrt(2)
+        let targetScale = maxManhattan / (50 * Math.SQRT2)
 
         circleMask.scale = 0 // Start invisible
         wipeMask.visible = true
@@ -60,26 +60,20 @@ Item {
         visible: false
         layer.enabled: false
 
-        Item {
-            id: pivot
-            x: circleMask.centerX
-            y: circleMask.centerY
-            width: 1
-            height: 1
+        Rectangle {
+            id: circleMask
+            width: 100 // Fixed base width
+            height: Math.ceil(Math.sqrt(effect.width * effect.width + effect.height * effect.height)) * 2
+            color: "black"
+            rotation: 45
+            scale: 0 // Controlled by animation
+            transformOrigin: Item.Center
 
-            Rectangle {
-                id: circleMask
-                anchors.centerIn: parent
-                width: 100 // Fixed base width
-                height: Math.ceil(Math.sqrt(effect.width * effect.width + effect.height * effect.height)) * 2
-                color: "black"
-                rotation: 45
-                scale: 0 // Controlled by animation
-                transformOrigin: Item.Center
+            property real centerX: effect.width / 2
+            property real centerY: effect.height / 2
 
-                property real centerX: effect.width / 2
-                property real centerY: effect.height / 2
-            }
+            x: centerX - width / 2
+            y: centerY - height / 2
         }
     }
 

@@ -48,7 +48,8 @@ Item {
         "timer": [timerComp, timerCompVert],
         "weather": [weatherComp, weatherComp],
         "policies_panel_button": [policiesPanelButton, policiesPanelButton],
-        "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert]
+        "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert],
+        "network_speed": [networkSpeedComp, networkSpeedComp],
     })
 
     property real startRadius: {
@@ -164,5 +165,6 @@ Item {
     Component { id: policiesPanelButton; PoliciesPanelButton {} }
     
     Component { id: dashboardPanelButton; DashboardPanelButton {} }
+    Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical } }
     Component { id: dashboardPanelButtonVert; VerticalDashboardPanelButton {} }
 }

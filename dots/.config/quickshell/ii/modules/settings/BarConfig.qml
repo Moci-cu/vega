@@ -19,7 +19,8 @@ ContentPage {
         "system_tray": systemTray,
         "workspaces": workspaces,
         "timer": indicators,
-        "record_indicator": indicators
+        "record_indicator": indicators,
+        "network_speed": networkSpeed
     })
 
     function scrollTo(stringId) {
@@ -106,8 +107,14 @@ ContentPage {
                 ConfigSelectionArray {
                     currentValue: (Config.options.bar.bottom ? 1 : 0) | (Config.options.bar.vertical ? 2 : 0)
                     onSelected: newValue => {
+                        const newVertical = (newValue & 2) !== 0;
+                        if (newVertical && !Config.options.bar.vertical) {
+                            if (Config.options.bar.networkSpeed.displayMode < 4) {
+                                Config.options.bar.networkSpeed.displayMode = 4;
+                            }
+                        }
                         Config.options.bar.bottom = (newValue & 1) !== 0;
-                        Config.options.bar.vertical = (newValue & 2) !== 0;
+                        Config.options.bar.vertical = newVertical;
                     }
                     options: [
                         {
@@ -461,6 +468,83 @@ ContentPage {
     }
 
     ContentSection {
+        id: networkSpeed
+        icon: "speed"
+        title: Translation.tr("Network speed")
+        
+        ContentSubsection {
+            title: Translation.tr("Mode selector")
+            ConfigSelectionArray {
+                currentValue: Config.options.bar.networkSpeed.displayMode
+                onSelected: newValue => {
+                    Config.options.bar.networkSpeed.displayMode = newValue;
+                }
+                options: [
+                    { displayName: Translation.tr("Total"), icon: "expand", value: 0, enabled: !Config.options.bar.vertical },
+                    { displayName: Translation.tr("Download"), icon: "arrow_downward", value: 1, enabled: !Config.options.bar.vertical },
+                    { displayName: Translation.tr("Upload"), icon: "arrow_upward", value: 2, enabled: !Config.options.bar.vertical },
+                    { displayName: Translation.tr("Both"), icon: "unfold_more", value: 3, enabled: !Config.options.bar.vertical },
+                    { displayName: Translation.tr("Icon"), icon: "wifi", value: 4 }
+                ]
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Icon settings")
+            
+            ConfigSwitch {
+                buttonIcon: "vertical_align_center"
+                text: Translation.tr("Show speed indicators (↑↓)")
+                enabled: Config.options.bar.networkSpeed.displayMode !== 4
+                opacity: enabled ? 1.0 : 0.5
+                checked: Config.options.bar.networkSpeed.showIcons
+                onCheckedChanged: {
+                    Config.options.bar.networkSpeed.showIcons = checked;
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Icon position")
+                enabled: Config.options.bar.networkSpeed.showIcons
+                opacity: enabled ? 1.0 : 0.5
+                ConfigSelectionArray {
+                    currentValue: Config.options.bar.networkSpeed.iconPosition
+                    onSelected: newValue => {
+                        Config.options.bar.networkSpeed.iconPosition = newValue;
+                    }
+                    options: [
+                        { displayName: Translation.tr("Left"), icon: "align_horizontal_left", value: 0 },
+                        { displayName: Translation.tr("Right"), icon: "align_horizontal_right", value: 1 }
+                    ]
+                }
+            }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Performance & Layout")
+                ConfigSpinBox {
+                    icon: "timer"
+                    text: Translation.tr("Update interval (ms)")
+                    value: Config.options.bar.networkSpeed.updateInterval
+                    from: 100
+                    to: 5000
+                    stepSize: 100
+                    onValueChanged: {
+                        Config.options.bar.networkSpeed.updateInterval = value; 
+                    }
+                }
+                ConfigSwitch {
+                    buttonIcon: "visibility_off"
+                    text: Translation.tr("Auto-hide when idle")
+                    checked: Config.options.bar.networkSpeed.autoHide
+                    onCheckedChanged: { 
+                        Config.options.bar.networkSpeed.autoHide = checked; 
+                    }
+                }
+            }
+    }
+
+    ContentSection {
         id: utilityButtons
         icon: "widgets"
         title: Translation.tr("Utility buttons")
@@ -706,4 +790,6 @@ ContentPage {
             }
         }
     }
+
+    
 }

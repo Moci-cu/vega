@@ -439,6 +439,14 @@ Singleton {
                     property int height: 40 // horizontal mode
                     property int width: 46 // vertical mode
                 }
+
+                property JsonObject networkSpeed: JsonObject {
+                    property int displayMode: 0 // 0: total, 1: download, 2: upload, 3: both, 4: icon
+                    property bool showIcons: true
+                    property int iconPosition: 0 // 0: Left, 1: Right
+                    property int updateInterval: 1000 // ms
+                    property bool autoHide: true
+                }
             }
 
             property JsonObject battery: JsonObject {

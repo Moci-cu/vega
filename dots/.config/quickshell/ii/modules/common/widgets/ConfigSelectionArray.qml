@@ -59,6 +59,8 @@ Flow {
             buttonSymbol: modelData.symbol || ""
             buttonColor: modelData.color || ""
             buttonText: modelData.displayName
+            enabled: modelData.enabled !== undefined ? modelData.enabled : true
+            opacity: enabled ? 1.0 : 0.5
             toggled: root.currentValue == modelData.value
             releaseAction: modelData.releaseAction || ""
 

@@ -69,39 +69,51 @@ ContentPage {
         ContentSubsection {
             visible: Config.options.background.animateWallpaperChanges
             title: Translation.tr("Wallpaper transition style")
-
+            
             StyledComboBox {
+                Layout.fillWidth: true
+                buttonIcon: "masked_transitions"
                 textRole: "displayName"
                 model: [
                     {
                         displayName: Translation.tr("Radial Wipe"),
                         icon: "circle",
-                        value: "radial",
+                        value: "radial"
                     },
                     {
                         displayName: Translation.tr("Crossfade"),
                         icon: "blur_on",
-                        value: "crossfade",
+                        value: "crossfade"
                     },
                     {
                         displayName: Translation.tr("Linear Wipe"),
-                        icon: "blur_linear",
-                        value: "wipe",
+                        icon: "swap_horiz",
+                        value: "wipe"
                     },
                     {
                         displayName: Translation.tr("Diamond Wipe"),
-                        icon: "nearby",
-                        value: "diamond",
+                        icon: "diamond",
+                        value: "diamond"
                     },
                     {
                         displayName: Translation.tr("Slash Wipe"),
                         icon: "timeline",
-                        value: "slash",
+                        value: "slash"
+                    },
+                    {
+                        displayName: Translation.tr("Outer Wipe"),
+                        icon: "radio_button_unchecked",
+                        value: "outer"
+                    },
+                    {
+                        displayName: Translation.tr("Wave Wipe"),
+                        icon: "water",
+                        value: "wave"
                     }
                 ]
                 currentIndex: {
-                    const idx = model.findIndex(item => item.value === Config.options.background.transitionType);
-                    return idx >= 0 ? idx : 0;
+                    const index = model.findIndex(item => item.value === Config.options.background.transitionType);
+                    return index !== -1 ? index : 0;
                 }
                 onActivated: index => {
                     Config.options.background.transitionType = model[index].value;
@@ -109,10 +121,10 @@ ContentPage {
             }
 
             ConfigSpinBox {
-                visible: Config.options.background.transitionType === "wipe"
+                visible: Config.options.background.transitionType === "wipe" || Config.options.background.transitionType === "wave"
                 Layout.fillWidth: true
                 icon: "rotate_right"
-                text: Translation.tr("Wipe Angle")
+                text: Translation.tr("Wipe Angle (0° starts from left side)")
                 value: Config.options.background.wipeAngle
                 from: 0
                 to: 359
