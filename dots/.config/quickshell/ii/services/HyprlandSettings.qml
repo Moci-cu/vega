@@ -1,12 +1,16 @@
 pragma Singleton
+pragma ComponentBehavior: Bound
 
 import qs.modules.common
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import qs
 
 Singleton {
     id: root
+
+    signal reloaded()
 
     function changeKey(key, value) {
         if (/['"\\`$|&;]/.test(String(value)) || /['"\\`$|&;]/.test(String(key))) {
@@ -75,5 +79,15 @@ Singleton {
         }
         if (parts.length > 0)
             Quickshell.execDetached(["bash", "-c", parts.join(" && ")])
+    }
+
+    Connections {
+        target: Hyprland
+
+        function onRawEvent(event) {
+            if (event.name == "configreloaded") {
+                root.reloaded()
+            }
+        }
     }
 }
