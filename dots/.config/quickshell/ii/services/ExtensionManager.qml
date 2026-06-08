@@ -37,6 +37,7 @@ Singleton {
     onUpdateStatesChanged: { root.refreshExtensions() }
     onReadyChanged: { root.refreshExtensions() }
 
+    property bool watchFileChanges: true
     property var _extensionJsonQueue: []
 
     signal extensionSearchDone()
@@ -302,6 +303,7 @@ Singleton {
             }
 
             root.loading = false
+            root.reloadFromFile()
         } catch (e) {
             root.error = "Failed to parse extension.json: " + e
             root.loading = false
@@ -354,6 +356,7 @@ Singleton {
             root.extensionInstalled(extId)
             root.loadExtensionServices(extId)
             root.applyExtensionConfigDefaults(extId)
+            root.reloadFromFile()
         } catch (e) {
             root.error = "Invalid extension.json: " + e
             root.loading = false
@@ -425,6 +428,7 @@ Singleton {
         root.extensionOverlayConfigs = overlayConfigs
         root.syncPluginsAdapter()
         root.extensionRemoved(extId)
+        root.reloadFromFile()
     }
 
     function loadExtensionServices(extId) {
@@ -561,6 +565,7 @@ Singleton {
             root.updateCheckDone(extId, false, "")
             // Re-enable the extension
             root.toggleExtension(extId, true)
+            root.reloadFromFile()
         } catch (e) {
             root.error = "Failed to re-read extension.json: " + e
             root.toggleExtension(extId, true)
@@ -826,12 +831,16 @@ Singleton {
         }
     }
 
+    function reloadFromFile() {
+        extensionsFileView.reload()
+    }
+
     // ── File persistence ──
 
     FileView {
         id: extensionsFileView
         path: Directories.pluginsJsonPath
-        watchChanges: true
+        watchChanges: root.watchFileChanges
         onFileChanged: reload()
         onLoaded: {
             root.installedExtensions = extensionsAdapter.extensions || {}
@@ -846,7 +855,9 @@ Singleton {
             }
             root.fetchAuditDatabase()
 
-            root.ready = true
+            if (!root.ready) {
+                root.ready = true
+            }
             for (let id in root.installedExtensions) {
                 root.applyExtensionConfigDefaults(id)
                 if (root.installedExtensions[id].enabled) {
