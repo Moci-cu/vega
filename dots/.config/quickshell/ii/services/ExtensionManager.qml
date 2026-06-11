@@ -176,7 +176,6 @@ Singleton {
             }
 
             root.loading = false
-            root.reloadFromFile()
         } catch (e) {
             root.error = "Failed to parse extension.json: " + e
             root.loading = false
@@ -225,7 +224,6 @@ Singleton {
             root.extensionInstalled(extId)
             root.loadExtensionServices(extId)
             root.applyExtensionConfigDefaults(extId)
-            root.reloadFromFile()
         } catch (e) {
             root.error = "Invalid extension.json: " + e
             root.loading = false
@@ -294,7 +292,6 @@ Singleton {
         root.extensionOverlayConfigs = overlayConfigs
         root.syncPluginsAdapter()
         root.extensionRemoved(extId)
-        root.reloadFromFile()
     }
 
     function loadExtensionServices(extId) {
@@ -425,7 +422,6 @@ Singleton {
             root.updateStates = states
             root.updateCheckDone(extId, false, "")
             root.toggleExtension(extId, true)
-            root.reloadFromFile()
         } catch (e) {
             root.error = "Failed to re-read extension.json: " + e
             root.toggleExtension(extId, true)
