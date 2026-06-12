@@ -9,9 +9,9 @@
 <div align="center"> 
      <h2>• screenshots •</h2>
 
-| Overall view of widgets | Overlay and AI sidebar |
+| Overall view of widgets | Extension system |
 | ----------- | ----------- |
-| <img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/9297bec7-63b4-47bf-8905-9a4baa8de4e9" /> | <img width="1916" height="1078" alt="image" src="https://github.com/user-attachments/assets/53c3b4be-9ba0-40dc-8570-c6a3a80c18cf" /> |  
+| <img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/9297bec7-63b4-47bf-8905-9a4baa8de4e9" /> | <img width="1918" height="1078" alt="image" src="https://github.com/user-attachments/assets/95c0f812-f926-4bd9-8b69-c41f88ed95dd" /> |  
 
 | Media mode | Sharp style |
 | ----------- | ----------- |
