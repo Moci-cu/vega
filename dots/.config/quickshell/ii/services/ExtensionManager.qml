@@ -48,6 +48,7 @@ Singleton {
     function syncPluginsAdapter() {
         extensionsAdapter.extensions = root.installedExtensions
         extensionsAdapter.extensionConfigs = root.extensionConfigs
+        extensionsAdapter.extensionWidgetConfigs = root.extensionWidgetConfigs
         extensionsAdapter.extensionOverlayConfigs = root.extensionOverlayConfigs
         extensionsFileView.writeAdapter()
     }
@@ -592,6 +593,8 @@ Singleton {
                 root.applyExtensionConfigDefaults(id)
                 if (root.installedExtensions[id].enabled) {
                     root.loadExtensionServices(id)
+                } else {
+                    root.unloadExtensionServices(id)
                 }
             }
         }
