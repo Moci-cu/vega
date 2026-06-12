@@ -71,6 +71,13 @@ Use the update button _that runs the update script in background_:
   
 <img width="354" height="78" alt="image" src="https://github.com/user-attachments/assets/77d9d962-00b3-48a4-b9d5-1d3d0c053e86" />
 
+<div align="center">
+    <h2>• extensions •</h2>
+</div>
+
+You can now develop or install extensions to your shell. Check **Settings > Extensions**
+
+Check (or feed your AI with) [EXTENSIONS.md](https://github.com/vaguesyntax/ii-vynx/blob/main/.github/EXTENSIONS.md) to see how to create an extension for this shell.
 
 <div align="center">
     <h2>• documentation •</h2>
