@@ -99,6 +99,14 @@ ContentPage {
             Layout.fillWidth: true
 
             GroupButtonWithIcon {
+                buttonIcon: "info"
+                baseHeight: 44
+                extraWidth: 26
+                onClicked: Qt.openUrlExternally("https://github.com/vaguesyntax/ii-vynx/blob/main/.github/EXTENSIONS.md")
+                StyledToolTip { text: Translation.tr("Developer documentation to develop extensions") }
+            }
+
+            GroupButtonWithIcon {
                 buttonIcon: "link"
                 baseHeight: 44
                 extraWidth: 26
