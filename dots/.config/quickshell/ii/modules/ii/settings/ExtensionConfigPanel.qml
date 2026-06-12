@@ -32,15 +32,15 @@ Item {
                 required property var modelData
                 readonly property string cfgKey: modelData.key
                 readonly property var cfgEntry: modelData.entry
-                Layout.leftMargin: 8
-                Layout.rightMargin: 8
 
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16 
                 Layout.fillWidth: true
                 implicitHeight: loader.implicitHeight
 
                 Loader {
                     id: loader
-                    anchors { left: parent.left; right: parent.right }
+                    anchors { left: parent.left; right: parent.right; }
 
                     sourceComponent: {
                         if (!cfgEntry || !cfgEntry.type) return undefined
@@ -73,6 +73,12 @@ Item {
             property string cfgKey
             property var cfgEntry
             property string extId
+
+            // i have no fricking idea why configswitch applies parent margins twice, so  we have to tweak it here
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: -8
+            anchors.rightMargin: -8
 
             Connections {
                 target: ExtensionManager
@@ -146,27 +152,54 @@ Item {
 
     Component {
         id: enumConfigComp
-        ConfigSelectionArray {
+        Item {
             property string cfgKey
             property var cfgEntry
             property string extId
+
+            implicitHeight: rowLayout.implicitHeight
+            Layout.fillWidth: true
 
             Connections {
                 target: ExtensionManager
 
                 onExtensionConfigsChanged: {
-                    currentValue = ExtensionManager.extensionConfigs?.[extId]?.[cfgKey] ?? cfgEntry?.default ?? ""
+                    selectionArray.currentValue = ExtensionManager.extensionConfigs?.[extId]?.[cfgKey] ?? cfgEntry?.default ?? ""
                 }
             }
 
-            Layout.fillWidth: true
-            Layout.leftMargin: 8
-            Layout.rightMargin: 8
+            RowLayout {
+                id: rowLayout
+                anchors { left: parent.left; right: parent.right }
+                spacing: 10
 
-            options: cfgEntry?.options ?? []
-            currentValue: ExtensionManager.extensionConfigs?.[extId]?.[cfgKey] ?? cfgEntry?.default ?? ""
-            onSelected: newValue => {
-                if (extId && cfgKey) ExtensionManager.setExtensionConfig(extId, cfgKey, newValue)
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    visible: cfgEntry?.icon || cfgEntry?.label || cfgKey
+
+                    OptionalMaterialSymbol {
+                        icon: cfgEntry?.icon ?? ""
+                        iconSize: Appearance.font.pixelSize.larger
+                        visible: cfgEntry?.icon ?? "" !== ""
+                    }
+                    StyledText {
+                        text: cfgEntry?.label ?? cfgKey ?? ""
+                        color: Appearance.colors.colOnSecondaryContainer
+                    }
+                }
+
+                ConfigSelectionArray {
+                    id: selectionArray
+                    Layout.fillWidth: false
+                    Layout.alignment: Qt.AlignRight
+
+                    options: cfgEntry?.options ?? []
+                    currentValue: ExtensionManager.extensionConfigs?.[extId]?.[cfgKey] ?? cfgEntry?.default ?? ""
+                    onSelected: newValue => {
+                        if (extId && cfgKey) ExtensionManager.setExtensionConfig(extId, cfgKey, newValue)
+                    }
+                }
             }
         }
     }
@@ -191,8 +224,6 @@ Item {
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
                 spacing: 10
 
                 OptionalMaterialSymbol {
@@ -204,8 +235,17 @@ Item {
                     color: Appearance.colors.colOnSecondaryContainer
                     Layout.fillWidth: true
                 }
-                TextField {
-                    Layout.preferredWidth: 120
+                MaterialTextField {
+                    id: textField
+                    Layout.preferredWidth: 200
+                    Layout.preferredHeight: 40
+                    wrapMode: Text.NoWrap
+
+                    leftPadding: 8
+                    rightPadding: 8
+                    topPadding: 8
+                    bottomPadding: 0
+                    
                     text: ExtensionManager.extensionConfigs?.[extId]?.[cfgKey] ?? cfgEntry?.default ?? ""
                     onEditingFinished: {
                         if (extId && cfgKey) ExtensionManager.setExtensionConfig(extId, cfgKey, text)
