@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import qs
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.common.widgets.animations
 
 Item {
     id: root
@@ -13,8 +14,17 @@ Item {
     property alias description: widgetDescriptionText.text
     property alias shape: shapeWidget.shape
     property alias descriptionHorizontalAlignment: widgetDescriptionText.horizontalAlignment
+    property alias rotateIconWithShape: shapeWidget.rotateIconWithShape
 
     property alias iconWidget: shapeWidget
+    property alias titleWidget: widgetNameText
+    property alias descriptionWidget: widgetDescriptionText
+
+    property alias triggerAnimationOn: openingAnimation.trigger
+    PlaceholderOpeningAnimation {
+        id: openingAnimation
+        targetPlaceholder: root
+    }
 
     opacity: shown ? 1 : 0
     visible: opacity > 0

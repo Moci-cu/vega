@@ -12,6 +12,8 @@ MaterialShape {
     property alias animateChange: symbol.animateChange
     property real padding: 8
 
+    property bool rotateIconWithShape: false
+
     color: Appearance.colors.colSecondaryContainer
     colSymbol: Appearance.colors.colOnSecondaryContainer
     shape: MaterialShape.Shape.Clover4Leaf
@@ -27,6 +29,6 @@ MaterialShape {
         color: root.colSymbol
         width: root.iconSize
         height: root.iconSize
-        rotation: 360 - root.rotation
+        rotation: !root.rotateIconWithShape ? 360 - root.rotation: root.rotation
     }
 }
