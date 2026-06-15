@@ -217,7 +217,9 @@ Item {
                 title: Translation.tr("Anime boorus")
                 description: ""
                 shape: MaterialShape.Shape.Bun
+
                 triggerAnimationOn: GlobalStates.policiesPanelOpen
+                rotateToRight: (GlobalStates.effectiveLeftOpen && GlobalStates.policiesPanelOpen)
             }
 
             ScrollToBottomButton {

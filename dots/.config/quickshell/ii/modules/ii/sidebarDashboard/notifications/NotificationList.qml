@@ -1,6 +1,7 @@
+import qs
+import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
-import qs.services
 import Qt5Compat.GraphicalEffects
 import QtQuick
 import QtQuick.Controls
@@ -37,6 +38,9 @@ Item {
         description: Translation.tr("Nothing")
         shape: MaterialShape.Shape.Ghostish
         descriptionHorizontalAlignment: Text.AlignHCenter
+        
+        triggerAnimationOn: GlobalStates.dashboardPanelOpen
+        rotateToRight: !(GlobalStates.effectiveRightOpen && GlobalStates.dashboardPanelOpen)
     }
 
     ButtonGroup {

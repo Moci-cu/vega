@@ -21,6 +21,7 @@ Item {
     property alias descriptionWidget: widgetDescriptionText
 
     property alias triggerAnimationOn: openingAnimation.trigger
+    property alias rotateToRight: openingAnimation.rotateToRight
     PlaceholderOpeningAnimation {
         id: openingAnimation
         targetPlaceholder: root

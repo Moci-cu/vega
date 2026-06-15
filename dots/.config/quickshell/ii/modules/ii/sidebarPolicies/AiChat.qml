@@ -415,8 +415,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 
                 rotateIconWithShape: true
                 shown: Ai.messageIDs.length === 0
-                triggerAnimationOn: GlobalStates.policiesPanelOpen
                 description: Translation.tr("Type /key to get started with online models\nCtrl+O to expand sidebar\nCtrl+P to pin sidebar\nCtrl+D to detach sidebar")
+
+                triggerAnimationOn: GlobalStates.policiesPanelOpen
+                rotateToRight: (GlobalStates.effectiveLeftOpen && GlobalStates.policiesPanelOpen)
             }
 
             ScrollToBottomButton {
