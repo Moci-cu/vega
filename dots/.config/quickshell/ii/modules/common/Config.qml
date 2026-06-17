@@ -286,9 +286,9 @@ Singleton {
                     property bool togglePerMonitor: false
                     property string backgroundShape: "Square"
                     property bool enableBackgroundAnimation: true // It **may** cause nausea for someone
-                    property bool changeShellColor: true // Changes the shell color to the album color
+                    property bool changeShellColor: false // Changes the shell color to the album color
                     property int backgroundOpacity: 50 // In percent
-                    property int backgroundBlurRadius: 120
+                    property int backgroundBlurRadius: 40 // ponytail: was 120, 40 is visually similar but ~6x fewer GPU samples
                     property JsonObject backgroundAnimation: JsonObject {
                         property bool enable: true
                         property int speedScale: 10 // 1: very slow, 10: default, 20: 2x speed etc.
