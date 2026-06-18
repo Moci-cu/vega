@@ -37,12 +37,7 @@ Item {
         NumberAnimation { duration: 600; easing.type: Easing.OutCubic }
     }
 
-    GaussianBlur {
-        anchors.fill: parent
-        source: img
-        radius: Config.options.background.mediaMode.backgroundBlurRadius
-        samples: radius * 2 + 1
-    }
+    // ponytail: GaussianBlur removed — was causing 20W CPU / 80°C. Add back when GPU budget allows.
 
     TransitionImage {
         id: img
@@ -61,40 +56,6 @@ Item {
             Translate { id: parallaxTranslate; x: -root.parallaxX; y: root.parallaxY }
         ]
 
-        AxisAnimation {
-            speed: root.animationSpeedScale
-            axis: "x"
-            frames: [-50,  30, -20,  50, -50]
-            times:  [16500, 11500, 19500, 14500]
-        }
-
-        AxisAnimation {
-            speed: root.animationSpeedScale
-            axis: "y"
-            frames: [20, -50,  30, -30,  20]
-            times:  [20000, 14000, 19000, 14500]
-        }
-    }
-
-    component AxisAnimation: SequentialAnimation {
-        required property string axis
-        required property var frames 
-        required property var times 
-        required property var speed
-
-        loops: Animation.Infinite
-        running: root.animationEnabled
-
-        onSpeedChanged: { // to instantly update the speed, it waits for the full animation to end to take effect otherwise
-            running = false
-            Qt.callLater (() => {
-                running = root.animationEnabled
-            })
-        }
-
-        NumberAnimation { target: floatTranslate; property: axis; from: frames[0]; to: frames[1]; duration: times[0] / speed; easing.type: Easing.InOutSine }
-        NumberAnimation { target: floatTranslate; property: axis; from: frames[1]; to: frames[2]; duration: times[1] / speed; easing.type: Easing.InOutSine }
-        NumberAnimation { target: floatTranslate; property: axis; from: frames[2]; to: frames[3]; duration: times[2] / speed; easing.type: Easing.InOutSine }
-        NumberAnimation { target: floatTranslate; property: axis; from: frames[3]; to: frames[4]; duration: times[3] / speed; easing.type: Easing.InOutSine }
+        // ponytail: AxisAnimation removed — continuous render was causing lag. Add back when animation budget allows.
     }
 }

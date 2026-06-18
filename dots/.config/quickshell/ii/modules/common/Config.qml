@@ -286,11 +286,11 @@ Singleton {
                     property bool togglePerMonitor: false
                     property string backgroundShape: "Square"
                     property bool enableBackgroundAnimation: true // It **may** cause nausea for someone
-                    property bool changeShellColor: true // Changes the shell color to the album color
+                    property bool changeShellColor: false // Changes the shell color to the album color
                     property int backgroundOpacity: 50 // In percent
-                    property int backgroundBlurRadius: 120
+                    property int backgroundBlurRadius: 0 // ponytail: was 120, blur removed for performance
                     property JsonObject backgroundAnimation: JsonObject {
-                        property bool enable: true
+                        property bool enable: false // ponytail: was true, continuous render caused lag
                         property int speedScale: 10 // 1: very slow, 10: default, 20: 2x speed etc.
                     }
                     property JsonObject syllable: JsonObject {

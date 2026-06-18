@@ -61,9 +61,11 @@ Singleton {
         Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", darkMode ? "dark" : "light"]);
     }
 
-    function apply(path, darkMode = Appearance.m3colors.darkmode) {
+    function apply(path, darkMode = Appearance.m3colors.darkmode, noKittyReload = false) {
         if (!path || path.length === 0) return;
-        Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", darkMode ? "dark" : "light", "--image", path]);
+        const args = [Directories.wallpaperSwitchScriptPath, "--mode", darkMode ? "dark" : "light", "--image", path]
+        if (noKittyReload) args.push("--no-kitty-reload")
+        Quickshell.execDetached(args);
         root.changed()
     }
 

@@ -16,62 +16,31 @@ Item { // MediaMode instance
     id: root
 
     property MprisPlayer player: MprisController.activePlayer
-    property var artUrl: player?.trackArtUrl
-    property string artDownloadLocation: Directories.coverArt
-    property string artFileName: Qt.md5(artUrl)
-    property string artFilePath: `${artDownloadLocation}/${artFileName}`
-    property bool downloaded: false
-    property string displayedArtFilePath: ""
+    property list<real> visualizerPoints: []
 
     readonly property string trackTitle: root.player.trackTitle || ""
     Component.onCompleted: Persistent.states.background.mediaMode.userScrollOffset = 0
+    Component.onDestruction: {
+        cavaProc.running = false
+    }
     onTrackTitleChanged: Persistent.states.background.mediaMode.userScrollOffset = 0
 
-    property bool canChangeColor: true
     property string geniusLyricsString: LyricsService.plainLyrics
 
-    function updateArt() {
-        coverArtDownloader.targetFile = root.artUrl 
-        coverArtDownloader.artFilePath = root.artFilePath
-        root.downloaded = false
-        coverArtDownloader.running = true
-    }
-
-    onArtFilePathChanged: {
-        if (!root.artUrl || root.artUrl.length == 0) {
-            root.displayedArtFilePath = "";
-            return;
-        }
-
-        updateArt();
-    }
-
-    Process { // Cover art downloader
-        id: coverArtDownloader
-        property string targetFile: root.artUrl
-        property string artFilePath: root.artFilePath
-        command: ["bash", "-c", `[ -f ${artFilePath} ] || curl -sSL '${targetFile}' -o '${artFilePath}'`]
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode === 0) {
-                root.displayedArtFilePath = Qt.resolvedUrl(root.artFilePath);
-                root.downloaded = true;
+    Process {
+        id: cavaProc
+        running: root.player?.isPlaying ?? false
+        onRunningChanged: {
+            if (!cavaProc.running) {
+                root.visualizerPoints = []
             }
         }
-    }
-    
-
-    ColorQuantizer {
-        id: colorQuantizer
-        source: root.displayedArtFilePath
-        depth: 0 // 2^0 = 1 color
-        rescaleSize: 1 // Rescale to 1x1 pixel for faster processing
-
-        // We have to delay the color change if the media changes too quickly...
-        onColorsChanged: {
-            // console.log("[Media Mode] Colors changed: ", colorQuantizer.colors)
-            if (!Config.options.background.mediaMode.changeShellColor) return;
-            // console.log("[Media Mode] Requesting to change shell color")
-            LyricsService.changeShellColor(colorQuantizer.colors[0])
+        command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
+        stdout: SplitParser {
+            onRead: data => {
+                const points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p))
+                root.visualizerPoints = points
+            }
         }
     }
 
@@ -87,35 +56,16 @@ Item { // MediaMode instance
                 anchors.fill: parent
                 color: ColorUtils.applyAlpha(Appearance.colors.colLayer0, 1)
 
-                FloatingArtBackground {
-                    anchors.fill: parent
-                    opacity: Config.options.background.mediaMode.backgroundOpacity / 100
-
-                    animationSpeedScale: Config.options.background.mediaMode.backgroundAnimation.speedScale / 10
-                    artFilePath: root.displayedArtFilePath
-                    overlayColor: ColorUtils.transparentize(Appearance.colors.colLayer0, 0.3)
-                    animationEnabled: Config.options.background.mediaMode.backgroundAnimation.enable
-
-                    workspaceNorm: {
-                        const chunkSize = Config?.options.bar.workspaces.shown ?? 10
-                        const lower = Math.floor(bgRoot.firstWorkspaceId / chunkSize) * chunkSize
-                        const upper = Math.ceil(bgRoot.lastWorkspaceId / chunkSize) * chunkSize
-                        const range = upper - lower
-                        const id = bgRoot.monitor.activeWorkspace?.id ?? 1
-                        return range > 0 ? (id - lower) / range : 0.5
-                    }
-
-                }
-
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 13
                     spacing: 15
 
-                    MediaModeCoverArt {
+                    MediaModeVisualizerPanel {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        showLoadingIndicator: !root.downloaded
+                        player: root.player
+                        visualizerPoints: root.visualizerPoints
                     }
 
                     Item {
@@ -158,6 +108,103 @@ Item { // MediaMode instance
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    component MediaModeVisualizerPanel: Item {
+        id: panel
+
+        required property var player
+        required property list<real> visualizerPoints
+
+        ColumnLayout {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            spacing: 20
+
+            Rectangle {
+                id: visualizerFrame
+                Layout.preferredWidth: Math.min(400, parent.width)
+                Layout.preferredHeight: 220
+                Layout.alignment: Qt.AlignHCenter
+                radius: Appearance.rounding.verylarge
+                color: ColorUtils.transparentize(Appearance.colors.colLayer1, 0.45)
+                border.width: 1
+                border.color: ColorUtils.transparentize(Appearance.colors.colOutline, 0.75)
+                clip: true
+
+                WaveVisualizer {
+                    anchors.fill: parent
+                    anchors.margins: 18
+                    points: panel.visualizerPoints
+                    live: panel.player?.isPlaying ?? false
+                    color: Appearance.colors.colPrimary
+                    maxVisualizerValue: 1000
+                    smoothing: 2
+                }
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: panel.player?.isPlaying ? "graphic_eq" : "music_note"
+                    iconSize: 72
+                    fill: 1
+                    color: ColorUtils.transparentize(Appearance.colors.colOnLayer1, 0.25)
+                    visible: panel.visualizerPoints.length < 3 || !(panel.player?.isPlaying ?? false)
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: panel.player?.trackArtist || Translation.tr("Unknown Artist")
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: Appearance.font.pixelSize.huge
+                    font.family: Appearance.font.family.title
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: StringUtils.cleanMusicTitle(panel.player?.trackTitle) || Translation.tr("Unknown Title")
+                    font.pixelSize: Appearance.font.pixelSize.hugeass * 1.5
+                    font.weight: Font.Bold
+                    font.family: Appearance.font.family.title
+                    color: Appearance.colors.colOnLayer0
+                    elide: Text.ElideRight
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    horizontalAlignment: Text.AlignHCenter
+                }
+            }
+
+            MaterialMusicControls {
+                Layout.alignment: Qt.AlignHCenter
+                baseButtonHeight: 60
+                baseButtonWidth: 60
+                player: panel.player
+            }
+
+            StyledSlider {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: false
+                Layout.preferredWidth: Math.min(360, parent.width)
+                Layout.maximumWidth: 360
+                implicitWidth: Math.min(360, parent.width)
+                enabled: panel.player?.canSeek ?? false
+                configuration: StyledSlider.Configuration.Wavy
+                highlightColor: Appearance.colors.colPrimary
+                trackColor: Appearance.colors.colSecondaryContainer
+                handleColor: Appearance.colors.colPrimary
+                value: panel.player?.length > 0 ? panel.player.position / panel.player.length : 0
+                onMoved: {
+                    if (!panel.player || panel.player.length <= 0) return
+                    panel.player.position = value * panel.player.length
                 }
             }
         }
