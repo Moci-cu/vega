@@ -31,6 +31,7 @@ Singleton {
 
     readonly property alias syncedLines: lrclib.lines
     readonly property alias currentIndex: lrclib.currentIndex
+    readonly property bool lyricsLoading: lrclib.loading || genius.loading
     readonly property string statusText: lrclib.displayText
     readonly property bool hasSyncedLines: lrclib.lines.length > 0
 
@@ -79,7 +80,7 @@ Singleton {
     // https://quickshell.org/docs/master/types/Quickshell.Services.Mpris/MprisPlayer/#position
     Timer {
         running: root.activePlayer?.playbackState == MprisPlaybackState.Playing && root.hasSyncedLines && root.isInitialized
-        interval: 250
+        interval: 150
         repeat: true
         onTriggered: root.activePlayer.positionChanged()
     }
@@ -119,21 +120,21 @@ Singleton {
         property bool hasString: false
         onLyricsUpdated: (lyrics) => {
             if (!effectiveGeniusEnabled) return
-            genius.hasString = true
-            genius.lyricsString = filterLyricLines(lyrics)
+            const filteredLyrics = filterLyricLines(lyrics).trim()
+            genius.hasString = filteredLyrics.length > 0 && filteredLyrics !== "Song not found."
+            genius.lyricsString = genius.hasString ? filteredLyrics : ""
         }
     }
     
     onCurrentTrackIdChanged: {
+        genius.hasString = false
+        genius.lyricsString = ""
+        shellColorChanged = false // reseting at each track change
 
         if (!effectiveGeniusEnabled) return;
         if (currentTrackId !== "" && root.activePlayer?.trackArtist) {
             genius.fetchLyrics(root.activePlayer.trackArtist, root.activePlayer.trackTitle)
-        } else {
-            genius.lyricsString = ""
         }
-
-        shellColorChanged = false // reseting at each track change
     }
 
     // I dont know if this is the correct place for this, but we only call this from MediaMode so it should be fine

@@ -83,14 +83,59 @@ Item { // MediaMode instance
                             readonly property bool hasSyncedLines: LyricsService.syncedLines.length > 0
                             readonly property bool geniusEnabled: Config.options.lyricsService.enableGenius
                             readonly property bool lrclibEnabled: Config.options.lyricsService.enableLrclib
+                            readonly property bool lyricsCanLoad: Config.options.lyricsService.enable && (geniusEnabled || lrclibEnabled)
+                            readonly property bool showLyricsPlaceholder: lyricsCanLoad && !LyricsService.geniusHasLyrics && !hasSyncedLines
+                            readonly property bool showLyricsLoading: showLyricsPlaceholder && LyricsService.lyricsLoading
 
                             Component.onCompleted: {
                                 if (!geniusEnabled && !lrclibEnabled) return
                                 LyricsService.initiliazeLyrics()
                             }
 
+                            Item {
+                                anchors.fill: parent
+                                opacity: lyricsItem.showLyricsPlaceholder ? 1 : 0
+                                visible: opacity > 0
+
+                                Behavior on opacity {
+                                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                                }
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    width: Math.min(parent.width, 520)
+                                    spacing: 16
+
+                                    MaterialLoadingIndicator {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        loading: lyricsItem.showLyricsLoading
+                                        visible: lyricsItem.showLyricsLoading
+                                        implicitSize: 84
+                                    }
+
+                                    StyledText {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.fillWidth: true
+                                        text: lyricsItem.showLyricsLoading ? Translation.tr("Fetching lyrics...") : (LyricsService.statusText || Translation.tr("No lyrics"))
+                                        color: Appearance.colors.colSubtext
+                                        font.pixelSize: Appearance.font.pixelSize.large
+                                        horizontalAlignment: Text.AlignHCenter
+                                        wrapMode: Text.Wrap
+                                    }
+
+                                    MaterialSymbol {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        visible: !lyricsItem.showLyricsLoading
+                                        text: "lyrics"
+                                        iconSize: 84
+                                        fill: 1
+                                        color: Appearance.colors.colSubtext
+                                    }
+                                }
+                            }
+
                             FadeLoader {
-                                shown: !lyricsItem.hasSyncedLines
+                                shown: !lyricsItem.showLyricsPlaceholder && !lyricsItem.hasSyncedLines
                                 anchors.fill: parent
                                 sourceComponent: LyricsFlickable {
                                     anchors.fill: parent

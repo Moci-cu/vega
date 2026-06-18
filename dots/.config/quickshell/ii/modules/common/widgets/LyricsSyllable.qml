@@ -62,7 +62,7 @@ Item {
             highlightRangeMode: highlightFollowsCurrentItem ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
             preferredHighlightBegin: parent.height / 2 - 60
             preferredHighlightEnd: parent.height / 2
-            highlightMoveDuration: 600
+            highlightMoveDuration: 300
 
             function scrollToCurrentItem() {
                 if (!lyricsList.currentItem || lyricsList.moving) return
@@ -77,7 +77,7 @@ Item {
                 id: contentYAnim
                 target: lyricsList
                 property: "contentY"
-                duration: 250
+                duration: 140
                 easing.type: Easing.InOutQuad
                 onStopped: {
                     lyricsList.highlightFollowsCurrentItem = true
