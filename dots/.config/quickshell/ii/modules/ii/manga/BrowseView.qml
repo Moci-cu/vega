@@ -61,7 +61,7 @@ Item {
                         selectByMouse: true
                         background: null
                         onTextEdited: searchTimer.restart()
-                        onAccepted: root.service.searchManga(text, true)
+                        onAccepted: root.service.searchManga(text.trim(), true)
                         Keys.onEscapePressed: {
                             text = ""
                             root.service.fetchByOrigin(root.service.currentOrigin, true)

@@ -3,6 +3,7 @@
 import ipaddress
 import json
 import os
+import socket
 import sqlite3
 import threading
 import time
@@ -38,7 +39,11 @@ LIBRARY_LOCK = threading.Lock()
 IMAGE_CACHE = {}
 IMAGE_CACHE_LOCK = threading.Lock()
 IMAGE_SEMAPHORE = threading.Semaphore(8)
+CHAPTER_PROGRESS_LOCK = threading.Lock()
 _chapter_progress = {"current": 0, "mangaId": ""}
+CHAPTER_JOBS = {}
+CHAPTER_JOBS_LOCK = threading.Lock()
+ALLOWED_IMAGE_HOST_SUFFIXES = ("shngm.id",)
 
 
 DB_PATH = os.path.join(DATA_DIR, "cache.db")
@@ -91,6 +96,46 @@ def cached(key, ttl, callback, use_file=False):
             pass
 
     return value
+
+
+def cache_get(key, ttl=None, use_file=False):
+    with CACHE_LOCK:
+        entry = CACHE.get(key)
+    if entry and (entry[1] is None or time.monotonic() < entry[1]):
+        return entry[0]
+
+    if not use_file:
+        return None
+
+    try:
+        with _db_lock:
+            row = _db.execute("SELECT value, expires_at FROM cache WHERE key = ?", (key,)).fetchone()
+        if row and (row[1] is None or time.time() < row[1]):
+            value = json.loads(row[0])
+            with CACHE_LOCK:
+                CACHE[key] = (value, None if ttl is None else time.monotonic() + ttl)
+            return value
+    except Exception:
+        pass
+    return None
+
+
+def cache_set(key, value, ttl=None, use_file=False):
+    with CACHE_LOCK:
+        CACHE[key] = (value, None if ttl is None else time.monotonic() + ttl)
+
+    if not use_file or value is None:
+        return
+
+    try:
+        with _db_lock:
+            _db.execute(
+                "INSERT OR REPLACE INTO cache (key, value, expires_at) VALUES (?, ?, ?)",
+                (key, json.dumps(value, ensure_ascii=False), None if ttl is None else time.time() + ttl)
+            )
+            _db.commit()
+    except Exception:
+        pass
 
 
 def api_get(path, params=None, timeout=30):
@@ -292,31 +337,84 @@ def _extract_chapter(data, fallback_id):
 
 def chapters(manga_id, latest_chapter_id):
     if not latest_chapter_id:
-        return []
+        return {"chapters": [], "complete": True, "current": 0, "error": ""}
 
-    def fetch():
-        _chapter_progress["current"] = 0
-        _chapter_progress["mangaId"] = manga_id
-        raw = []
+    def update_progress(current):
+        with CHAPTER_PROGRESS_LOCK:
+            _chapter_progress["current"] = current
+            _chapter_progress["mangaId"] = manga_id
+
+    def snapshot(job):
+        with job["lock"]:
+            chapters_value = list(reversed(job["raw"]))
+            return {
+                "chapters": chapters_value,
+                "complete": job["complete"],
+                "current": len(chapters_value),
+                "error": job["error"],
+            }
+
+    cache_key = f"chapters:{manga_id}:{latest_chapter_id}"
+    cached_chapters = cache_get(cache_key, use_file=True)
+    if cached_chapters is not None:
+        return {
+            "chapters": cached_chapters,
+            "complete": True,
+            "current": len(cached_chapters),
+            "error": "",
+        }
+
+    def fetch_job(job):
+        update_progress(0)
         seen = set()
         chapter_id = latest_chapter_id
-        while chapter_id and chapter_id not in seen and len(raw) < 2000:
+        while chapter_id and chapter_id not in seen and len(seen) < 2000:
+            with job["lock"]:
+                if job["cancelled"]:
+                    return
             seen.add(chapter_id)
-            _chapter_progress["current"] = len(raw) + 1
+            update_progress(len(seen))
             try:
                 data = api_get(f"/chapter/detail/{chapter_id}", timeout=15)
             except requests.RequestException as error:
                 print(f"[manga-server] chapter traversal stopped at {chapter_id}: {error}")
+                with job["lock"]:
+                    job["error"] = str(error)
+                    job["complete"] = True
                 break
             if not data:
                 break
-            raw.append(_extract_chapter(data, chapter_id))
+            with job["lock"]:
+                job["raw"].append(_extract_chapter(data, chapter_id))
             chapter_id = data.get("prev_chapter_id")
-        raw.reverse()
-        _chapter_progress["current"] = len(raw)
-        return raw
 
-    return cached(f"chapters:{manga_id}", None, fetch, use_file=True)
+        with job["lock"]:
+            if job["cancelled"]:
+                return
+            job["complete"] = True
+            complete_chapters = list(reversed(job["raw"]))
+        update_progress(len(complete_chapters))
+        if not job["error"]:
+            cache_set(cache_key, complete_chapters, use_file=True)
+            with CHAPTER_JOBS_LOCK:
+                if CHAPTER_JOBS.get(cache_key) is job:
+                    del CHAPTER_JOBS[cache_key]
+
+    with CHAPTER_JOBS_LOCK:
+        job = CHAPTER_JOBS.get(cache_key)
+        if job is None:
+            job = {
+                "raw": [],
+                "complete": False,
+                "error": "",
+                "cancelled": False,
+                "lock": threading.Lock(),
+            }
+            job["thread"] = threading.Thread(target=fetch_job, args=(job,), daemon=True)
+            CHAPTER_JOBS[cache_key] = job
+            job["thread"].start()
+
+    return snapshot(job)
 
 
 def pages(chapter_id):
@@ -337,70 +435,89 @@ def pages(chapter_id):
 
 def load_library():
     with LIBRARY_LOCK:
-        try:
-            with open(LIBRARY_FILE, encoding="utf-8") as handle:
-                value = json.load(handle)
-            return value if isinstance(value, list) else []
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            return []
+        return _load_library_unlocked()
 
 
 def save_library(entries):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    temporary = f"{LIBRARY_FILE}.tmp"
     with LIBRARY_LOCK:
-        with open(temporary, "w", encoding="utf-8") as handle:
-            json.dump(entries, handle, indent=2, ensure_ascii=False)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, LIBRARY_FILE)
+        _save_library_unlocked(entries)
     return entries
 
 
+def _load_library_unlocked():
+    try:
+        with open(LIBRARY_FILE, encoding="utf-8") as handle:
+            value = json.load(handle)
+        return value if isinstance(value, list) else []
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_library_unlocked(entries):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    temporary = f"{LIBRARY_FILE}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(entries, handle, indent=2, ensure_ascii=False)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, LIBRARY_FILE)
+
+
 def update_library(action, payload):
-    entries = load_library()
     manga_id = str(payload.get("id", ""))
     if not manga_id:
         raise ValueError("missing id")
 
-    if action == "add":
-        if not any(entry.get("id") == manga_id for entry in entries):
-            entries.insert(0, {
-                "id": manga_id,
-                "title": payload.get("title", ""),
-                "coverUrl": payload.get("coverUrl", ""),
-                "lastReadChapterId": "",
-                "lastReadChapterNum": "",
-                "lastReadPage": 0,
-                "lastReadAt": "",
-                "addedAt": payload.get("addedAt", ""),
-            })
-    elif action == "remove":
-        entries = [entry for entry in entries if entry.get("id") != manga_id]
-    elif action == "progress":
-        for entry in entries:
-            if entry.get("id") == manga_id:
-                entry["lastReadChapterId"] = payload.get("chapterId", "")
-                entry["lastReadChapterNum"] = payload.get("chapterNum", "")
-                entry["lastReadPage"] = payload.get("lastReadPage", 0)
-                entry["lastReadAt"] = datetime.now().isoformat()
-                break
-    else:
-        raise ValueError("unsupported library action")
-    return save_library(entries)
+    with LIBRARY_LOCK:
+        entries = _load_library_unlocked()
+
+        if action == "add":
+            if not any(entry.get("id") == manga_id for entry in entries):
+                entries.insert(0, {
+                    "id": manga_id,
+                    "title": payload.get("title", ""),
+                    "coverUrl": payload.get("coverUrl", ""),
+                    "lastReadChapterId": "",
+                    "lastReadChapterNum": "",
+                    "lastReadPage": 0,
+                    "lastReadAt": "",
+                    "addedAt": payload.get("addedAt", ""),
+                })
+        elif action == "remove":
+            entries = [entry for entry in entries if entry.get("id") != manga_id]
+        elif action == "progress":
+            for entry in entries:
+                if entry.get("id") == manga_id:
+                    entry["lastReadChapterId"] = payload.get("chapterId", "")
+                    entry["lastReadChapterNum"] = payload.get("chapterNum", "")
+                    entry["lastReadPage"] = payload.get("lastReadPage", 0)
+                    entry["lastReadAt"] = datetime.now().isoformat()
+                    break
+        else:
+            raise ValueError("unsupported library action")
+
+        _save_library_unlocked(entries)
+        return entries
 
 
 def validate_image_url(url):
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         raise ValueError("invalid image URL")
-    if parsed.hostname == "localhost":
+    hostname = parsed.hostname.lower()
+    if hostname == "localhost":
         raise ValueError("local image URL is not allowed")
+    if not any(hostname == suffix or hostname.endswith(f".{suffix}") for suffix in ALLOWED_IMAGE_HOST_SUFFIXES):
+        raise ValueError("image host is not allowed")
     try:
-        address = ipaddress.ip_address(parsed.hostname)
+        addresses = [ipaddress.ip_address(hostname)]
     except ValueError:
-        address = None
-    if address is not None and not address.is_global:
+        try:
+            infos = socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+            addresses = [ipaddress.ip_address(info[4][0]) for info in infos]
+        except (OSError, ValueError) as error:
+            raise ValueError(f"could not validate image host: {error}") from error
+    if any(not address.is_global for address in addresses):
         raise ValueError("private image URL is not allowed")
 
 
@@ -419,8 +536,11 @@ def fetch_image(url):
                 "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
                 "Referer": HEADERS["Referer"],
             },
+            allow_redirects=False,
             timeout=30,
         )
+        if 300 <= response.status_code < 400:
+            raise ValueError("image redirects are not allowed")
         response.raise_for_status()
         result = (response.content, response.headers.get("Content-Type", "image/jpeg"))
 
@@ -489,7 +609,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_error_json("missing mangaId", 400)
                 return self.send_json(chapters(manga_id, param("latestChapterId")))
             if parsed.path == "/chapters_progress":
-                return self.send_json(_chapter_progress)
+                with CHAPTER_PROGRESS_LOCK:
+                    return self.send_json(dict(_chapter_progress))
             if parsed.path == "/clear_cache":
                 manga_id = param("mangaId")
                 if not manga_id:
@@ -501,6 +622,12 @@ class Handler(BaseHTTPRequestHandler):
                     to_remove = [k for k in CACHE if k.startswith(f"chapters:{manga_id}")]
                     for k in to_remove:
                         del CACHE[k]
+                with CHAPTER_JOBS_LOCK:
+                    to_remove = [k for k in CHAPTER_JOBS if k.startswith(f"chapters:{manga_id}:")]
+                    for k in to_remove:
+                        with CHAPTER_JOBS[k]["lock"]:
+                            CHAPTER_JOBS[k]["cancelled"] = True
+                        del CHAPTER_JOBS[k]
                 return self.send_json({"ok": True})
             if parsed.path == "/pages":
                 chapter_id = param("chapterId")

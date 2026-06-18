@@ -22,16 +22,16 @@ Item {
     QtObject {
         id: mangaStyle
         readonly property string font: Appearance.font.family.main
-        readonly property color paper: Appearance.colors.colLayer0
-        readonly property color card: Appearance.colors.colLayer1
-        readonly property color field: Appearance.colors.colLayer2
-        readonly property color selected: ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 0.25)
-        readonly property color ink: Appearance.colors.colOnLayer1
-        readonly property color inkStrong: Appearance.colors.colOnLayer0
-        readonly property color inkSoft: Appearance.colors.colSubtext
+        readonly property color paper: "#16100c"
+        readonly property color card: "#211813"
+        readonly property color field: "#4e4540"
+        readonly property color selected: "#3b2b22"
+        readonly property color ink: "#e8d9cf"
+        readonly property color inkStrong: "#fff5ed"
+        readonly property color inkSoft: "#b79f93"
         readonly property color accent: Appearance.colors.colPrimary
-        readonly property color line: Appearance.colors.colLayer0Border
-        readonly property color lineFaint: Appearance.colors.colOutlineVariant
+        readonly property color line: "#3d2d25"
+        readonly property color lineFaint: "#332720"
         readonly property int radius: Appearance.rounding.small
         readonly property int windowRadius: Appearance.rounding.windowRounding
     }
@@ -65,6 +65,12 @@ Item {
             closePanel()
         else
             openPanel()
+    }
+
+    function openBrowseManga(mangaId) {
+        root.detailOrigin = "browse"
+        root.page = "detail"
+        service.fetchMangaDetail(mangaId)
     }
 
     Timer {
@@ -105,6 +111,7 @@ Item {
         width: root.panelWidth
         height: root.panelHeight
         visible: false
+        clip: true
         opacity: root.panelOpen ? 1 : 0
         scale: root.panelOpen ? 1 : 0.97
         focus: root.panelOpen
@@ -138,7 +145,7 @@ Item {
                     event.accepted = true
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     if (browseView.gridIndex >= 0 && browseView.gridIndex < service.mangaList.length) {
-                        root.mangaSelected(service.mangaList[browseView.gridIndex].id)
+                        root.openBrowseManga(service.mangaList[browseView.gridIndex].id)
                         event.accepted = true
                     }
                 }
@@ -287,9 +294,7 @@ Item {
                             browseView.forceActiveFocus()
                     }
                     onMangaSelected: function(mangaId) {
-                        root.detailOrigin = "browse"
-                        root.page = "detail"
-                        service.fetchMangaDetail(mangaId)
+                        root.openBrowseManga(mangaId)
                     }
                 }
 

@@ -13,7 +13,7 @@ Item {
 
     readonly property int highlightStyle: Config.options.background.mediaMode.syllable.textHighlightStyle
     readonly property int currentIndex: LyricsService.currentIndex
-    readonly property bool isPlaying: LyricsService.activePlayer.isPlaying 
+    readonly property bool isPlaying: LyricsService.activePlayer?.isPlaying ?? false
     
     property real largeFontSize: Appearance.font.pixelSize.hugeass * 2.0
 

@@ -17,8 +17,9 @@ Item { // MediaMode instance
 
     property MprisPlayer player: MprisController.activePlayer
     property list<real> visualizerPoints: []
+    property string visualizerError: ""
 
-    readonly property string trackTitle: root.player.trackTitle || ""
+    readonly property string trackTitle: root.player?.trackTitle ?? ""
     Component.onCompleted: Persistent.states.background.mediaMode.userScrollOffset = 0
     Component.onDestruction: {
         cavaProc.running = false
@@ -33,6 +34,8 @@ Item { // MediaMode instance
         onRunningChanged: {
             if (!cavaProc.running) {
                 root.visualizerPoints = []
+            } else {
+                root.visualizerError = ""
             }
         }
         command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
@@ -40,6 +43,20 @@ Item { // MediaMode instance
             onRead: data => {
                 const points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p))
                 root.visualizerPoints = points
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const message = text.trim()
+                if (!message) return
+                root.visualizerError = message
+                console.warn("[MediaMode] cava:", message)
+            }
+        }
+        onExited: code => {
+            if (code !== 0 && (root.player?.isPlaying ?? false)) {
+                root.visualizerError = `CAVA exited with code ${code}`
+                console.warn("[MediaMode]", root.visualizerError)
             }
         }
     }
@@ -197,6 +214,21 @@ Item { // MediaMode instance
                     fill: 1
                     color: ColorUtils.transparentize(Appearance.colors.colOnLayer1, 0.25)
                     visible: panel.visualizerPoints.length < 3 || !(panel.player?.isPlaying ?? false)
+                }
+
+                StyledText {
+                    anchors {
+                        horizontalCenter: parent.horizontalCenter
+                        bottom: parent.bottom
+                        bottomMargin: 18
+                    }
+                    width: parent.width - 36
+                    visible: root.visualizerError.length > 0
+                    text: Translation.tr("Visualizer unavailable")
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
                 }
             }
 

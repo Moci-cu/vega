@@ -109,11 +109,18 @@ Item {
         }
 
         delegate: Item {
+            id: pageDelegate
             required property var modelData
+            readonly property real imageWidth: Math.max(1, Math.min(pages.width, 720))
+            readonly property bool hasImageSize: pageImage.status === Image.Ready
+                && pageImage.sourceSize.width > 0
+                && pageImage.sourceSize.height > 0
+            readonly property real imageHeight: hasImageSize
+                ? pageImage.sourceSize.height * (imageWidth / pageImage.sourceSize.width)
+                : imageWidth * 1.42
+
             width: pages.width
-            height: pageImage.status === Image.Ready && pageImage.sourceSize.height > 0
-                ? pageImage.sourceSize.height * (720 / pageImage.sourceSize.width)
-                : 720 * 1.42
+            height: imageHeight
 
             Rectangle {
                 anchors.fill: parent
@@ -122,8 +129,8 @@ Item {
 
             Image {
                 id: pageImage
-                width: Math.min(parent.width, 720)
-                height: sourceSize.height > 0 ? sourceSize.height * (width / sourceSize.width) : width * 1.42
+                width: pageDelegate.imageWidth
+                height: pageDelegate.imageHeight
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 source: modelData.url || ""

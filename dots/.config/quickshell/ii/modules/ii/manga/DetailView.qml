@@ -15,6 +15,7 @@ Item {
     property bool ascending: false
     property string filterText: ""
     focus: true
+    clip: true
     Keys.onEscapePressed: {
         if (filterField.activeFocus) {
             filterField.text = ""
@@ -112,6 +113,7 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 0
                     text: root.service.currentManga ? root.service.currentManga.title : "MANGA DETAIL"
                     color: root.style.inkStrong
                     font.family: root.style.font
@@ -214,21 +216,13 @@ Item {
 
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: root.service.currentManga ? 170 : 0
+            Layout.preferredHeight: root.service.currentManga ? 154 : 0
             visible: height > 0
             clip: true
 
-            Image {
-                anchors.fill: parent
-                source: root.service.currentManga ? root.service.currentManga.image : ""
-                fillMode: Image.PreserveAspectCrop
-                opacity: 0.12
-            }
-
             Rectangle {
                 anchors.fill: parent
-                color: root.style.paper
-                opacity: 0.72
+                color: root.style.card
             }
 
             RowLayout {
@@ -239,7 +233,7 @@ Item {
                 spacing: 18
 
                 Rectangle {
-                    Layout.preferredWidth: 96
+                    Layout.preferredWidth: 86
                     Layout.fillHeight: true
                     color: root.style.field
                     border.color: root.style.line
@@ -260,6 +254,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         text: root.service.currentManga ? root.service.currentManga.title : ""
                         color: root.style.inkStrong
                         font.family: root.style.font
@@ -271,6 +266,7 @@ Item {
                     }
                     Text {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         text: root.service.currentManga
                             ? (root.service.currentManga.authors || []).join(", ") : ""
                         color: root.style.accent
@@ -281,6 +277,7 @@ Item {
                     Text {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        Layout.minimumWidth: 0
                         text: root.service.currentManga ? root.service.currentManga.description : ""
                         color: root.style.ink
                         font.family: root.style.font
@@ -443,17 +440,22 @@ Item {
                 ScrollBar.vertical: ScrollBar {}
 
                 delegate: Item {
+                    id: chapterDelegate
                     required property var modelData
+                    required property int index
                     width: chapterList.width
                     height: 58
                     readonly property var libraryEntry: root.service.currentManga
                         ? root.service.getLibraryEntry(root.service.currentManga.id) : null
                     readonly property bool lastRead: libraryEntry
                         && libraryEntry.lastReadChapterId === modelData.id
+                    readonly property color rowColor: lastRead
+                        ? root.style.selected
+                        : index % 2 === 0 ? root.style.paper : root.style.card
 
                     Rectangle {
                         anchors.fill: parent
-                        color: parent.lastRead ? root.style.selected : "transparent"
+                        color: chapterDelegate.rowColor
                     }
 
                     RowLayout {
@@ -467,7 +469,7 @@ Item {
                         Text {
                             Layout.preferredWidth: 64
                             text: "CH." + root.chapterLabel(modelData.chapter)
-                            color: parent.parent.lastRead ? root.style.accent : root.style.inkStrong
+                            color: chapterDelegate.lastRead ? root.style.accent : root.style.inkStrong
                             font.family: root.style.font
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
@@ -477,6 +479,7 @@ Item {
                             spacing: 2
                             Text {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
                                 text: modelData.title || ("Chapter " + root.chapterLabel(modelData.chapter))
                                 color: root.style.ink
                                 font.family: root.style.font
@@ -513,6 +516,40 @@ Item {
                 }
             }
 
+            Text {
+                anchors {
+                    top: parent.top
+                    right: parent.right
+                    margins: 14
+                }
+                visible: root.service.isFetchingChapters && root.processedChapters.length > 0
+                text: root.service.chaptersProgress > 0
+                    ? "LOADING " + root.service.chaptersProgress
+                    : "LOADING"
+                color: root.style.inkSoft
+                font.family: root.style.font
+                font.pixelSize: 9
+                font.letterSpacing: 2
+                z: 3
+            }
+
+            Text {
+                anchors {
+                    horizontalCenter: parent.horizontalCenter
+                    bottom: parent.bottom
+                    bottomMargin: 14
+                }
+                width: Math.min(parent.width - 80, 520)
+                visible: root.service.chaptersError.length > 0 && root.processedChapters.length > 0
+                text: root.service.chaptersError
+                color: root.style.accent
+                font.family: root.style.font
+                font.pixelSize: 10
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                z: 3
+            }
+
             Column {
                 anchors.centerIn: parent
                 spacing: 12
@@ -537,11 +574,15 @@ Item {
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 80, 420)
                 spacing: 12
-                visible: root.service.detailError.length > 0 && !root.service.isFetchingDetail
+                visible: (root.service.detailError.length > 0
+                    || root.service.chaptersError.length > 0)
+                    && !root.service.isFetchingDetail
+                    && root.processedChapters.length === 0
 
                 Text {
                     width: parent.width
-                    text: root.service.detailError
+                    text: root.service.detailError.length > 0
+                        ? root.service.detailError : root.service.chaptersError
                     color: root.style.accent
                     font.family: root.style.font
                     font.pixelSize: 12

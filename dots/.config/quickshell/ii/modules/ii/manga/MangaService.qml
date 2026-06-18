@@ -37,6 +37,8 @@ Item {
     property string chaptersError: ""
     property int chaptersRequestId: 0
     property int chaptersProgress: 0
+    property string chaptersPollPath: ""
+    property bool chaptersPollInFlight: false
 
     property var chapterPages: []
     property bool isFetchingPages: false
@@ -87,6 +89,8 @@ Item {
                 if (xhr.status !== 200) {
                     backendState = "idle"
                     keepAliveTimer.stop()
+                    healthAttempts = 0
+                    healthTimer.start()
                 }
             }
             xhr.open("GET", apiUrl + "/health?_=" + Date.now())
@@ -111,6 +115,13 @@ Item {
             xhr.open("GET", apiUrl + "/chapters_progress?_=" + Date.now())
             xhr.send()
         }
+    }
+
+    Timer {
+        id: chaptersPollTimer
+        interval: 700
+        repeat: true
+        onTriggered: root._pollChapters()
     }
 
     property int healthAttempts: 0
@@ -317,6 +328,9 @@ Item {
         pendingMangaId = mangaId
         currentManga = null
         currentChapters = []
+        chaptersPollTimer.stop()
+        progressTimer.stop()
+        chaptersPollInFlight = false
         isFetchingDetail = true
         detailError = ""
         chaptersLoaded = false
@@ -343,23 +357,51 @@ Item {
         isFetchingChapters = true
         chaptersError = ""
         chaptersProgress = 0
-        progressTimer.restart()
-        var path = "/chapters?mangaId=" + encodeURIComponent(manga.id)
+        chaptersPollTimer.stop()
+        progressTimer.stop()
+        chaptersPollInFlight = false
+        chaptersPollPath = "/chapters?mangaId=" + encodeURIComponent(manga.id)
             + "&latestChapterId=" + encodeURIComponent(manga.latestChapterId)
-        _request("GET", path, null, function(error, data) {
+        _requestChapters(requestId)
+    }
+
+    function _pollChapters() {
+        if (!isFetchingChapters || !chaptersPollPath || chaptersPollInFlight)
+            return
+        _requestChapters(chaptersRequestId)
+    }
+
+    function _requestChapters(requestId) {
+        chaptersPollInFlight = true
+        _request("GET", chaptersPollPath, null, function(error, data) {
+            chaptersPollInFlight = false
             if (requestId !== chaptersRequestId)
                 return
-            isFetchingChapters = false
             isFetchingDetail = false
-            progressTimer.stop()
             if (error) {
                 console.warn("[MangaService] chapters error:", error)
                 chaptersError = error
+                isFetchingChapters = false
+                chaptersPollTimer.stop()
                 return
             }
-            chaptersLoaded = true
-            currentChapters = Array.isArray(data) ? data : []
-            console.log("[MangaService] chapters loaded:", currentChapters.length, "chaptersLoaded:", chaptersLoaded)
+
+            var chapters = Array.isArray(data) ? data
+                : data && Array.isArray(data.chapters) ? data.chapters : []
+            currentChapters = chapters
+            chaptersProgress = data && data.current !== undefined ? Number(data.current) : chapters.length
+            chaptersError = data && data.error ? data.error : ""
+            chaptersLoaded = chapters.length > 0
+
+            var complete = Array.isArray(data) || !data || data.complete !== false
+            if (complete) {
+                isFetchingChapters = false
+                chaptersPollTimer.stop()
+                chaptersLoaded = true
+                console.log("[MangaService] chapters loaded:", currentChapters.length, "chaptersLoaded:", chaptersLoaded)
+            } else if (!chaptersPollTimer.running) {
+                chaptersPollTimer.start()
+            }
         })
     }
 
@@ -379,12 +421,17 @@ Item {
         currentChapters = []
         chaptersError = ""
         chaptersProgress = 0
-        progressTimer.restart()
+        chaptersPollTimer.stop()
+        progressTimer.stop()
+        chaptersPollInFlight = false
         _request("GET", "/clear_cache?mangaId=" + encodeURIComponent(currentManga.id), null, function(error) {
             if (!error)
                 _fetchChaptersForManga(currentManga)
-            else
+            else {
                 isFetchingChapters = false
+                chaptersPollTimer.stop()
+                chaptersError = error
+            }
         })
     }
 
