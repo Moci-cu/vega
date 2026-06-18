@@ -25,6 +25,9 @@ Item { // MediaMode instance
 
     readonly property string trackTitle: root.player.trackTitle || ""
     Component.onCompleted: Persistent.states.background.mediaMode.userScrollOffset = 0
+    Component.onDestruction: {
+        coverArtDownloader.running = false // ponytail: stop curl before cleanup to avoid blocking main thread
+    }
     onTrackTitleChanged: Persistent.states.background.mediaMode.userScrollOffset = 0
 
     property bool canChangeColor: true

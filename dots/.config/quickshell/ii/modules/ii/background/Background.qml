@@ -148,8 +148,8 @@ Variants {
 
         property bool mediaModeOpen: mediaModeLoader.active && MprisController.activePlayer
         onMediaModeOpenChanged: {
-            if (!mediaModeOpen && Config.options.appearance.palette.type.startsWith("scheme")) {
-                Wallpapers.apply(Config.options.background.wallpaperPath)
+            if (!mediaModeOpen && LyricsService.shellColorChanged && Config.options.appearance.palette.type.startsWith("scheme")) {
+                Wallpapers.apply(Config.options.background.wallpaperPath, Appearance.m3colors.darkmode, true)
                 LyricsService.shellColorChanged = false
             }
         }
@@ -273,10 +273,7 @@ Variants {
             clip: true
             scale: showOpeningAnimation && overviewOpen && bgRoot.isScrollingLayout ? zoomedRatio : defaultRatio
             opacity: mediaModeOpen ? 0 : 1
-            
-            Behavior on opacity {
-                NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
-            }
+            // ponytail: removed Behavior on opacity — was causing kitty freeze during media mode toggle
 
             Behavior on scale {
                 animation: Appearance.animation.elementMoveEnter.numberAnimation.createObject(this)
@@ -511,10 +508,6 @@ Variants {
             active: false
             asynchronous: true
             sourceComponent: MediaMode {}
-            opacity: status === Loader.Ready ? 1 : 0
-            Behavior on opacity {
-                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-            }
         }
     }
 }

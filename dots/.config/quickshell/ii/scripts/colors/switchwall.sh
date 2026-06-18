@@ -370,7 +370,11 @@ switch() {
         python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
             > "$STATE_DIR"/user/generated/material_colors.scss
         deactivate
-        "$SCRIPT_DIR"/applycolor.sh
+        if [[ -n "$no_kitty_reload_flag" ]]; then
+            "$SCRIPT_DIR"/applycolor.sh --no-kitty-reload
+        else
+            "$SCRIPT_DIR"/applycolor.sh
+        fi
     fi
 
     # Pass screen width, height, and wallpaper path to post_process
@@ -386,6 +390,7 @@ main() {
     color_flag=""
     color=""
     noswitch_flag=""
+    no_kitty_reload_flag=""
 
     get_type_from_config() {
         jq -r '.appearance.palette.type' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "auto"
@@ -434,6 +439,10 @@ main() {
             --noswitch)
                 noswitch_flag="1"
                 imgpath=$(jq -r '.background.wallpaperPath' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "")
+                shift
+                ;;
+            --no-kitty-reload)
+                no_kitty_reload_flag="1"
                 shift
                 ;;
             *)

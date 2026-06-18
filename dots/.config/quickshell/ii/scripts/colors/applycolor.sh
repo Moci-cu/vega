@@ -11,6 +11,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 term_alpha=100 #Set this to < 100 make all your terminals transparent
 # sleep 0 # idk i wanted some delay or colors dont get applied properly
+skip_kitty_reload=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-kitty-reload)
+      skip_kitty_reload=1
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 if [ ! -d "$STATE_DIR"/user/generated ]; then
   mkdir -p "$STATE_DIR"/user/generated
 fi
@@ -42,6 +54,9 @@ apply_kitty() {
   done
 
   # Reload
+  if [[ "$skip_kitty_reload" -eq 1 ]]; then
+    return
+  fi
   if ! pgrep -f kitty >/dev/null; then
     return
   fi
@@ -49,6 +64,10 @@ apply_kitty() {
 }
 
 apply_anyterm() {
+  if [[ "$skip_kitty_reload" -eq 1 ]]; then
+    return
+  fi
+
   # Check if terminal escape sequence template exists
   if [ ! -f "$SCRIPT_DIR/terminal/sequences.txt" ]; then
     echo "Template file not found for Terminal. Skipping that."
