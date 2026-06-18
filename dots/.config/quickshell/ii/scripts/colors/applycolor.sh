@@ -64,10 +64,6 @@ apply_kitty() {
 }
 
 apply_anyterm() {
-  if [[ "$skip_kitty_reload" -eq 1 ]]; then
-    return
-  fi
-
   # Check if terminal escape sequence template exists
   if [ ! -f "$SCRIPT_DIR/terminal/sequences.txt" ]; then
     echo "Template file not found for Terminal. Skipping that."
@@ -82,6 +78,10 @@ apply_anyterm() {
   done
 
   sed -i "s/\$alpha/$term_alpha/g" "$STATE_DIR/user/generated/terminal/sequences.txt"
+
+  if [[ "$skip_kitty_reload" -eq 1 ]]; then
+    return
+  fi
 
   for file in /dev/pts/*; do
     if [[ $file =~ ^/dev/pts/[0-9]+$ ]]; then
