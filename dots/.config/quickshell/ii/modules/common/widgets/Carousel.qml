@@ -180,11 +180,9 @@ Item {
                     onWheel: event => {
                         root.pressedAny()
                         if (event.angleDelta.y < 0) {
-                            root.currentIndex += 1
-                            root.snapToIndex(currentIndex);
+                            flickable.flick(-900,0)
                         } else if (event.angleDelta.y > 0) {
-                            root.currentIndex -= 1
-                            root.snapToIndex(currentIndex);
+                            flickable.flick(900,0)
                         }
                     }
 
