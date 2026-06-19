@@ -8,6 +8,7 @@ Scope {
     id: root
 
     signal toggleRequested()
+    signal fullscreenRequested()
 
     readonly property var focusedScreen: {
         const focused = Hyprland.focusedMonitor
@@ -26,8 +27,10 @@ Scope {
 
         visible: mangaPanel.panelOpen || mangaPanel.animRunning
         color: "transparent"
-        implicitWidth: mangaPanel.panelWidth
-        implicitHeight: mangaPanel.panelHeight
+        screen: root.focusedScreen
+        fullscreen: mangaPanel.isFullscreen
+        implicitWidth: mangaPanel.normalPanelWidth
+        implicitHeight: mangaPanel.normalPanelHeight
         title: "Manga Reader"
 
         MangaPanel {
@@ -43,6 +46,10 @@ Scope {
             function onToggleRequested() {
                 mangaPanel.togglePanel()
             }
+
+            function onFullscreenRequested() {
+                mangaPanel.toggleFullscreen()
+            }
         }
     }
 
@@ -51,6 +58,10 @@ Scope {
 
         function toggle() {
             root.toggleRequested()
+        }
+
+        function toggleFullscreen() {
+            root.fullscreenRequested()
         }
     }
 

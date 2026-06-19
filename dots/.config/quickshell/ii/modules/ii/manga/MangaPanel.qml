@@ -16,8 +16,10 @@ Item {
     property string page: "browse"
     property string detailOrigin: "browse"
 
-    readonly property int panelWidth: isFullscreen ? screenW : Math.min(screenW - 48, 1080)
-    readonly property int panelHeight: isFullscreen ? screenH : Math.min(screenH - 48, 820)
+    readonly property int normalPanelWidth: Math.min(screenW - 48, 1080)
+    readonly property int normalPanelHeight: Math.min(screenH - 48, 820)
+    readonly property int panelWidth: isFullscreen ? width : normalPanelWidth
+    readonly property int panelHeight: isFullscreen ? height : normalPanelHeight
 
     QtObject {
         id: mangaStyle
@@ -33,7 +35,7 @@ Item {
         readonly property color line: "#3d2d25"
         readonly property color lineFaint: "#332720"
         readonly property int radius: Appearance.rounding.small
-        readonly property int windowRadius: Appearance.rounding.windowRounding
+        readonly property int windowRadius: root.isFullscreen ? 0 : Appearance.rounding.windowRounding
     }
 
     MangaService {
@@ -65,6 +67,13 @@ Item {
             closePanel()
         else
             openPanel()
+    }
+
+    function toggleFullscreen() {
+        if (!panelOpen)
+            openPanel()
+        isFullscreen = !isFullscreen
+        focusTimer.restart()
     }
 
     function openBrowseManga(mangaId) {
@@ -118,7 +127,7 @@ Item {
         Keys.onEscapePressed: root.closePanel()
         Keys.onPressed: function(event) {
             if (event.key === Qt.Key_F) {
-                root.isFullscreen = !root.isFullscreen
+                root.toggleFullscreen()
                 event.accepted = true
             } else if (root.page === "browse") {
                 browseView.forceActiveFocus()
@@ -169,7 +178,7 @@ Item {
             anchors.fill: parent
             color: mangaStyle.paper
             border.color: mangaStyle.line
-            border.width: 1
+            border.width: root.isFullscreen ? 0 : 1
             radius: mangaStyle.windowRadius
             clip: true
         }
