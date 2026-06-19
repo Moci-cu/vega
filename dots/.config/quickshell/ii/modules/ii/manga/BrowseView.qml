@@ -164,24 +164,12 @@ Item {
                 }
                 readonly property int columns: width >= 900 ? 5 : width >= 700 ? 4 : 3
                 cellWidth: width / columns
-                cellHeight: Math.max(210, cellWidth * 1.55)
+                cellHeight: Math.max(242, cellWidth * 1.68)
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: root.service.mangaList
                 currentIndex: root.gridIndex
                 cacheBuffer: Math.max(0, height)
-                highlightFollowsCurrentItem: true
-                highlightMoveDuration: 100
-                highlight: Item {
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        color: "transparent"
-                        border.color: root.style.accent
-                        border.width: 2
-                        radius: 6
-                    }
-                }
                 ScrollBar.vertical: ScrollBar {}
 
                 onContentYChanged: {
@@ -194,18 +182,53 @@ Item {
                     required property int index
                     width: grid.cellWidth
                     height: grid.cellHeight
-                    scale: grid.currentIndex === index ? 0.92 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 120 } }
+                    z: selected ? 20 : cardMouse.containsMouse ? 10 : 0
+                    readonly property bool selected: grid.currentIndex === index
 
                     Rectangle {
+                        id: selectionGlow
                         anchors {
-                            fill: parent
-                            margins: 7
+                            centerIn: card
                         }
+                        width: card.width
+                        height: card.height
+                        radius: 7
+                        scale: card.scale + 0.035
+                        color: root.style.accent
+                        opacity: parent.selected ? 0.22 : cardMouse.containsMouse ? 0.08 : 0
+
+                        Behavior on opacity { NumberAnimation { duration: 140 } }
+                        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    }
+
+                    Rectangle {
+                        id: card
+                        anchors.centerIn: parent
+                        anchors.verticalCenterOffset: 0
+                        width: parent.width - 14
+                        height: parent.height - 28
+                        scale: parent.selected ? 1.055 : cardMouse.containsMouse ? 1.02 : 1
                         color: root.style.card
                         border.color: root.style.line
-                        border.width: 1
+                        border.width: parent.selected ? 0 : 1
+                        radius: 4
                         clip: true
+
+                        Behavior on anchors.verticalCenterOffset {
+                            NumberAnimation {
+                                duration: 160
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: 160
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                        Behavior on border.color {
+                            ColorAnimation { duration: 140 }
+                        }
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -283,6 +306,7 @@ Item {
                         }
 
                         MouseArea {
+                            id: cardMouse
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
