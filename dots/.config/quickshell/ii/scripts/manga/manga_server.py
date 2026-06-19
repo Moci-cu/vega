@@ -21,6 +21,7 @@ API_BASE = os.environ.get("UNIT4_MANGA_API_BASE", "https://api.shngm.io/v1")
 ASSET_BASE = "https://assets.shngm.id"
 PAGE_SIZE = 24
 FILTER_SCAN_SIZE = 1000
+DISCOVERY_TTL = 600
 DATA_HOME = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
 DATA_DIR = os.path.join(DATA_HOME, "unit-4", "manga")
 LIBRARY_FILE = os.path.join(DATA_DIR, "library.json")
@@ -43,6 +44,8 @@ CHAPTER_PROGRESS_LOCK = threading.Lock()
 _chapter_progress = {"current": 0, "mangaId": ""}
 CHAPTER_JOBS = {}
 CHAPTER_JOBS_LOCK = threading.Lock()
+CHAPTER_ENDPOINT_DISCOVERY_LOCK = threading.Lock()
+CHAPTER_ENDPOINT_DISCOVERY_DISABLED_UNTIL = 0
 ALLOWED_IMAGE_HOST_SUFFIXES = ("shngm.id",)
 
 
@@ -335,6 +338,138 @@ def _extract_chapter(data, fallback_id):
     }
 
 
+def _chapter_value(data, *keys):
+    for key in keys:
+        value = data.get(key)
+        if value not in (None, ""):
+            return value
+    return ""
+
+
+def _normalize_chapter_list_item(data):
+    if not isinstance(data, dict):
+        return None
+    chapter_id = _chapter_value(data, "chapter_id", "chapterId", "id", "uuid")
+    chapter_number = _chapter_value(data, "chapter_number", "chapterNumber", "chapter", "number")
+    if not chapter_id or chapter_number == "":
+        return None
+    return {
+        "id": str(chapter_id),
+        "title": str(_chapter_value(data, "chapter_title", "chapterTitle", "title", "name")),
+        "chapter": str(chapter_number),
+        "publishAt": str(_chapter_value(data, "release_date", "releaseDate", "published_at", "created_at", "updated_at")),
+    }
+
+
+def _chapter_sort_value(chapter):
+    try:
+        return float(str(chapter.get("chapter", "")).split()[0])
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_chapter_list(items, latest_chapter_id):
+    chapters_value = []
+    seen = set()
+    for item in items if isinstance(items, list) else []:
+        chapter = _normalize_chapter_list_item(item)
+        if not chapter or chapter["id"] in seen:
+            continue
+        seen.add(chapter["id"])
+        chapters_value.append(chapter)
+
+    if latest_chapter_id and latest_chapter_id not in seen:
+        return []
+    chapters_value.sort(key=_chapter_sort_value)
+    return chapters_value
+
+
+def _iter_candidate_lists(value, depth=0):
+    if depth > 4:
+        return
+    if isinstance(value, list):
+        yield value
+        for item in value[:5]:
+            yield from _iter_candidate_lists(item, depth + 1)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_candidate_lists(item, depth + 1)
+
+
+def _extract_chapters_from_payload(payload, latest_chapter_id):
+    best = []
+    for candidate in _iter_candidate_lists(payload):
+        chapters_value = _normalize_chapter_list(candidate, latest_chapter_id)
+        if len(chapters_value) > len(best):
+            best = chapters_value
+    return best
+
+
+def _chapter_endpoint_candidates(manga_id):
+    encoded = quote(manga_id, safe="")
+    return [
+        f"/chapter/list/{encoded}",
+        f"/chapter/list?manga_id={encoded}&page=1&page_size=500",
+        f"/chapter/list?mangaId={encoded}&page=1&page_size=500",
+        f"/chapter?manga_id={encoded}&page=1&page_size=500",
+        f"/chapters?manga_id={encoded}&page=1&page_size=500",
+        f"/manga/{encoded}/chapters",
+        f"/manga/chapter/{encoded}",
+        f"/manga/chapters/{encoded}",
+    ]
+
+
+def discover_chapters(manga_id, latest_chapter_id):
+    cache_key = f"chapter-discovery:{manga_id}:{latest_chapter_id}"
+
+    def discover():
+        global CHAPTER_ENDPOINT_DISCOVERY_DISABLED_UNTIL
+
+        try:
+            detail = api_get(f"/manga/detail/{manga_id}", timeout=12)
+            chapters_value = _extract_chapters_from_payload(detail, latest_chapter_id)
+            if chapters_value:
+                print(f"[manga-server] discovered chapters from manga detail: {manga_id} ({len(chapters_value)})")
+                return {"found": True, "chapters": chapters_value}
+        except requests.RequestException as error:
+            print(f"[manga-server] chapter discovery detail failed for {manga_id}: {error}")
+
+        with CHAPTER_ENDPOINT_DISCOVERY_LOCK:
+            endpoints_disabled = time.monotonic() < CHAPTER_ENDPOINT_DISCOVERY_DISABLED_UNTIL
+        if endpoints_disabled:
+            return {"found": False, "chapters": []}
+
+        endpoints_checked = False
+        for path in _chapter_endpoint_candidates(manga_id):
+            endpoints_checked = True
+            try:
+                response = SESSION.get(f"{API_BASE}{path}", headers=HEADERS, timeout=10)
+            except requests.RequestException as error:
+                print(f"[manga-server] chapter discovery request failed for {path}: {error}")
+                continue
+            if response.status_code == 404:
+                continue
+            if response.status_code < 200 or response.status_code >= 300:
+                print(f"[manga-server] chapter discovery skipped {path}: HTTP {response.status_code}")
+                continue
+            try:
+                payload = response.json().get("data")
+            except (ValueError, AttributeError):
+                continue
+            chapters_value = _extract_chapters_from_payload(payload, latest_chapter_id)
+            if chapters_value:
+                print(f"[manga-server] discovered chapters from {path}: {manga_id} ({len(chapters_value)})")
+                return {"found": True, "chapters": chapters_value}
+
+        if endpoints_checked:
+            with CHAPTER_ENDPOINT_DISCOVERY_LOCK:
+                CHAPTER_ENDPOINT_DISCOVERY_DISABLED_UNTIL = time.monotonic() + DISCOVERY_TTL
+        return {"found": False, "chapters": []}
+
+    result = cached(cache_key, DISCOVERY_TTL, discover)
+    return result["chapters"] if result.get("found") else None
+
+
 def chapters(manga_id, latest_chapter_id):
     if not latest_chapter_id:
         return {"chapters": [], "complete": True, "current": 0, "error": ""}
@@ -361,6 +496,16 @@ def chapters(manga_id, latest_chapter_id):
             "chapters": cached_chapters,
             "complete": True,
             "current": len(cached_chapters),
+            "error": "",
+        }
+
+    discovered_chapters = discover_chapters(manga_id, latest_chapter_id)
+    if discovered_chapters:
+        cache_set(cache_key, discovered_chapters, use_file=True)
+        return {
+            "chapters": discovered_chapters,
+            "complete": True,
+            "current": len(discovered_chapters),
             "error": "",
         }
 
@@ -396,12 +541,18 @@ def chapters(manga_id, latest_chapter_id):
         update_progress(len(complete_chapters))
         if not job["error"]:
             cache_set(cache_key, complete_chapters, use_file=True)
-            with CHAPTER_JOBS_LOCK:
-                if CHAPTER_JOBS.get(cache_key) is job:
-                    del CHAPTER_JOBS[cache_key]
+        with CHAPTER_JOBS_LOCK:
+            if CHAPTER_JOBS.get(cache_key) is job:
+                del CHAPTER_JOBS[cache_key]
 
     with CHAPTER_JOBS_LOCK:
         job = CHAPTER_JOBS.get(cache_key)
+        if job is not None:
+            with job["lock"]:
+                failed_complete_job = job["complete"] and bool(job["error"])
+            if failed_complete_job:
+                del CHAPTER_JOBS[cache_key]
+                job = None
         if job is None:
             job = {
                 "raw": [],
