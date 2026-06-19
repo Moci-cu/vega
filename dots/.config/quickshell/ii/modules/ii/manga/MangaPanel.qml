@@ -45,6 +45,8 @@ Item {
     function openPanel() {
         if (panelOpen)
             return
+        resetFullscreenAfterHide.stop()
+        isFullscreen = false
         panelOpen = true
         animRunning = true
         panelHost.visible = true
@@ -55,6 +57,15 @@ Item {
     function closePanel() {
         if (!panelOpen)
             return
+        if (isFullscreen) {
+            panelOpen = false
+            focusTimer.stop()
+            hideDone.stop()
+            panelHost.visible = false
+            animRunning = false
+            resetFullscreenAfterHide.restart()
+            return
+        }
         panelOpen = false
         isFullscreen = false
         animRunning = true
@@ -95,6 +106,12 @@ Item {
             panelHost.visible = false
             root.animRunning = false
         }
+    }
+
+    Timer {
+        id: resetFullscreenAfterHide
+        interval: 1
+        onTriggered: root.isFullscreen = false
     }
 
     Rectangle {

@@ -31,6 +31,12 @@ Scope {
         fullscreen: mangaPanel.isFullscreen
         implicitWidth: mangaPanel.normalPanelWidth
         implicitHeight: mangaPanel.normalPanelHeight
+        minimumSize: mangaPanel.isFullscreen
+            ? Qt.size(1, 1)
+            : Qt.size(mangaPanel.normalPanelWidth, mangaPanel.normalPanelHeight)
+        maximumSize: mangaPanel.isFullscreen
+            ? Qt.size(root.screenW, root.screenH)
+            : Qt.size(mangaPanel.normalPanelWidth, mangaPanel.normalPanelHeight)
         title: "Manga Reader"
 
         MangaPanel {
