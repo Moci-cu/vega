@@ -357,6 +357,12 @@ Item {
                             )
                         root.page = "reader"
                     }
+                    onContinueReadingRequested: function(entry) {
+                        if (!entry || !entry.lastReadChapterId)
+                            return
+                        service.fetchChapterPages(entry.lastReadChapterId)
+                        root.page = "reader"
+                    }
                     onReadLatestRequested: {
                         if (service.currentManga && service.currentManga.latestChapterId) {
                             service.fetchChapterPages(service.currentManga.latestChapterId)

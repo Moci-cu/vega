@@ -190,6 +190,19 @@ def taxonomy_names(taxonomy, key):
     ]
 
 
+def rating_value(data):
+    for key in ("rating", "rate", "score", "rating_score", "average_rating", "avg_rating"):
+        value = data.get(key)
+        if value is None:
+            continue
+        try:
+            rating = float(value)
+        except (TypeError, ValueError):
+            continue
+        return f"{rating:.1f}".rstrip("0").rstrip(".")
+    return ""
+
+
 def normalize_list_item(item):
     return {
         "id": item.get("manga_id", ""),
@@ -322,6 +335,7 @@ def manga_info(manga_id):
             "image": proxy_url(data.get("cover_image_url", "")),
             "authors": taxonomy_names(data.get("taxonomy"), "Author"),
             "tags": taxonomy_names(data.get("taxonomy"), "Genre"),
+            "rating": rating_value(data),
             "chapters": [],
             "latestChapterId": data.get("latest_chapter_id", ""),
         }
@@ -766,11 +780,15 @@ class Handler(BaseHTTPRequestHandler):
                 manga_id = param("mangaId")
                 if not manga_id:
                     return self.send_error_json("missing mangaId", 400)
+                escaped_id = manga_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
                 with _db_lock:
-                    _db.execute("DELETE FROM cache WHERE key LIKE ?", (f"chapters:{manga_id}%",))
+                    _db.execute(
+                        "DELETE FROM cache WHERE key LIKE ? ESCAPE '\\'",
+                        (f"chapters:{escaped_id}:%",),
+                    )
                     _db.commit()
                 with CACHE_LOCK:
-                    to_remove = [k for k in CACHE if k.startswith(f"chapters:{manga_id}")]
+                    to_remove = [k for k in CACHE if k.startswith(f"chapters:{manga_id}:")]
                     for k in to_remove:
                         del CACHE[k]
                 with CHAPTER_JOBS_LOCK:
