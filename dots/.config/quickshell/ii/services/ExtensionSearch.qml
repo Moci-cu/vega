@@ -45,9 +45,10 @@ Singleton {
         root.loading = true
         ExtensionManager.error = ""
         ExtensionManager.loading = true
-        searchProc.exec(["curl", "-s",
+        searchProc.exec([
+            "curl", "-s",
             "-H", "Accept: application/vnd.github+json",
-            "https://api.github.com/search/repositories?q=ii-vynx-extension+in:topic&per_page=50"
+            "https://api.github.com/search/repositories?q=\"ii-vynx-extension\"+in:topic&per_page=50"
         ])
     }
 
