@@ -317,14 +317,15 @@ Item {
                     property bool imageEverLoaded: false
 
                     readonly property real imageWidth: Math.max(1, Math.min(pages.width, 720))
-                    readonly property bool nearViewport: y + height >= pages.contentY - pages.lazyMargin
+                    readonly property real estimatedHeight: imageWidth * root.cachedPageRatio(modelData)
+                    readonly property bool nearViewport: y + estimatedHeight >= pages.contentY - pages.lazyMargin
                         && y <= pages.contentY + pages.height + pages.lazyMargin
                     readonly property bool hasImageSize: pageImage.status === Image.Ready
                         && pageImage.sourceSize.width > 0
                         && pageImage.sourceSize.height > 0
                     readonly property real imageHeight: hasImageSize
                         ? pageImage.sourceSize.height * (imageWidth / pageImage.sourceSize.width)
-                        : imageWidth * root.cachedPageRatio(modelData)
+                        : estimatedHeight
 
                     width: pages.width
                     height: imageHeight

@@ -109,8 +109,7 @@ RowLayout {
                     var centerX = width / 2
                     var centerY = height / 2
                     var startAngle = -Math.PI / 2
-                    var visibleProgress = progress > 0 ? progress : 0.16
-                    var endAngle = startAngle + Math.PI * 2 * visibleProgress
+                    var endAngle = startAngle + Math.PI * 2 * progress
 
                     // Draw scalloped shape using bezier curves
                     function drawScallopedShape(r, bumpHeight, numBumps) {

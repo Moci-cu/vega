@@ -105,7 +105,7 @@ Item { // MediaMode instance
                             readonly property bool showLyricsLoading: showLyricsPlaceholder && LyricsService.lyricsLoading
 
                             Component.onCompleted: {
-                                if (!geniusEnabled && !lrclibEnabled) return
+                                if (!lyricsCanLoad) return
                                 LyricsService.initiliazeLyrics()
                             }
 
