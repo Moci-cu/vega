@@ -15,6 +15,7 @@ Item {
     property real screenH: 1080
     property string page: "browse"
     property string detailOrigin: "browse"
+    property int focusRestoreTicks: 0
 
     readonly property int normalPanelWidth: Math.min(screenW - 48, 1080)
     readonly property int normalPanelHeight: Math.min(screenH - 48, 820)
@@ -84,7 +85,7 @@ Item {
         if (!panelOpen)
             openPanel()
         isFullscreen = !isFullscreen
-        focusTimer.restart()
+        scheduleFocusRestore()
     }
 
     function openBrowseManga(mangaId) {
@@ -93,10 +94,72 @@ Item {
         service.fetchMangaDetail(mangaId)
     }
 
+    function scheduleFocusRestore() {
+        focusTimer.restart()
+        focusRestoreTicks = 6
+        focusRestoreTimer.restart()
+    }
+
+    function restoreKeyboardFocus() {
+        panelHost.forceActiveFocus()
+        if (page === "reader")
+            readerView.pagesView.forceActiveFocus()
+        else if (page === "detail")
+            detailView.forceActiveFocus()
+        else if (page === "browse")
+            browseView.forceActiveFocus()
+    }
+
+    function chapterNumber(chapter) {
+        var match = String(chapter && chapter.chapter ? chapter.chapter : "0").match(/\d+(\.\d+)?/)
+        return match ? parseFloat(match[0]) : 0
+    }
+
+    function sortedReaderChapters() {
+        if (!Array.isArray(service.currentChapters))
+            return []
+        return service.currentChapters.slice().sort(function(left, right) {
+            return root.chapterNumber(left) - root.chapterNumber(right)
+        })
+    }
+
+    function openRelativeChapter(direction) {
+        var chapters = sortedReaderChapters()
+        if (!service.currentChapterId || chapters.length === 0)
+            return
+        var index = -1
+        for (var i = 0; i < chapters.length; i++) {
+            if (chapters[i].id === service.currentChapterId) {
+                index = i
+                break
+            }
+        }
+        var nextIndex = index + direction
+        if (index < 0 || nextIndex < 0 || nextIndex >= chapters.length)
+            return
+        var chapter = chapters[nextIndex]
+        service.fetchChapterPages(chapter.id)
+        if (service.currentManga)
+            service.updateLastRead(service.currentManga.id, chapter.id, chapter.chapter)
+        scheduleFocusRestore()
+    }
+
     Timer {
         id: focusTimer
         interval: 30
-        onTriggered: panelHost.forceActiveFocus()
+        onTriggered: root.restoreKeyboardFocus()
+    }
+
+    Timer {
+        id: focusRestoreTimer
+        interval: 90
+        repeat: true
+        onTriggered: {
+            root.restoreKeyboardFocus()
+            root.focusRestoreTicks--
+            if (root.focusRestoreTicks <= 0)
+                stop()
+        }
     }
 
     Timer {
@@ -384,6 +447,12 @@ Item {
                     onProgressSaved: function(mangaId, chapterId, chapterNum, page) {
                         service.updateLastRead(mangaId, chapterId, chapterNum, page)
                     }
+                    onPreviousChapterRequested: root.openRelativeChapter(-1)
+                    onChapterListRequested: {
+                        service.clearChapterPages()
+                        root.page = "detail"
+                    }
+                    onNextChapterRequested: root.openRelativeChapter(1)
                     onBackRequested: {
                         service.clearChapterPages()
                         root.page = "detail"

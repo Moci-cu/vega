@@ -694,20 +694,33 @@ def fetch_image(url):
         return cached_image
 
     with IMAGE_SEMAPHORE:
-        response = SESSION.get(
-            url,
-            headers={
-                "User-Agent": HEADERS["User-Agent"],
-                "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
-                "Referer": HEADERS["Referer"],
-            },
-            allow_redirects=False,
-            timeout=30,
-        )
-        if 300 <= response.status_code < 400:
-            raise ValueError("image redirects are not allowed")
-        response.raise_for_status()
-        result = (response.content, response.headers.get("Content-Type", "image/jpeg"))
+        last_error = None
+        for attempt in range(3):
+            try:
+                response = SESSION.get(
+                    url,
+                    headers={
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+                        "Referer": HEADERS["Referer"],
+                        "Origin": HEADERS["Origin"],
+                        "Cache-Control": "no-cache" if attempt else "max-age=0",
+                    },
+                    allow_redirects=False,
+                    timeout=30,
+                )
+                if 300 <= response.status_code < 400:
+                    raise ValueError("image redirects are not allowed")
+                response.raise_for_status()
+                result = (response.content, response.headers.get("Content-Type", "image/jpeg"))
+                break
+            except (requests.RequestException, ValueError) as error:
+                last_error = error
+                if isinstance(error, ValueError) or attempt == 2:
+                    raise
+                time.sleep(0.35 * (attempt + 1))
+        else:
+            raise last_error
 
     with IMAGE_CACHE_LOCK:
         if len(IMAGE_CACHE) >= 300:

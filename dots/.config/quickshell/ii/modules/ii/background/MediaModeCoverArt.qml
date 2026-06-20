@@ -162,24 +162,8 @@ Item {
             
             Layout.alignment: Qt.AlignCenter
             Layout.fillHeight: false
-            Layout.preferredHeight: baseButtonHeight
+            Layout.preferredHeight: implicitHeight
             Layout.topMargin: layout.spacing * 2 
-        }
-
-        StyledSlider { 
-            Layout.alignment: Qt.AlignHCenter
-            Layout.fillHeight: false
-            Layout.fillWidth: false
-            Layout.preferredWidth: parent.implicitWidth
-
-            configuration: StyledSlider.Configuration.Wavy
-            highlightColor: Appearance.colors.colPrimary
-            trackColor: Appearance.colors.colSecondaryContainer
-            handleColor: Appearance.colors.colPrimary
-            value: root.player?.position / root.player?.length
-            onMoved: {
-                root.player.position = value * root.player.length;
-            }
         }
 
         Item {

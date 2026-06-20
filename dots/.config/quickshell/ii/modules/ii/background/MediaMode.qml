@@ -266,24 +266,6 @@ Item { // MediaMode instance
                 baseButtonWidth: 60
                 player: panel.player
             }
-
-            StyledSlider {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillWidth: false
-                Layout.preferredWidth: Math.min(360, parent.width)
-                Layout.maximumWidth: 360
-                implicitWidth: Math.min(360, parent.width)
-                enabled: panel.player?.canSeek ?? false
-                configuration: StyledSlider.Configuration.Wavy
-                highlightColor: Appearance.colors.colPrimary
-                trackColor: Appearance.colors.colSecondaryContainer
-                handleColor: Appearance.colors.colPrimary
-                value: panel.player?.length > 0 ? panel.player.position / panel.player.length : 0
-                onMoved: {
-                    if (!panel.player || panel.player.length <= 0) return
-                    panel.player.position = value * panel.player.length
-                }
-            }
         }
     }
 }
