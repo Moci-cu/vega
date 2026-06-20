@@ -294,6 +294,11 @@ if [ "$DO_PULL" = true ]; then
             echo -e "${RED}An error occurred while running git pull!${NC}"
             exit 1
         fi
+        git submodule update --init --recursive
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}An error occurred while updating git submodules!${NC}"
+            exit 1
+        fi
         echo -e "${GREEN}✓ Repository updated${NC}"
         echo ""
     else
