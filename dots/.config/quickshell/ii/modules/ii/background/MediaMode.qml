@@ -17,8 +17,9 @@ Item { // MediaMode instance
 
     property MprisPlayer player: MprisController.activePlayer
     property list<real> visualizerPoints: []
+    property string visualizerError: ""
 
-    readonly property string trackTitle: root.player.trackTitle || ""
+    readonly property string trackTitle: root.player?.trackTitle ?? ""
     Component.onCompleted: Persistent.states.background.mediaMode.userScrollOffset = 0
     Component.onDestruction: {
         cavaProc.running = false
@@ -33,6 +34,8 @@ Item { // MediaMode instance
         onRunningChanged: {
             if (!cavaProc.running) {
                 root.visualizerPoints = []
+            } else {
+                root.visualizerError = ""
             }
         }
         command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
@@ -40,6 +43,20 @@ Item { // MediaMode instance
             onRead: data => {
                 const points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p))
                 root.visualizerPoints = points
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const message = text.trim()
+                if (!message) return
+                root.visualizerError = message
+                console.warn("[MediaMode] cava:", message)
+            }
+        }
+        onExited: code => {
+            if (code !== 0 && (root.player?.isPlaying ?? false)) {
+                root.visualizerError = `CAVA exited with code ${code}`
+                console.warn("[MediaMode]", root.visualizerError)
             }
         }
     }
@@ -83,14 +100,59 @@ Item { // MediaMode instance
                             readonly property bool hasSyncedLines: LyricsService.syncedLines.length > 0
                             readonly property bool geniusEnabled: Config.options.lyricsService.enableGenius
                             readonly property bool lrclibEnabled: Config.options.lyricsService.enableLrclib
+                            readonly property bool lyricsCanLoad: Config.options.lyricsService.enable && (geniusEnabled || lrclibEnabled)
+                            readonly property bool showLyricsPlaceholder: lyricsCanLoad && !LyricsService.geniusHasLyrics && !hasSyncedLines
+                            readonly property bool showLyricsLoading: showLyricsPlaceholder && LyricsService.lyricsLoading
 
                             Component.onCompleted: {
-                                if (!geniusEnabled && !lrclibEnabled) return
+                                if (!lyricsCanLoad) return
                                 LyricsService.initiliazeLyrics()
                             }
 
+                            Item {
+                                anchors.fill: parent
+                                opacity: lyricsItem.showLyricsPlaceholder ? 1 : 0
+                                visible: opacity > 0
+
+                                Behavior on opacity {
+                                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                                }
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    width: Math.min(parent.width, 520)
+                                    spacing: 16
+
+                                    MaterialLoadingIndicator {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        loading: lyricsItem.showLyricsLoading
+                                        visible: lyricsItem.showLyricsLoading
+                                        implicitSize: 84
+                                    }
+
+                                    StyledText {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.fillWidth: true
+                                        text: lyricsItem.showLyricsLoading ? Translation.tr("Fetching lyrics...") : (LyricsService.statusText || Translation.tr("No lyrics"))
+                                        color: Appearance.colors.colSubtext
+                                        font.pixelSize: Appearance.font.pixelSize.large
+                                        horizontalAlignment: Text.AlignHCenter
+                                        wrapMode: Text.Wrap
+                                    }
+
+                                    MaterialSymbol {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        visible: !lyricsItem.showLyricsLoading
+                                        text: "lyrics"
+                                        iconSize: 84
+                                        fill: 1
+                                        color: Appearance.colors.colSubtext
+                                    }
+                                }
+                            }
+
                             FadeLoader {
-                                shown: !lyricsItem.hasSyncedLines
+                                shown: !lyricsItem.showLyricsPlaceholder && !lyricsItem.hasSyncedLines
                                 anchors.fill: parent
                                 sourceComponent: LyricsFlickable {
                                     anchors.fill: parent
@@ -153,6 +215,21 @@ Item { // MediaMode instance
                     color: ColorUtils.transparentize(Appearance.colors.colOnLayer1, 0.25)
                     visible: panel.visualizerPoints.length < 3 || !(panel.player?.isPlaying ?? false)
                 }
+
+                StyledText {
+                    anchors {
+                        horizontalCenter: parent.horizontalCenter
+                        bottom: parent.bottom
+                        bottomMargin: 18
+                    }
+                    width: parent.width - 36
+                    visible: root.visualizerError.length > 0
+                    text: Translation.tr("Visualizer unavailable")
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
             }
 
             ColumnLayout {
@@ -188,24 +265,6 @@ Item { // MediaMode instance
                 baseButtonHeight: 60
                 baseButtonWidth: 60
                 player: panel.player
-            }
-
-            StyledSlider {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillWidth: false
-                Layout.preferredWidth: Math.min(360, parent.width)
-                Layout.maximumWidth: 360
-                implicitWidth: Math.min(360, parent.width)
-                enabled: panel.player?.canSeek ?? false
-                configuration: StyledSlider.Configuration.Wavy
-                highlightColor: Appearance.colors.colPrimary
-                trackColor: Appearance.colors.colSecondaryContainer
-                handleColor: Appearance.colors.colPrimary
-                value: panel.player?.length > 0 ? panel.player.position / panel.player.length : 0
-                onMoved: {
-                    if (!panel.player || panel.player.length <= 0) return
-                    panel.player.position = value * panel.player.length
-                }
             }
         }
     }

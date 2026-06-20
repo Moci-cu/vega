@@ -14,6 +14,7 @@ Item {
     signal lyricsUpdated(string lyrics)
 
     readonly property var geniusApiKey: KeyringStorage.keyringData?.apiKeys?.genius
+    readonly property alias loading: fetchLyricsProcess.running
 
     function fetchLyrics(artist, title) {
         console.log("[Genius Lyrics] Fetching lyrics for", artist, "-", title)

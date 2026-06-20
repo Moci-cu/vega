@@ -375,9 +375,12 @@ Item {
 
     onFetchKeyChanged: {
         root.resetState();
+        const shouldFetch = root.enabled && root.queryTitle && root.queryArtist;
+        root.loading = shouldFetch;
 
         if (lyricFileView.isInitialLoad) {
-            fetchDebounce.restart();
+            if (shouldFetch)
+                fetchDebounce.restart();
             return;
         }
         
@@ -388,7 +391,7 @@ Item {
             root.loading = false;
             root.error = "";
             root.loadedKey = root.fetchKey;
-        } else if (root.enabled) {
+        } else if (shouldFetch) {
             fetchDebounce.restart();
         }
     }
