@@ -229,6 +229,7 @@ Queue: checkAllUpdates() populates _updateCheckQueue, processes one at a time
 | `sidebarRightBottom` | `BottomWidgetGroup` | Nav buttons + `Loader` per tab |
 | `backgroundWidgets` | `Background` → `widgetCanvas` | `loadExtensionQmlComponent()` + position from config |
 | `overlayWidgets` | `OverlayContext` → `ExtensionOverlayWidgetLoader` | `loadExtensionQmlComponent()` + geometry from config |
+| `cheatsheet` | `Cheatsheet` (`Cheatsheet.qml`) | Tab buttons + `Loader` per page in SwipeView |
 
 ### QML Component Loading
 

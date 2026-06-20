@@ -16,7 +16,45 @@ ContentPage {
     interactive: false
 
     property bool allowHeavyLoad: false
-    Component.onCompleted: Qt.callLater(() => page.allowHeavyLoad = true)
+    property ListModel favouritesCarouselModel: ListModel {}
+    property int currentIndex: -1
+
+    function refreshFavouritesCarousel() {
+        favouritesCarouselModel.clear()
+        
+        let favs = [...Persistent.states.wallpaper.favourites]
+        const currentWallpaper = Config.options.background.wallpaperPath
+        const currentIndex = favs.indexOf(currentWallpaper)
+        
+        if (favs.length === 0) return
+        if (currentIndex !== -1) {
+            const elementsBefore = favs.slice(0, currentIndex)
+            const elementsFromCurrent = favs.slice(currentIndex)
+            favs = elementsFromCurrent.concat(elementsBefore)
+        } else if (currentWallpaper !== "") {
+            favs.unshift(currentWallpaper)
+        }
+        
+        for (let i = 0; i < favs.length; i++) {
+            const path = favs[i]
+            const fileName = path.split('/').pop()
+            
+            const name = (path === currentWallpaper && currentIndex === -1) ? "current-wallpaper" : fileName
+            favouritesCarouselModel.append({ filePath: path, fileName: name })
+        }
+    }
+
+    Component.onCompleted: Qt.callLater(() => {
+        page.allowHeavyLoad = true
+        page.refreshFavouritesCarousel()
+    })
+
+    Connections {
+        target: Persistent.states.wallpaper
+        function onFavouritesChanged() {
+            page.refreshFavouritesCarousel()
+        }
+    }
 
     Process {
         id: randomWallProc
@@ -58,6 +96,7 @@ ContentPage {
                     color: smallLightDarkPreferenceButton.colText
                 }
                 StyledText {
+                    visible: !carouselWrapper.expanded
                     Layout.alignment: Qt.AlignHCenter
                     text: dark ? Translation.tr("Dark") : Translation.tr("Light")
                     font.pixelSize: Appearance.font.pixelSize.smaller
@@ -71,72 +110,117 @@ ContentPage {
     ContentSection {
         icon: "format_paint"
         title: Translation.tr("Wallpaper & Colors")
+        tooltip: Translation.tr("Favourite your wallpapers from wallpaper selector for them to be visible in the carousel")
         Layout.fillWidth: true
 
         RowLayout {
             Layout.fillWidth: true
 
             Item {
+                id: carouselWrapper
                 implicitWidth: 360
                 implicitHeight: 220
                 
-                StyledImage {
-                    id: wallpaperPreview
-                    anchors.fill: parent
-                    fillMode: Image.PreserveAspectCrop
-                    source: Config.options.background.wallpaperPath
-                    cache: false
-                    layer.enabled: true
-                    layer.effect: OpacityMask {
-                        maskSource: Rectangle {
-                            width: 360
-                            height: 200
-                            radius: Appearance.rounding.normal
-                        }
-                    }
-                    RippleButton {
-                        anchors.fill: parent
-                        colBackground: "transparent"
-                        colBackgroundHover: ColorUtils.transparentize(Appearance.colors.colOnPrimary, 0.85)
-                        colRipple: ColorUtils.transparentize(Appearance.colors.colOnPrimary, 0.5)
-                        onClicked: {
-                            Quickshell.execDetached(`${Directories.wallpaperSwitchScriptPath}`);
-                        }
-                    }
+                readonly property bool expanded: implicitWidth > 400
+
+                PropertyAnimation {
+                    id: expandAnimation
+                    target: carouselWrapper
+                    property: "implicitWidth"
+                    to: 450
+                    duration: 450
+                    easing.type: Easing.OutCubic
+                }
+                PropertyAnimation {
+                    id: shrinkAnimation
+                    target: carouselWrapper
+                    property: "implicitWidth"
+                    to: 360
+                    duration: 450
+                    easing.type: Easing.OutCubic
+                }
+
+                
+
+                Carousel {
+                    id: favouritesCarousel
+                    implicitWidth: parent.implicitWidth
+                    implicitHeight: parent.implicitHeight
+                    showBadges: true
                     
+                    leftPadding: 0
+                    rightPadding: 0
+                    topPadding: 0
+                    bottomPadding: 0
+
+                    model: page.favouritesCarouselModel
+                    visible: page.favouritesCarouselModel.count > 0
+                    onItemClicked: (index, modelData) => {
+                        shrinkAnimation.running = true
+                        favouritesCarousel.currentIndex = 0
+                        favouritesCarousel.snapToIndex(0)
+                        Wallpapers.select(modelData.filePath)
+                    }
+
+                    onPressedAny: () => {
+                        expandAnimation.running = true
+                    }
+
+                    delegate: Item {
+                        id: carouselItem
+                        required property var modelData
+                        required property int index
+
+                        ThumbnailImage {
+                            anchors.fill: parent
+                            sourcePath: carouselItem.modelData.filePath
+                            fillMode: Image.PreserveAspectCrop
+                            generateThumbnail: true
+
+                            // fix for resolution
+                            thumbnailSizeName: Images.thumbnailSizeNameForDimensions(512, 512)
+                            sourceSize: (512,512)
+                        }
+                    }
+                }
+                
+                Timer {
+                    // The text below is visible even if the favouritesCarousel is not empty, so we add a little delay before making it visible
+                    interval: 200
+                    running: true
+                    onTriggered: {
+                        emptyFavouritesColumn.canBeVisible = true
+                    }
                 }
 
-                MaterialSymbol {
-                    anchors.centerIn: parent
-                    text: "hourglass_top"
-                    color: Appearance.colors.colPrimary
-                    iconSize: 40
-                    z: -1
-                }
-
-                Rectangle {
+                ColumnLayout {
+                    id: emptyFavouritesColumn
+                    property bool canBeVisible: false
+                    opacity: page.favouritesCarouselModel.count === 0 && canBeVisible ? 1 : 0
+                    Behavior on opacity {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
                     anchors {
-                        left: parent.left
-                        bottom: parent.bottom
-                        margins: 10
+                        horizontalCenter: parent.horizontalCenter
+                        verticalCenter: parent.verticalCenter
+                        verticalCenterOffset: -10
                     }
-
-                    implicitWidth: Math.min(text.implicitWidth + 20, parent.width - 20)
-                    implicitHeight: text.implicitHeight + 5
-                    color: Appearance.colors.colPrimary
-                    radius: Appearance.rounding.full
-
+                    MaterialSymbol {
+                        iconSize: 30
+                        text: "star"
+                        fill: 1
+                        color: Appearance.colors.colOnLayer3
+                        Layout.alignment: Qt.AlignHCenter
+                    }
                     StyledText {
-                        id: text
-                        anchors.centerIn: parent
-                        property string fileName: Config.options.background.wallpaperPath.split("/")[Config.options.background.wallpaperPath.split("/").length - 1]
-                        text: fileName.length > 30 ? fileName.slice(27) + "..." : fileName
-                        color: Appearance.colors.colOnPrimary
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        text: Translation.tr("No favourites yet\nAdd some from wallpaper selector")
+                        font.pixelSize: Appearance.font.pixelSize.body
+                        color: Appearance.colors.colOnLayer3
+                        horizontalAlignment: Text.AlignHCenter
                     }
                 }
+                
             }
-
 
             ColumnLayout {
                 Layout.fillHeight: true
@@ -187,6 +271,7 @@ ContentPage {
                                 ]
                                 
                                 delegate: ColorPreviewGrid {
+                                    columns: carouselWrapper.expanded ? 2 : 3
                                     customTheme: modelData.customTheme
                                     builtInTheme: modelData.builtInTheme
                                 }
@@ -208,10 +293,7 @@ ContentPage {
                 Config.options.appearance.transparency.enable = checked;
             }
         }
-        
     }
-
-    
 
     ContentSection {
         icon: "screenshot_monitor"

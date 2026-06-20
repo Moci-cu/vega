@@ -73,7 +73,8 @@ Each key is a contribution point name. The value is always an **array of contrib
     "sidebarLeftPages":   [...],
     "sidebarRightBottom": [...],
     "backgroundWidgets":  [...],
-    "overlayWidgets":     [...]
+    "overlayWidgets":     [...],
+    "cheatsheet":         [...]
   }
 }
 ```
@@ -460,6 +461,59 @@ StyledOverlayWidget {
         "height": 200,
         "pinned": false,
         "clickthrough": true
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 7. `cheatsheet`
+
+Custom tabs in the cheatsheet overlay, alongside Timetable, Keybinds, and Elements tabs.
+
+**Descriptor fields:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `identifier` | string | **Yes** | Unique ID within this extension. |
+| `title` | string | **Yes** | Tab label text shown in the cheatsheet toolbar. |
+| `icon` | string | **Yes** | Material Symbols icon codepoint name. |
+| `component` | string | **Yes** | Relative path to the QML page file. |
+
+**QML contract:**
+
+Use `anchors.fill: parent` or bind to the implicit size of your content to fill the available space:
+
+```qml
+// cheatsheet/MyCheatsheetTab.qml
+import QtQuick
+
+Item {
+    id: root
+    anchors.fill: parent
+    // Injected automatically:
+    // property string extensionId: "..."
+
+    Text {
+        anchors.centerIn: parent
+        text: "My Cheatsheet Tab"
+    }
+}
+```
+
+**Example:**
+
+```json
+{
+  "contributes": {
+    "cheatsheet": [
+      {
+        "identifier": "myCheatsheetTab",
+        "title": "My Shortcuts",
+        "icon": "keyboard",
+        "component": "cheatsheet/MyCheatsheetTab.qml"
       }
     ]
   }
