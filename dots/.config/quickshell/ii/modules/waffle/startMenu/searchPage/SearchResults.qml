@@ -203,17 +203,20 @@ RowLayout {
                 clip: true
                 spacing: 2
                 model: {
-                    const isAppEntry = resultPreview.entry.type === Translation.tr("App");
-                    const appId = isAppEntry ? resultPreview.entry.id : "";
+                    const entry = resultPreview.entry;
+                    if (!entry) return [];
+
+                    const isAppEntry = entry.type === Translation.tr("App");
+                    const appId = isAppEntry ? entry.id : "";
                     const pinned = isAppEntry ? (Config.options.dock.pinnedApps.includes(appId)) : false;
                     const startPinned = isAppEntry ? (Config.options.launcher.pinnedApps.includes(appId)) : false;
                     var result = [
                         {
-                            name: resultPreview.entry.verb,
+                            name: entry.verb,
                             iconName: isAppEntry ? "open_in_new" : "keyboard_return",
                             iconType: LauncherSearchResult.IconType.Material,
                             execute: () => {
-                                resultPreview.entry.execute();
+                                entry.execute();
                             }
                         },
                         ...(isAppEntry ? [
@@ -237,7 +240,7 @@ RowLayout {
                             }
                         ] : []),
                     ];
-                    result = result.concat(resultPreview.entry.actions);
+                    result = result.concat(entry.actions ?? []);
                     return result;
                 }
                 delegate: WButton {
