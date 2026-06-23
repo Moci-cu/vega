@@ -62,9 +62,17 @@ Scope { // Scope
             implicitWidth: cheatsheetBackground.width + Appearance.sizes.elevationMargin * 2
             implicitHeight: cheatsheetBackground.height + Appearance.sizes.elevationMargin * 2
             WlrLayershell.namespace: "quickshell:cheatsheet"
-            // Setting this value makes it take its sweet time to open
+            // Setting this value makes it take its sweet time to open, so we use a timer to force it
             // WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
             color: "transparent"
+
+            Timer {
+                id: keyboardFocusTimer
+                interval: 2000
+                onTriggered: {
+                    cheatsheetRoot.WlrLayershell.keyboardFocus = WlrKeyboardFocus.OnDemand
+                }
+            }
 
             mask: Region {
                 item: cheatsheetBackground
@@ -72,6 +80,7 @@ Scope { // Scope
 
             Component.onCompleted: {
                 GlobalFocusGrab.addDismissable(cheatsheetRoot);
+                keyboardFocusTimer.start();
             }
             Component.onDestruction: {
                 GlobalFocusGrab.removeDismissable(cheatsheetRoot);

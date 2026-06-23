@@ -22,6 +22,7 @@ Item {
     property real rightPadding: 16
     property bool snapEnabled: true
     property bool showBadges: false
+    property bool showOpenningAnimation: false
 
     property int currentIndex: 0
     property list<real> sizeRatios: [6, 3, 1] // Must be a list with a size of 3
@@ -40,16 +41,30 @@ Item {
     property real _largeW: sizeRatios[0] > 0 ? Math.max(40, _unitWidth * sizeRatios[0]) : 0
     property real _mediumW: sizeRatios[1] > 0 ? Math.max(30, _unitWidth * sizeRatios[1]) : 0
     property real _smallW: sizeRatios[2] > 0 ? Math.max(20, _unitWidth * sizeRatios[2]) : 0
+    property real _animProgress: showOpenningAnimation ? 0 : 1
+    Behavior on _animProgress {
+        NumberAnimation {
+            duration: Appearance.animation.elementMove.duration * 1.7
+            easing.type: Appearance.animation.elementMove.type
+            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        }
+    }
+
+    readonly property real _fullSlotWidth: width - leftPadding - rightPadding
     readonly property real _stepSize: _largeW + itemSpacing
+
+    property real _effectiveLargeW: _largeW + (_fullSlotWidth - _largeW) * (1 - _animProgress)
+    property real _effectiveMediumW: _mediumW * _animProgress
+    property real _effectiveSmallW: _smallW * _animProgress
 
     readonly property var _slotX: [
         root.leftPadding - root.itemSpacing,
         root.leftPadding,
-        root.leftPadding + _largeW + itemSpacing,
-        root.leftPadding + _largeW + itemSpacing + _mediumW + itemSpacing,
-        root.leftPadding + _largeW + itemSpacing + _mediumW + itemSpacing + _smallW + itemSpacing
+        root.leftPadding + _effectiveLargeW + itemSpacing,
+        root.leftPadding + _effectiveLargeW + itemSpacing + _effectiveMediumW + itemSpacing,
+        root.leftPadding + _effectiveLargeW + itemSpacing + _effectiveMediumW + itemSpacing + _effectiveSmallW + itemSpacing
     ]
-    readonly property var _slotWidth: [0, _largeW, _mediumW, _smallW, 0]
+    readonly property var _slotWidth: [0, _effectiveLargeW, _effectiveMediumW, _effectiveSmallW, 0]
 
     function snapToIndex(index) {
         if (index < 0 || index >= repeater.count) return
@@ -149,7 +164,7 @@ Item {
                     color: Appearance.colors.colPrimary
                     radius: Appearance.rounding.full
 
-                    opacity: itemContainer.width >= root._largeW ? 1 : 0
+                    opacity: itemContainer.width >= root._largeW - 20 ? 1 : 0
                     Behavior on opacity {
                         NumberAnimation {
                             duration: 350
@@ -262,6 +277,12 @@ Item {
             if (root.snapEnabled && !snapAnim.running) {
                 snapToIndex(root.currentIndex)
             }
+        }
+    }
+
+    Component.onCompleted: {
+        if (showOpenningAnimation) {
+            _animProgress = 1
         }
     }
 }

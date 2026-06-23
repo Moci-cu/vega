@@ -146,7 +146,9 @@ ContentPage {
                     id: favouritesCarousel
                     implicitWidth: parent.implicitWidth
                     implicitHeight: parent.implicitHeight
+                    
                     showBadges: true
+                    showOpenningAnimation: true
                     
                     leftPadding: 0
                     rightPadding: 0
