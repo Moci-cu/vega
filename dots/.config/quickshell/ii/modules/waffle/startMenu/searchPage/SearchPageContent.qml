@@ -15,6 +15,7 @@ BodyRectangle {
     property alias context: searchResults.context
     property string searchText: LauncherSearch.query
     property alias currentIndex: searchResults.currentIndex
+    property alias visibleResultCount: searchResults.visibleResultCount
 
     ColumnLayout {
         anchors {

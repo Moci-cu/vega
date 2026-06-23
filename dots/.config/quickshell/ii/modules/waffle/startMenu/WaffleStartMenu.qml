@@ -11,20 +11,22 @@ import qs.modules.common.widgets
 Scope {
     id: root
 
+    property bool panelLoaded: false
+
     Connections {
         target: GlobalStates
 
         function onSearchOpenChanged() {
             if (GlobalStates.searchOpen) {
                 LauncherSearch.query = "";
-                panelLoader.active = true;
+                root.panelLoaded = true;
             }
         }
     }
 
     Loader {
         id: panelLoader
-        active: GlobalStates.searchOpen
+        active: root.panelLoaded
         sourceComponent: PanelWindow {
             id: panelWindow
             exclusiveZone: 0
@@ -38,12 +40,13 @@ Scope {
                 left: Config.options.waffles.bar.leftAlignApps
             }
 
+            visible: GlobalStates.searchOpen
             implicitWidth: content.implicitWidth
             implicitHeight: content.implicitHeight
 
             HyprlandFocusGrab {
                 id: focusGrab
-                active: true
+                active: GlobalStates.searchOpen
                 windows: [panelWindow]
                 onCleared: content.close()
             }
@@ -63,7 +66,6 @@ Scope {
 
                 onClosed: {
                     GlobalStates.searchOpen = false;
-                    panelLoader.active = false;
                     LauncherSearch.query = "";
                 }
             }

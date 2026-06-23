@@ -71,7 +71,8 @@ WBarAttachedPanelContent {
 
         // Arrow keys for item navigation
         if (event.key === Qt.Key_Down) {
-            let maxIndex = Math.max(0, LauncherSearch.results.length - 1);
+            let visibleResultCount = root.searching ? (pageContentLoader.item?.visibleResultCount ?? 0) : LauncherSearch.results.length;
+            let maxIndex = Math.max(0, visibleResultCount - 1);
             context.setCurrentIndex(Math.min(context.currentIndex + 1, maxIndex));
             event.accepted = true;
         } else if (event.key === Qt.Key_Up) {

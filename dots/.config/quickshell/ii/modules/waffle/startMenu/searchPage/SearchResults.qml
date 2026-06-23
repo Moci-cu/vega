@@ -17,6 +17,7 @@ RowLayout {
     property int maxResultsPerCategory: 4
     property int resultLimit: 20
     property StartMenuContext context
+    property int visibleResultCount: resultList.count
     property int currentIndex: context.currentIndex
     onCurrentIndexChanged: {
         forceCurrentIndex(currentIndex);
@@ -43,6 +44,8 @@ RowLayout {
         }
     }
 
+    property QtObject emptyEntry: searchResultComp.createObject(root)
+
     ResultList {
         id: resultList
         Layout.fillHeight: true
@@ -52,7 +55,7 @@ RowLayout {
         Layout.preferredWidth: 386
         Layout.leftMargin: 1
         Layout.rightMargin: 1
-        entry: resultList.model[resultList.currentIndex] ?? searchResultComp.createObject()
+        entry: resultList.model[resultList.currentIndex]?.entry ?? root.emptyEntry
     }
 
     component ResultList: WListView {
@@ -111,10 +114,10 @@ RowLayout {
                             break;
                         }
                         const entry = allResults[i];
-                        const tweakedEntry = searchResultComp.createObject(null, Object.assign({}, entry));
-                        tweakedEntry.category = categorizedResults.length === 0 ? Translation.tr("Best match") : entry.type;
-
-                        categorizedResults.push(tweakedEntry); // Section header
+                        categorizedResults.push({
+                            entry: entry,
+                            category: categorizedResults.length === 0 ? Translation.tr("Best match") : entry.type
+                        });
                         count++;
                         totalCount++;
                         if (count >= root.maxResultsPerCategory) {
@@ -136,7 +139,7 @@ RowLayout {
         delegate: SearchResultButton {
             required property int index
             required property var modelData
-            entry: modelData
+            entry: modelData.entry
             firstEntry: index === 0
             width: ListView.view?.width
             checked: resultListView.currentIndex === index
@@ -205,33 +208,33 @@ RowLayout {
                     const pinned = isAppEntry ? (Config.options.dock.pinnedApps.includes(appId)) : false;
                     const startPinned = isAppEntry ? (Config.options.launcher.pinnedApps.includes(appId)) : false;
                     var result = [
-                        searchResultComp.createObject(null, {
+                        {
                             name: resultPreview.entry.verb,
                             iconName: isAppEntry ? "open_in_new" : "keyboard_return",
                             iconType: LauncherSearchResult.IconType.Material,
                             execute: () => {
                                 resultPreview.entry.execute();
                             }
-                        }),
+                        },
                         ...(isAppEntry ? [
-                            searchResultComp.createObject(null, {
+                            {
                                 name: startPinned ? Translation.tr("Unpin from Start") : Translation.tr("Pin to Start"),
                                 iconName: startPinned ? "keep_off" : "keep",
                                 iconType: LauncherSearchResult.IconType.Material,
                                 execute: () => {
                                     LauncherApps.togglePin(appId);
                                 }
-                            })
+                            }
                         ] : []),
                         ...(isAppEntry ? [
-                            searchResultComp.createObject(null, {
+                            {
                                 name: pinned ? Translation.tr("Unpin from taskbar") : Translation.tr("Pin to taskbar"),
                                 iconName: pinned ? "keep_off" : "keep",
                                 iconType: LauncherSearchResult.IconType.Material,
                                 execute: () => {
                                     TaskbarApps.togglePin(appId);
                                 }
-                            })
+                            }
                         ] : []),
                     ];
                     result = result.concat(resultPreview.entry.actions);

@@ -12,6 +12,7 @@ Singleton {
     id: root
     property bool sloppySearch: Config.options?.search.sloppy ?? false
     property real scoreThreshold: 0.2
+    property int resultLimit: 40
     property var substitutions: ({
         "code-url-handler": "visual-studio-code",
         "Code": "visual-studio-code",
@@ -65,13 +66,15 @@ Singleton {
                 score: Levendist.computeScore(obj.name.toLowerCase(), search.toLowerCase())
             })).filter(item => item.score > root.scoreThreshold)
                 .sort((a, b) => b.score - a.score)
+                .slice(0, root.resultLimit)
             return results
                 .map(item => item.entry)
         }
 
         return Fuzzy.go(search, preppedNames, {
             all: true,
-            key: "name"
+            key: "name",
+            limit: root.resultLimit
         }).map(r => {
             return r.obj.entry
         });
