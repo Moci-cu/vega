@@ -271,7 +271,7 @@ RippleButton {
             Layout.bottomMargin: -root.buttonVerticalPadding // Why is this necessary? Good question.
             spacing: 4
             Repeater {
-                model: root.selected ? LauncherSearch.resultActions(root.entry).slice(0, 4) : []
+                model: root.selected ? LauncherSearch.resultActions(root.entry, 4) : []
                 delegate: RippleButton {
                     id: actionButton
                     required property var modelData

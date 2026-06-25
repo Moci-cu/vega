@@ -13,7 +13,7 @@ Singleton {
     id: root
 
     property string query: ""
-    property int resultLimit: 20
+    property int resultLimit: 15
 
     function ensurePrefix(prefix) {
         if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch].some(i => root.query.startsWith(i))) {
@@ -190,11 +190,11 @@ Singleton {
         return StringUtils.stringListContainsSubstring(entry.toLowerCase(), unsafeKeywords);
     }
 
-    function resultActions(entry) {
+    function resultActions(entry, limit) {
         if (!entry) return [];
         const actions = entry.actions;
-        if (typeof actions === "function") return actions();
-        return actions ?? [];
+        if (typeof actions === "function") return actions(limit);
+        return limit ? (actions ?? []).slice(0, limit) : actions ?? [];
     }
 
     function clipboardResult(entry, index, array) {
@@ -210,7 +210,7 @@ Singleton {
             verb: "",
             type: type,
             execute: () => Cliphist.copy(entry),
-            actions: () => [
+            actions: limit => [
                 {
                     name: Translation.tr("Copy"),
                     iconName: "content_copy",
@@ -223,7 +223,7 @@ Singleton {
                     iconType: LauncherSearchResult.IconType.Material,
                     execute: () => Cliphist.deleteEntry(entry)
                 }
-            ],
+            ].slice(0, limit ?? 2),
             blurImage: shouldBlurImage
         };
     }
@@ -302,7 +302,7 @@ Singleton {
             runInTerminal: entry.runInTerminal,
             genericName: entry.genericName,
             keywords: entry.keywords,
-            actions: () => entry.actions.map(action => root.appAction(action))
+            actions: limit => entry.actions.slice(0, limit ?? entry.actions.length).map(action => root.appAction(action))
         };
     }
 

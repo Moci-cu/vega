@@ -168,12 +168,11 @@ Item { // Wrapper
                 spacing: 2
                 KeyNavigation.up: searchBar
                 highlightMoveDuration: 100
-                property string resultQuery: ""
 
-                function setResultValues(values, resetIndex) {
+                function setResultValues(values) {
                     const limitedValues = (values ?? []).slice(0, root.typingResultLimit);
                     resultModel.values = limitedValues;
-                    if (limitedValues.length > 0 && (resetIndex || appResults.currentIndex < 0 || appResults.currentIndex >= limitedValues.length)) {
+                    if (limitedValues.length > 0) {
                         Qt.callLater(root.focusFirstItem);
                     }
                 }
@@ -191,21 +190,10 @@ Item { // Wrapper
                     }
                 }
 
-                Timer {
-                    id: debounceTimer
-                    interval: root.typingDebounceInterval
-                    onTriggered: {
-                        appResults.setResultValues(LauncherSearch.results, false);
-                    }
-                }
-
                 Connections {
                     target: LauncherSearch
                     function onResultsChanged() {
-                        const queryChanged = appResults.resultQuery !== root.searchingText;
-                        appResults.resultQuery = root.searchingText;
-                        appResults.setResultValues(LauncherSearch.results, queryChanged);
-                        debounceTimer.restart();
+                        appResults.setResultValues(LauncherSearch.results);
                     }
                 }
 
