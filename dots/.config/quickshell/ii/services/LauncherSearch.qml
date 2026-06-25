@@ -194,7 +194,7 @@ Singleton {
         if (!entry) return [];
         const actions = entry.actions;
         if (typeof actions === "function") return actions(limit);
-        return limit ? (actions ?? []).slice(0, limit) : actions ?? [];
+        return limit !== undefined ? (actions ?? []).slice(0, limit) : actions ?? [];
     }
 
     function clipboardResult(entry, index, array) {
@@ -326,7 +326,7 @@ Singleton {
                 if (cleanedCommand.startsWith(Config.options.search.prefix.shellCommand)) {
                     cleanedCommand = cleanedCommand.slice(Config.options.search.prefix.shellCommand.length);
                 }
-                Quickshell.execDetached(["bash", "-c", root.query.startsWith("sudo") ? `${Config.options.apps.terminal} fish -C '${cleanedCommand}'` : cleanedCommand]);
+                Quickshell.execDetached(["bash", "-c", cleanedCommand.startsWith("sudo") ? `${Config.options.apps.terminal} fish -C '${cleanedCommand}'` : cleanedCommand]);
             }
         };
     }
@@ -409,7 +409,7 @@ Singleton {
             if (expr.length < 2) return
             activeExpression = expr;
             fileProc.running = false;
-            fileProc.command = ["fd", expr, Config.options.search.fileSearchDirectory]; 
+            fileProc.command = ["fd", "--", expr, Config.options.search.fileSearchDirectory];
             fileProc.running = true;
         }
         stdout: StdioCollector {

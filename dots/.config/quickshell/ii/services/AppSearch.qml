@@ -68,6 +68,7 @@ Singleton {
 
     onSloppySearchChanged: queryCache = ({})
     onResultLimitChanged: queryCache = ({})
+    onScoreThresholdChanged: queryCache = ({})
 
     function hasCachedValue(cache, key) {
         return Object.prototype.hasOwnProperty.call(cache, key);
@@ -98,7 +99,7 @@ Singleton {
 
     function fuzzyQuery(search: string, limit): var { // Idk why list<DesktopEntry> doesn't work
         const effectiveLimit = limit ?? root.resultLimit;
-        const cacheKey = `${root.sloppySearch ? "sloppy" : "fuzzy"}:${effectiveLimit}:${search}`;
+        const cacheKey = `${root.sloppySearch ? "sloppy" : "fuzzy"}:${effectiveLimit}:${root.scoreThreshold}:${search}`;
         if (root.hasCachedValue(root.queryCache, cacheKey)) {
             return root.queryCache[cacheKey];
         }
