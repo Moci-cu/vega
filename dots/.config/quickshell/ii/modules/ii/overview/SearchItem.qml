@@ -15,6 +15,7 @@ RippleButton {
     id: root
     property var entry
     property string query
+    property bool current: false
     property bool entryShown: entry?.shown ?? true
     property string itemType: entry?.type ?? Translation.tr("App")
     property string itemName: entry?.name ?? ""
@@ -41,7 +42,7 @@ RippleButton {
     property int buttonHorizontalPadding: 10
     property int buttonVerticalPadding: 6
     property bool keyboardDown: false
-    readonly property bool selected: (ListView.isCurrentItem || root.focus)
+    readonly property bool selected: root.current
 
     implicitHeight: rowLayout.implicitHeight + root.buttonVerticalPadding * 2
     implicitWidth: rowLayout.implicitWidth + root.buttonHorizontalPadding * 2
@@ -49,7 +50,7 @@ RippleButton {
     colBackground: (root.down || root.keyboardDown) ? Appearance.colors.colPrimaryContainerActive : 
         (selected ? Appearance.colors.colPrimaryContainer : 
         ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 1))
-    colBackgroundHover: Appearance.colors.colPrimaryContainer
+    colBackgroundHover: root.selected ? Appearance.colors.colPrimaryContainer : ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 1)
     colRipple: Appearance.colors.colPrimaryContainerActive
     property color colForeground: selected ? Appearance.colors.colOnPrimaryContainer : Appearance.m3colors.m3onSurface
 

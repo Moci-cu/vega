@@ -26,7 +26,11 @@ Item { // Wrapper
     implicitHeight: searchWidgetContent.implicitHeight + searchBar.verticalPadding * 2 + Appearance.sizes.elevationMargin * 2
 
     function focusFirstItem() {
+        if (appResults.count <= 0)
+            return;
+        appResults.currentIndex = -1;
         appResults.currentIndex = 0;
+        appResults.positionViewAtIndex(0, ListView.Beginning);
     }
 
     function focusSearchInput() {
@@ -213,11 +217,13 @@ Item { // Wrapper
                 delegate: SearchItem {
                     id: searchItem
                     // The selectable item for each search result
+                    required property int index
                     required property var modelData
                     anchors.left: parent?.left
                     anchors.right: parent?.right
                     entry: modelData
                     query: StringUtils.cleanOnePrefix(root.searchingText, [Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch])
+                    current: appResults.currentIndex === index
 
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_Tab) {
