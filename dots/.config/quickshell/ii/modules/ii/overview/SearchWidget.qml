@@ -170,20 +170,20 @@ Item { // Wrapper
                     const limitedValues = (values ?? []).slice(0, root.typingResultLimit);
                     resultModel.values = limitedValues;
                     if (limitedValues.length > 0 && (resetIndex || appResults.currentIndex < 0 || appResults.currentIndex >= limitedValues.length)) {
-                        root.focusFirstItem();
+                        Qt.callLater(root.focusFirstItem);
                     }
                 }
 
                 onFocusChanged: {
                     if (focus)
-                        appResults.currentIndex = 1;
+                        root.focusFirstItem();
                 }
 
                 Connections {
                     target: root
                     function onSearchingTextChanged() {
                         if (appResults.count > 0)
-                            appResults.currentIndex = 0;
+                            root.focusFirstItem();
                     }
                 }
 
