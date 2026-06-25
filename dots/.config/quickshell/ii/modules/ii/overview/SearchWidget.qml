@@ -165,6 +165,14 @@ Item { // Wrapper
                 KeyNavigation.up: searchBar
                 highlightMoveDuration: 100
 
+                function setResultValues(values) {
+                    const limitedValues = (values ?? []).slice(0, root.typingResultLimit);
+                    resultModel.values = limitedValues;
+                    if (limitedValues.length > 0 && (appResults.currentIndex < 0 || appResults.currentIndex >= limitedValues.length)) {
+                        root.focusFirstItem();
+                    }
+                }
+
                 onFocusChanged: {
                     if (focus)
                         appResults.currentIndex = 1;
@@ -182,15 +190,14 @@ Item { // Wrapper
                     id: debounceTimer
                     interval: root.typingDebounceInterval
                     onTriggered: {
-                        resultModel.values = LauncherSearch.results ?? [];
+                        appResults.setResultValues(LauncherSearch.results);
                     }
                 }
 
                 Connections {
                     target: LauncherSearch
                     function onResultsChanged() {
-                        resultModel.values = LauncherSearch.results.slice(0, root.typingResultLimit);
-                        root.focusFirstItem();
+                        appResults.setResultValues(LauncherSearch.results);
                         debounceTimer.restart();
                     }
                 }

@@ -142,6 +142,46 @@ Singleton {
         return enabled && sensitiveNetwork;
     }
 
+    function mathExpression(query) {
+        if (query.startsWith(Config.options.search.prefix.math)) {
+            return query.slice(Config.options.search.prefix.math.length).trim();
+        }
+        if (/^\d/.test(query)) {
+            return query.trim();
+        }
+        return "";
+    }
+
+    function updateNonAppSearches() {
+        const query = root.query;
+        const mathExpr = root.mathExpression(query);
+        if (mathExpr.length > 0) {
+            nonAppResultsTimer.restart();
+        } else {
+            nonAppResultsTimer.stop();
+            mathProc.running = false;
+            root.mathResult = "";
+        }
+
+        if (!query.startsWith(Config.options.search.prefix.fileSearch)) {
+            fileSearchTimer.stop();
+            fileProc.running = false;
+            if (root.fileResults.length > 0) root.fileResults = [];
+            return;
+        }
+
+        const fileExpr = query.slice(Config.options.search.prefix.fileSearch.length).trim();
+        if (fileExpr.length < 2) {
+            fileSearchTimer.stop();
+            fileProc.running = false;
+            if (root.fileResults.length > 0) root.fileResults = [];
+            return;
+        }
+
+        fileSearchTimer.expression = fileExpr;
+        fileSearchTimer.restart();
+    }
+
     function containsUnsafeLink(entry) {
         if (entry == undefined)
             return false;
@@ -153,21 +193,20 @@ Singleton {
         id: nonAppResultsTimer
         interval: Config.options.search.nonAppResultDelay
         onTriggered: {
-            let expr = root.query;
-            if (expr.startsWith(Config.options.search.prefix.math)) {
-                expr = expr.slice(Config.options.search.prefix.math.length);
-            }
+            const expr = root.mathExpression(root.query);
+            if (expr.length === 0) return;
             mathProc.calculateExpression(expr);
         }
     }
 
-    onQueryChanged: {
-        let expr = root.query;
-        if (expr.startsWith(Config.options.search.prefix.fileSearch)) {
-            expr = expr.slice(Config.options.search.prefix.fileSearch.length);
-            fileProc.searchFiles(expr);
-        }
+    Timer {
+        id: fileSearchTimer
+        property string expression: ""
+        interval: Math.max(Config.options.search.nonAppResultDelay, 150)
+        onTriggered: fileProc.searchFiles(expression)
     }
+
+    onQueryChanged: updateNonAppSearches()
 
 
     Process {
@@ -188,14 +227,20 @@ Singleton {
     property var fileResults: []
     Process {
         id: fileProc 
+        property string activeExpression: ""
         function searchFiles(expr) {
             if (expr.length < 2) return
+            activeExpression = expr;
             fileProc.running = false;
             fileProc.command = ["fd", expr, Config.options.search.fileSearchDirectory]; 
             fileProc.running = true;
         }
         stdout: StdioCollector {
             onStreamFinished: {
+                const currentExpr = root.query.startsWith(Config.options.search.prefix.fileSearch)
+                    ? root.query.slice(Config.options.search.prefix.fileSearch.length).trim()
+                    : "";
+                if (currentExpr !== fileProc.activeExpression) return;
                 const rawResult = this.text
                 const result = rawResult.split('\n')
                 result.pop() // deleting the last empty line
@@ -267,13 +312,7 @@ Singleton {
             }).filter(Boolean);
         }
 
-        // A better way to reset file results? //
-        if (!root.query.startsWith(Config.options.search.prefix.fileSearch)) {
-            root.fileResults = [];
-        }
-
         ////////////////// Init ///////////////////
-        nonAppResultsTimer.restart();
         const mathResultObject = resultComp.createObject(null, {
             name: root.mathResult,
             verb: Translation.tr("Copy"),
