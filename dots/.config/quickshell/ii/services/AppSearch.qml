@@ -94,8 +94,9 @@ Singleton {
         function onApplicationsChanged() { root.clearCaches() }
     }
 
-    function fuzzyQuery(search: string): var { // Idk why list<DesktopEntry> doesn't work
-        const cacheKey = `${root.sloppySearch ? "sloppy" : "fuzzy"}:${root.resultLimit}:${search}`;
+    function fuzzyQuery(search: string, limit): var { // Idk why list<DesktopEntry> doesn't work
+        const effectiveLimit = limit ?? root.resultLimit;
+        const cacheKey = `${root.sloppySearch ? "sloppy" : "fuzzy"}:${effectiveLimit}:${search}`;
         if (root.hasCachedValue(root.queryCache, cacheKey)) {
             return root.queryCache[cacheKey];
         }
@@ -106,7 +107,7 @@ Singleton {
                 score: Levendist.computeScore(obj.name.toLowerCase(), search.toLowerCase())
             })).filter(item => item.score > root.scoreThreshold)
                 .sort((a, b) => b.score - a.score)
-                .slice(0, root.resultLimit)
+                .slice(0, effectiveLimit)
                 .map(item => item.entry)
             return root.rememberCacheValue(root.queryCache, cacheKey, results, root.queryCacheLimit);
         }
@@ -114,7 +115,7 @@ Singleton {
         const results = Fuzzy.go(search, preppedNames, {
             all: true,
             key: "name",
-            limit: root.resultLimit
+            limit: effectiveLimit
         }).map(r => {
             return r.obj.entry
         });
