@@ -205,6 +205,7 @@ Singleton {
         }
         const type = `#${entry.match(/^\s*(\S+)/)?.[1] || ""}`;
         return {
+            key: `clipboard:${entry.match(/^\s*(\S+)/)?.[1] ?? index}`,
             rawValue: entry,
             name: StringUtils.cleanCliphistEntry(entry),
             verb: "",
@@ -231,6 +232,7 @@ Singleton {
     function emojiResult(entry) {
         const emoji = entry.match(/^\s*(\S+)/)?.[1] || "";
         return {
+            key: `emoji:${emoji}:${entry}`,
             rawValue: entry,
             name: entry.replace(/^\s*\S+\s+/, ""),
             iconName: emoji,
@@ -245,6 +247,7 @@ Singleton {
 
     function mathResultEntry() {
         return {
+            key: "math",
             name: root.mathResult,
             verb: Translation.tr("Copy"),
             type: Translation.tr("Math result"),
@@ -259,6 +262,7 @@ Singleton {
 
     function fileResult(entry) {
         return {
+            key: `file:${entry}`,
             type: Translation.tr("File"),
             name: entry,
             verb: Translation.tr("Open"),
@@ -285,6 +289,7 @@ Singleton {
 
     function appResult(entry) {
         return {
+            key: `app:${entry.id || entry.name}`,
             type: Translation.tr("App"),
             id: entry.id,
             name: entry.name,
@@ -308,6 +313,7 @@ Singleton {
 
     function commandResult() {
         return {
+            key: "command",
             name: StringUtils.cleanPrefix(root.query, Config.options.search.prefix.shellCommand).replace("file://", ""),
             verb: Translation.tr("Run"),
             type: Translation.tr("Command"),
@@ -327,6 +333,7 @@ Singleton {
 
     function webSearchResult() {
         return {
+            key: "web-search",
             name: StringUtils.cleanPrefix(root.query, Config.options.search.prefix.webSearch),
             verb: Translation.tr("Search"),
             type: Translation.tr("Web search"),
@@ -347,6 +354,7 @@ Singleton {
         const actionString = `${Config.options.search.prefix.action}${action.action}`;
         if (!actionString.startsWith(root.query) && !root.query.startsWith(actionString)) return null;
         return {
+            key: `action:${action.action}`,
             name: root.query.startsWith(actionString) ? root.query : actionString,
             verb: Translation.tr("Run"),
             type: Translation.tr("Action"),

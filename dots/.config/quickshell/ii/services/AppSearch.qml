@@ -19,6 +19,7 @@ Singleton {
     property var queryCache: ({})
     property var iconExistsCache: ({})
     property var guessIconCache: ({})
+    property var iconPathCache: ({})
     property var substitutions: ({
         "code-url-handler": "visual-studio-code",
         "Code": "visual-studio-code",
@@ -87,6 +88,7 @@ Singleton {
         queryCache = ({});
         iconExistsCache = ({});
         guessIconCache = ({});
+        iconPathCache = ({});
     }
 
     Connections {
@@ -128,6 +130,13 @@ Singleton {
         const exists = (Quickshell.iconPath(iconName, true).length > 0)
             && !iconName.includes("image-missing");
         return root.rememberCacheValue(root.iconExistsCache, iconName, exists, root.iconCacheLimit);
+    }
+
+    function iconPath(iconName, fallback) {
+        if (!iconName || iconName.length == 0) return fallback ? Quickshell.iconPath(fallback) : "";
+        const cacheKey = `${iconName}|${fallback ?? ""}`;
+        if (root.hasCachedValue(root.iconPathCache, cacheKey)) return root.iconPathCache[cacheKey];
+        return root.rememberCacheValue(root.iconPathCache, cacheKey, Quickshell.iconPath(iconName, fallback), root.iconCacheLimit);
     }
 
     function getReverseDomainNameAppName(str) {

@@ -28,9 +28,8 @@ Item { // Wrapper
     function focusFirstItem() {
         if (appResults.count <= 0)
             return;
-        appResults.currentIndex = -1;
-        appResults.currentIndex = 0;
-        appResults.positionViewAtIndex(0, ListView.Beginning);
+        if (appResults.currentIndex !== 0)
+            appResults.currentIndex = 0;
     }
 
     function focusSearchInput() {
@@ -172,7 +171,7 @@ Item { // Wrapper
                 function setResultValues(values) {
                     const limitedValues = (values ?? []).slice(0, root.typingResultLimit);
                     resultModel.values = limitedValues;
-                    if (limitedValues.length > 0) {
+                    if (limitedValues.length > 0 && appResults.currentIndex !== 0) {
                         Qt.callLater(root.focusFirstItem);
                     }
                 }
@@ -180,14 +179,6 @@ Item { // Wrapper
                 onFocusChanged: {
                     if (focus)
                         root.focusFirstItem();
-                }
-
-                Connections {
-                    target: root
-                    function onSearchingTextChanged() {
-                        if (appResults.count > 0)
-                            root.focusFirstItem();
-                    }
                 }
 
                 Connections {
