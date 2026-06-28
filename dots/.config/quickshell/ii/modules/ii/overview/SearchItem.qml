@@ -13,8 +13,9 @@ import Quickshell.Hyprland
 
 RippleButton {
     id: root
-    property LauncherSearchResult entry
+    property var entry
     property string query
+    property bool current: false
     property bool entryShown: entry?.shown ?? true
     property string itemType: entry?.type ?? Translation.tr("App")
     property string itemName: entry?.name ?? ""
@@ -31,7 +32,7 @@ RippleButton {
     }
     property string itemClickActionName: entry?.verb ?? "Open"
     property string bigText: entry?.iconType === LauncherSearchResult.IconType.Text ? entry?.iconName ?? "" : ""
-    property string materialSymbol: entry.iconType === LauncherSearchResult.IconType.Material ? entry?.iconName ?? "" : ""
+    property string materialSymbol: entry?.iconType === LauncherSearchResult.IconType.Material ? entry?.iconName ?? "" : ""
     property string cliphistRawString: entry?.rawValue ?? ""
     property string filePath: Images.isValidImageByName(entry?.name) ? entry?.name : ""
     property bool blurImage: entry?.blurImage ?? false
@@ -41,7 +42,7 @@ RippleButton {
     property int buttonHorizontalPadding: 10
     property int buttonVerticalPadding: 6
     property bool keyboardDown: false
-    readonly property bool selected: (root.hovered || root.focus)
+    readonly property bool selected: root.current
 
     implicitHeight: rowLayout.implicitHeight + root.buttonVerticalPadding * 2
     implicitWidth: rowLayout.implicitWidth + root.buttonHorizontalPadding * 2
@@ -49,7 +50,7 @@ RippleButton {
     colBackground: (root.down || root.keyboardDown) ? Appearance.colors.colPrimaryContainerActive : 
         (selected ? Appearance.colors.colPrimaryContainer : 
         ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 1))
-    colBackgroundHover: Appearance.colors.colPrimaryContainer
+    colBackgroundHover: root.selected ? Appearance.colors.colPrimaryContainer : ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 1)
     colRipple: Appearance.colors.colPrimaryContainerActive
     property color colForeground: selected ? Appearance.colors.colOnPrimaryContainer : Appearance.m3colors.m3onSurface
 
@@ -110,7 +111,7 @@ RippleButton {
     }
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Delete && event.modifiers === Qt.ShiftModifier) {
-            const deleteAction = root.entry.actions.find(action => action.name == Translation.tr("Delete"));
+            const deleteAction = LauncherSearch.resultActions(root.entry).find(action => action.name == Translation.tr("Delete"));
 
             if (deleteAction) {
                 deleteAction.execute()
@@ -156,7 +157,7 @@ RippleButton {
         Component {
             id: iconImageComponent
             IconImage {
-                source: Quickshell.iconPath(root.iconName, "image-missing")
+                source: AppSearch.iconPath(root.iconName, "image-missing")
                 width: 35
                 height: 35
             }
@@ -270,7 +271,7 @@ RippleButton {
             Layout.bottomMargin: -root.buttonVerticalPadding // Why is this necessary? Good question.
             spacing: 4
             Repeater {
-                model: (root.entry.actions ?? []).slice(0, 4)
+                model: root.selected ? LauncherSearch.resultActions(root.entry, 4) : []
                 delegate: RippleButton {
                     id: actionButton
                     required property var modelData
@@ -298,7 +299,7 @@ RippleButton {
                             anchors.centerIn: parent
                             active: actionButton.iconType === LauncherSearchResult.IconType.System && actionButton.iconName !== ""
                             sourceComponent: IconImage {
-                                source: Quickshell.iconPath(actionButton.iconName)
+                                source: AppSearch.iconPath(actionButton.iconName)
                                 implicitSize: 20
                             }
                         }

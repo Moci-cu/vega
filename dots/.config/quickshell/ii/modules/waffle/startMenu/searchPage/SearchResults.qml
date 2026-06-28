@@ -44,7 +44,14 @@ RowLayout {
         }
     }
 
-    property QtObject emptyEntry: searchResultComp.createObject(root)
+    property var emptyEntry: ({
+        name: "",
+        type: "",
+        verb: "",
+        iconName: "",
+        iconType: LauncherSearchResult.IconType.None,
+        execute: () => {}
+    })
 
     ResultList {
         id: resultList
@@ -152,7 +159,7 @@ RowLayout {
     component ResultPreview: Rectangle {
         id: resultPreview
 
-        property LauncherSearchResult entry // LauncherSearchResult
+        property var entry
 
         Layout.fillHeight: true
         color: Looks.colors.bg1
@@ -240,7 +247,7 @@ RowLayout {
                             }
                         ] : []),
                     ];
-                    result = result.concat(entry.actions ?? []);
+                    result = result.concat(LauncherSearch.resultActions(entry));
                     return result;
                 }
                 delegate: WButton {
@@ -268,8 +275,4 @@ RowLayout {
         }
     }
 
-    Component {
-        id: searchResultComp
-        LauncherSearchResult {}
-    }
 }

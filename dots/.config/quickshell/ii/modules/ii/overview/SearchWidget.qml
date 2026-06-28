@@ -26,7 +26,10 @@ Item { // Wrapper
     implicitHeight: searchWidgetContent.implicitHeight + searchBar.verticalPadding * 2 + Appearance.sizes.elevationMargin * 2
 
     function focusFirstItem() {
-        appResults.currentIndex = 0;
+        if (appResults.count <= 0)
+            return;
+        if (appResults.currentIndex !== 0)
+            appResults.currentIndex = 0;
     }
 
     function focusSearchInput() {
@@ -165,33 +168,23 @@ Item { // Wrapper
                 KeyNavigation.up: searchBar
                 highlightMoveDuration: 100
 
+                function setResultValues(values) {
+                    const limitedValues = (values ?? []).slice(0, root.typingResultLimit);
+                    resultModel.values = limitedValues;
+                    if (limitedValues.length > 0 && appResults.currentIndex !== 0) {
+                        Qt.callLater(root.focusFirstItem);
+                    }
+                }
+
                 onFocusChanged: {
                     if (focus)
-                        appResults.currentIndex = 1;
-                }
-
-                Connections {
-                    target: root
-                    function onSearchingTextChanged() {
-                        if (appResults.count > 0)
-                            appResults.currentIndex = 0;
-                    }
-                }
-
-                Timer {
-                    id: debounceTimer
-                    interval: root.typingDebounceInterval
-                    onTriggered: {
-                        resultModel.values = LauncherSearch.results ?? [];
-                    }
+                        root.focusFirstItem();
                 }
 
                 Connections {
                     target: LauncherSearch
                     function onResultsChanged() {
-                        resultModel.values = LauncherSearch.results.slice(0, root.typingResultLimit);
-                        root.focusFirstItem();
-                        debounceTimer.restart();
+                        appResults.setResultValues(LauncherSearch.results);
                     }
                 }
 
@@ -203,11 +196,13 @@ Item { // Wrapper
                 delegate: SearchItem {
                     id: searchItem
                     // The selectable item for each search result
+                    required property int index
                     required property var modelData
                     anchors.left: parent?.left
                     anchors.right: parent?.right
                     entry: modelData
                     query: StringUtils.cleanOnePrefix(root.searchingText, [Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch])
+                    current: appResults.currentIndex === index
 
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_Tab) {

@@ -12,7 +12,7 @@ import qs.modules.waffle.looks
 WChoiceButton {
     id: root
 
-    required property LauncherSearchResult entry
+    required property var entry
     property bool firstEntry: false
 
     signal requestFocus()
