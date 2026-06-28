@@ -85,6 +85,7 @@ ApplicationWindow {
     title: "illogical-impulse Settings"
     
     Component.onCompleted: {
+        ExtensionManager.watchFileChanges = false // Settings app doesn't need file watching to prevent loops
         MaterialThemeLoader.reapplyTheme()
         Config.readWriteDelay = 0 // Settings app always only sets one var at a time so delay isn't needed
     }

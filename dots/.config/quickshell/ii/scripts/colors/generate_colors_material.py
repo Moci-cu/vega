@@ -141,7 +141,7 @@ term_colors = {}
 material_colors = material_colors_for_scheme(args.scheme)
 
 if args.preview_all:
-    schemes = ["scheme-auto", "scheme-content", "scheme-tonal-spot", "scheme-fidelity", "scheme-fruit-salad", "scheme-expressive", "scheme-rainbow", "scheme-neutral", "scheme-monochrome"]
+    schemes = ["scheme-auto", "scheme-content", "scheme-tonal-spot", "scheme-fidelity", "scheme-fruit-salad", "scheme-expressive", "scheme-rainbow", "scheme-neutral", "scheme-monochrome", "scheme-vibrant"]
     previews = {}
     for scheme_name in schemes:
         colors = material_colors_for_scheme(scheme_name)

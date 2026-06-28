@@ -79,7 +79,7 @@ RippleButton {
     }
 
     onPreviewDataChanged: {
-        if (!root.loaded && previewData) root.applyPreview(previewData)
+        if (previewData) root.applyPreview(previewData)
     }
 
     onShouldLoadChanged: {

@@ -30,6 +30,7 @@ GridLayout {
     property int loadInterval: 80
     property list<string> colorSchemes: customTheme ? customColorSchemes : builtInTheme ? builtInColorSchemes : root.wallpaperColorSchemes
     property var previewResults: ({})
+    property string previewRequestPath: ""
 
     readonly property bool wallpaperTheme: !customTheme && !builtInTheme
     readonly property string wallpaperPath: Config.options.background.wallpaperPath
@@ -42,6 +43,18 @@ GridLayout {
     }
 
     property int loadedCount: 0
+
+    function resetLoadingState() {
+        startTimer.stop()
+        loadTimer.stop()
+        root.loadedCount = 0
+        root.previewResults = ({})
+    }
+
+    function scheduleLoading() {
+        root.resetLoadingState()
+        startTimer.start()
+    }
 
     Repeater {
         model: root.colorSchemes
@@ -66,6 +79,7 @@ GridLayout {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                if (root.previewRequestPath !== root.wallpaperPath) return
                 try {
                     root.previewResults = JSON.parse(this.text || "{}")
                     root.loadedCount = root.colorSchemes.length
@@ -97,7 +111,9 @@ GridLayout {
         repeat: false
         running: false
         onTriggered: {
-            if (root.wallpaperTheme && root.wallpaperPath !== "") {
+            if (root.wallpaperTheme) {
+                if (root.wallpaperPath === "") return
+                root.previewRequestPath = root.wallpaperPath
                 wallpaperPreviewProcess.running = true
                 return
             }
@@ -105,7 +121,8 @@ GridLayout {
         }
     }
 
-    Component.onCompleted: {
-        Qt.callLater(() => startTimer.start())
-    }
+    onColorSchemesChanged: Qt.callLater(root.scheduleLoading)
+    onWallpaperPathChanged: if (root.wallpaperTheme) Qt.callLater(root.scheduleLoading)
+
+    Component.onCompleted: Qt.callLater(root.scheduleLoading)
 }

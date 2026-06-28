@@ -481,7 +481,7 @@ Singleton {
         if (Config.options.search.prefix.showDefaultActionsWithoutPrefix) {
             if (!startsWithShellCommandPrefix)
                 result.push(root.commandResult());
-            if (!startsWithNumber && !startsWithMathPrefix)
+            if (!startsWithNumber && !startsWithMathPrefix && root.mathResult.length > 0)
                 result.push(root.mathResultEntry());
             if (!startsWithWebSearchPrefix)
                 result.push(root.webSearchResult());
