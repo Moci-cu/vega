@@ -39,6 +39,7 @@ ContentPage {
     }
 
     Component.onCompleted: {
+        ExtensionManager.watchFileChanges = false // Settings app doesn't need file watching to prevent loops
         if (!ExtensionManager.ready) return
         if (!Config.options.extensions.enable) { page.filter(); return }
         if (ExtensionSearch.availableExtensions.length === 0) {

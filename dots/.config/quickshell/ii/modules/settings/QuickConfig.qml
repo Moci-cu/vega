@@ -44,10 +44,14 @@ ContentPage {
         }
     }
 
-    Component.onCompleted: Qt.callLater(() => {
-        page.allowHeavyLoad = true
-        page.refreshFavouritesCarousel()
-    })
+    Component.onCompleted: Qt.callLater(page.refreshFavouritesCarousel)
+
+    Timer {
+        interval: 700
+        running: true
+        repeat: false
+        onTriggered: page.allowHeavyLoad = true
+    }
 
     Connections {
         target: Persistent.states.wallpaper
@@ -267,15 +271,21 @@ ContentPage {
 
                             Repeater {
                                 model: [
-                                    { customTheme: false, builtInTheme: false },
-                                    { customTheme: false, builtInTheme: true },
-                                    { customTheme: true, builtInTheme: false }
+                                    { customTheme: false, builtInTheme: false, startDelay: 0, loadInterval: 80 },
+                                    { customTheme: false, builtInTheme: true, startDelay: 800, loadInterval: 80 },
+                                    { customTheme: true, builtInTheme: false, startDelay: 3200, loadInterval: 120 }
                                 ]
-                                
-                                delegate: ColorPreviewGrid {
-                                    columns: carouselWrapper.expanded ? 2 : 3
-                                    customTheme: modelData.customTheme
-                                    builtInTheme: modelData.builtInTheme
+
+                                delegate: Loader {
+                                    Layout.fillWidth: true
+                                    active: page.allowHeavyLoad
+                                    sourceComponent: ColorPreviewGrid {
+                                        columns: carouselWrapper.expanded ? 2 : 3
+                                        customTheme: modelData.customTheme
+                                        builtInTheme: modelData.builtInTheme
+                                        startDelay: modelData.startDelay
+                                        loadInterval: modelData.loadInterval
+                                    }
                                 }
                             }
 

@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 
 /*
     Almost all of the custom color schemes (latte.json, samurai.json etc.) are gotten from https://github.com/snowarch/quickshell-ii-niri/blob/main/modules/common/ThemePresets.qml
@@ -24,7 +26,14 @@ GridLayout {
 
     property bool customTheme: false
     property bool builtInTheme: false
+    property int startDelay: 0
+    property int loadInterval: 80
     property list<string> colorSchemes: customTheme ? customColorSchemes : builtInTheme ? builtInColorSchemes : root.wallpaperColorSchemes
+    property var previewResults: ({})
+
+    readonly property bool wallpaperTheme: !customTheme && !builtInTheme
+    readonly property string wallpaperPath: Config.options.background.wallpaperPath
+    readonly property string materialPreviewScript: FileUtils.trimFileProtocol(`${Directories.scriptPath}/colors/generate_colors_material.py`)
 
     function formatText(text) {
         if (customTheme || builtInTheme) return text.charAt(0).toUpperCase() + text.slice(1);
@@ -44,14 +53,32 @@ GridLayout {
             colorSchemeDisplayName: formatText(modelData)
             customTheme: root.customTheme
             builtInTheme: root.builtInTheme
+            previewData: root.previewResults[modelData] ?? null
             
             shouldLoad: index < root.loadedCount
         }
     }
 
+    Process {
+        id: wallpaperPreviewProcess
+        running: false
+        command: [root.materialPreviewScript, "--path", root.wallpaperPath, "--preview-all"]
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.previewResults = JSON.parse(this.text || "{}")
+                    root.loadedCount = root.colorSchemes.length
+                } catch (e) {
+                    console.log("[ColorPreviewGrid] Batch preview parse error:", this.text)
+                }
+            }
+        }
+    }
+
     Timer {
         id: loadTimer
-        interval: 20
+        interval: root.loadInterval
         repeat: true
         running: false
         
@@ -64,7 +91,21 @@ GridLayout {
         }
     }
 
+    Timer {
+        id: startTimer
+        interval: root.startDelay
+        repeat: false
+        running: false
+        onTriggered: {
+            if (root.wallpaperTheme && root.wallpaperPath !== "") {
+                wallpaperPreviewProcess.running = true
+                return
+            }
+            loadTimer.start()
+        }
+    }
+
     Component.onCompleted: {
-        Qt.callLater(() => loadTimer.start())
+        Qt.callLater(() => startTimer.start())
     }
 }

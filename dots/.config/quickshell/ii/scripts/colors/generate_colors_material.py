@@ -26,6 +26,7 @@ parser.add_argument('--blend_bg_fg', action='store_true', default=False, help='S
 parser.add_argument('--cache', type=str, default=None, help='file path to store the generated color')
 parser.add_argument('--debug', action='store_true', default=False, help='debug mode')
 parser.add_argument('--preview', action='store_true', help='preview the generated colorscheme and returns three accent colors to be previewed in the UI')
+parser.add_argument('--preview-all', action='store_true', help='preview all wallpaper color schemes in one run')
 args = parser.parse_args()
 
 rgba_to_hex = lambda rgba: "#{:02X}{:02X}{:02X}".format(rgba[0], rgba[1], rgba[2])
@@ -88,49 +89,69 @@ elif args.color is not None:
     argb = hex_to_argb(args.color)
     hct = Hct.from_int(argb)
 
-if args.scheme == 'scheme-fruit-salad':
-    from materialyoucolor.scheme.scheme_fruit_salad import SchemeFruitSalad as Scheme
-elif args.scheme == 'scheme-expressive':
-    from materialyoucolor.scheme.scheme_expressive import SchemeExpressive as Scheme
-elif args.scheme == 'scheme-monochrome':
-    from materialyoucolor.scheme.scheme_monochrome import SchemeMonochrome as Scheme
-elif args.scheme == 'scheme-rainbow':
-    from materialyoucolor.scheme.scheme_rainbow import SchemeRainbow as Scheme
-elif args.scheme == 'scheme-tonal-spot':
-    from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot as Scheme
-elif args.scheme == 'scheme-neutral':
-    from materialyoucolor.scheme.scheme_neutral import SchemeNeutral as Scheme
-elif args.scheme == 'scheme-fidelity':
-    from materialyoucolor.scheme.scheme_fidelity import SchemeFidelity as Scheme
-elif args.scheme == 'scheme-content':
-    from materialyoucolor.scheme.scheme_content import SchemeContent as Scheme
-elif args.scheme == 'scheme-vibrant':
-    from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant as Scheme
-else:
-    from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot as Scheme
-# Generate
-scheme = Scheme(hct, darkmode, 0.0)
+def scheme_class(scheme_name):
+    if scheme_name == 'scheme-fruit-salad':
+        from materialyoucolor.scheme.scheme_fruit_salad import SchemeFruitSalad as Scheme
+    elif scheme_name == 'scheme-expressive':
+        from materialyoucolor.scheme.scheme_expressive import SchemeExpressive as Scheme
+    elif scheme_name == 'scheme-monochrome':
+        from materialyoucolor.scheme.scheme_monochrome import SchemeMonochrome as Scheme
+    elif scheme_name == 'scheme-rainbow':
+        from materialyoucolor.scheme.scheme_rainbow import SchemeRainbow as Scheme
+    elif scheme_name == 'scheme-tonal-spot':
+        from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot as Scheme
+    elif scheme_name == 'scheme-neutral':
+        from materialyoucolor.scheme.scheme_neutral import SchemeNeutral as Scheme
+    elif scheme_name == 'scheme-fidelity':
+        from materialyoucolor.scheme.scheme_fidelity import SchemeFidelity as Scheme
+    elif scheme_name == 'scheme-content':
+        from materialyoucolor.scheme.scheme_content import SchemeContent as Scheme
+    elif scheme_name == 'scheme-vibrant':
+        from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant as Scheme
+    else:
+        from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot as Scheme
+    return Scheme
+
+def material_colors_for_scheme(scheme_name):
+    Scheme = scheme_class(scheme_name)
+    scheme = Scheme(hct, darkmode, 0.0)
+    colors = {}
+    for color in vars(MaterialDynamicColors).keys():
+        color_name = getattr(MaterialDynamicColors, color)
+        if hasattr(color_name, "get_hct"):
+            rgba = color_name.get_hct(scheme).to_rgba()
+            colors[color] = rgba_to_hex(rgba)
+    if darkmode == True:
+        colors['success'] = '#B5CCBA'
+        colors['onSuccess'] = '#213528'
+        colors['successContainer'] = '#374B3E'
+        colors['onSuccessContainer'] = '#D1E9D6'
+    else:
+        colors['success'] = '#4F6354'
+        colors['onSuccess'] = '#FFFFFF'
+        colors['successContainer'] = '#D1E8D5'
+        colors['onSuccessContainer'] = '#0C1F13'
+    return colors
+
+scheme = scheme_class(args.scheme)(hct, darkmode, 0.0)
 
 material_colors = {}
 term_colors = {}
 
-for color in vars(MaterialDynamicColors).keys():
-    color_name = getattr(MaterialDynamicColors, color)
-    if hasattr(color_name, "get_hct"):
-        rgba = color_name.get_hct(scheme).to_rgba()
-        material_colors[color] = rgba_to_hex(rgba)
+material_colors = material_colors_for_scheme(args.scheme)
 
-# Extended material
-if darkmode == True:
-    material_colors['success'] = '#B5CCBA'
-    material_colors['onSuccess'] = '#213528'
-    material_colors['successContainer'] = '#374B3E'
-    material_colors['onSuccessContainer'] = '#D1E9D6'
-else:
-    material_colors['success'] = '#4F6354'
-    material_colors['onSuccess'] = '#FFFFFF'
-    material_colors['successContainer'] = '#D1E8D5'
-    material_colors['onSuccessContainer'] = '#0C1F13'
+if args.preview_all:
+    schemes = ["scheme-auto", "scheme-content", "scheme-tonal-spot", "scheme-fidelity", "scheme-fruit-salad", "scheme-expressive", "scheme-rainbow", "scheme-neutral", "scheme-monochrome"]
+    previews = {}
+    for scheme_name in schemes:
+        colors = material_colors_for_scheme(scheme_name)
+        previews[scheme_name] = {
+            "primary": colors.get("primary"),
+            "primary_container": colors.get("primaryContainer"),
+            "secondary": colors.get("secondary")
+        }
+    print(json.dumps(previews))
+    exit(0)
 
 if args.preview:
     print(json.dumps({
