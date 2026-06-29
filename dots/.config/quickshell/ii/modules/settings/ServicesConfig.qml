@@ -306,6 +306,15 @@ ContentPage {
                         Config.options.search.prefix.fileSearch = text;
                     }
                 }
+                MaterialTextArea {
+                    Layout.fillWidth: true
+                    placeholderText: Translation.tr("Window")
+                    text: Config.options.search.prefix.window
+                    wrapMode: TextEdit.Wrap
+                    onTextChanged: {
+                        Config.options.search.prefix.window = text;
+                    }
+                }
             }
         }
         ContentSubsection {

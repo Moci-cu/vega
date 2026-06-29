@@ -1084,6 +1084,14 @@ ContentPage {
 
         ContentSubsection {
             title: Translation.tr("Scrolling overview style")
+            ConfigSwitch {
+                buttonIcon: "pin"
+                text: Translation.tr("Show workspace numbers")
+                checked: Config.options.overview.scrollingStyle.showWorkspaceNumbers
+                onCheckedChanged: {
+                    Config.options.overview.scrollingStyle.showWorkspaceNumbers = checked;
+                }
+            }
             ConfigSelectionArray {
                 currentValue: Config.options.overview.scrollingStyle.backgroundStyle
                 onSelected: newValue => {

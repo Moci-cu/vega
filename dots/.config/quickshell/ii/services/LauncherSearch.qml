@@ -15,8 +15,10 @@ Singleton {
     property string query: ""
     property int resultLimit: 15
 
+    readonly property list<string> searchPrefixes: [Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch, Config.options.search.prefix.window]
+
     function ensurePrefix(prefix) {
-        if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch].some(i => root.query.startsWith(i))) {
+        if (root.searchPrefixes.some(i => i.length > 0 && root.query.startsWith(i))) {
             root.query = prefix + root.query.slice(1);
         } else {
             root.query = prefix + root.query;
@@ -85,6 +87,15 @@ Singleton {
             action: "light",
             execute: () => {
                 Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "light", "--noswitch"]);
+            }
+        },
+        {
+            action: "killall",
+            execute: () => {
+                const windows = HyprlandData.windowList.filter(win => win.address)
+                for (const win of windows) {
+                    Hyprland.dispatch(`hl.dsp.window.close({window = "address:${win.address}"})`)
+                }
             }
         },
         {
@@ -311,6 +322,57 @@ Singleton {
         };
     }
 
+    function windowSearchText(win) {
+        return [win.class, win.initialClass, win.title, win.initialTitle]
+            .filter(value => value && String(value).length > 0)
+            .join(" ")
+    }
+
+    function windowResult(win) {
+        const appClass = win.class || win.initialClass || ""
+        const title = win.title || win.initialTitle || appClass || Translation.tr("Untitled window")
+        return {
+            key: `window:${win.address}`,
+            type: Translation.tr("Window"),
+            name: title,
+            iconName: AppSearch.guessIcon(appClass),
+            iconType: LauncherSearchResult.IconType.System,
+            verb: Translation.tr("Focus"),
+            execute: () => {
+                Hyprland.dispatch(`hl.dsp.focus({window = "address:${win.address}"})`)
+                GlobalStates.overviewOpen = false
+            },
+            actions: limit => [
+                {
+                    name: Translation.tr("Close"),
+                    iconName: "close",
+                    iconType: LauncherSearchResult.IconType.Material,
+                    execute: () => Hyprland.dispatch(`hl.dsp.window.close({window = "address:${win.address}"})`)
+                }
+            ].slice(0, limit ?? 1)
+        }
+    }
+
+    function windowResults(search) {
+        const activeWorkspaceId = HyprlandData.activeWorkspace?.id ?? Hyprland.focusedWorkspace?.id ?? 0
+        const windows = HyprlandData.windowList
+            .filter(win => win.workspace?.id === activeWorkspaceId)
+            .sort((a, b) => (a.focusHistoryID ?? 999999) - (b.focusHistoryID ?? 999999))
+
+        if (search.length === 0) return windows.slice(0, root.resultLimit)
+
+        const preppedWindows = windows.map(win => ({
+            name: Fuzzy.prepare(root.windowSearchText(win)),
+            entry: win
+        }))
+
+        return Fuzzy.go(search, preppedWindows, {
+            all: true,
+            key: "name",
+            limit: root.resultLimit
+        }).map(r => r.obj.entry)
+    }
+
     function commandResult() {
         return {
             key: "command",
@@ -442,6 +504,9 @@ Singleton {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.emojis);
             return Emojis.fuzzyQuery(searchString).map(entry => root.emojiResult(entry));
+        } else if (Config.options.search.prefix.window.length > 0 && root.query.startsWith(Config.options.search.prefix.window)) {
+            const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.window).trim();
+            return root.windowResults(searchString).map(entry => root.windowResult(entry));
         }
 
         //////// Prioritized by prefix /////////
@@ -453,6 +518,7 @@ Singleton {
         const startsWithMathPrefix = root.query.startsWith(Config.options.search.prefix.math);
         const startsWithShellCommandPrefix = root.query.startsWith(Config.options.search.prefix.shellCommand);
         const startsWithWebSearchPrefix = root.query.startsWith(Config.options.search.prefix.webSearch);
+        const startsWithWindowPrefix = Config.options.search.prefix.window.length > 0 && root.query.startsWith(Config.options.search.prefix.window);
         if (startsWithNumber || startsWithMathPrefix) {
             result.push(root.mathResultEntry());
         } else if (startsWithShellCommandPrefix) {
@@ -467,7 +533,7 @@ Singleton {
         }
 
         //////////////// Apps //////////////////
-        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithNumber;
+        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !startsWithNumber;
         if (shouldSearchApps || startsWithAppPrefix) {
             result = result.concat(AppSearch.fuzzyQuery(StringUtils.cleanPrefix(root.query, Config.options.search.prefix.app), root.resultLimit).map(entry => root.appResult(entry)));
         }

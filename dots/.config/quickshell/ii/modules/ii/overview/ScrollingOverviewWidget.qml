@@ -222,7 +222,7 @@ Item {
                     y: (root.workspaceImplicitHeight + root.workspaceSpacing) * rowIndex - 3
                     implicitWidth: isScrolledWorkspace ? root.workspaceImplicitWidth * 1.5 : root.workspaceImplicitWidth
                     implicitHeight: root.workspaceImplicitHeight
-                    color: hovering ? ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 0.7) : ColorUtils.transparentize(Appearance.colors.colLayer1, 0.5)
+                    color: hovering ? ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 0.7) : "transparent"
                     radius: root.windowRounding
 
                     Behavior on color {
@@ -233,19 +233,20 @@ Item {
                     }
 
                     StyledText {
+                        visible: Config.options.overview.scrollingStyle.showWorkspaceNumbers
                         text: wsId
                         anchors.centerIn: parent
                         font.pixelSize: 64
-                        color: ColorUtils.transparentize(Appearance.colors.colSecondaryContainer,0.5)
-                        
-                        // text flashes over windowses for a split second if we dont put this animation
-                        opacity: 0.0  
+                        color: ColorUtils.transparentize(Appearance.colors.colSecondaryContainer, 0.5)
+
+                        // Avoid text flashing over windows for a split second on load.
+                        opacity: 0.0
                         Component.onCompleted: opacity = 1
                         Behavior on opacity {
                             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                         }
                     }
-                    
+
                     DropArea { // Workspace drop
                         anchors.fill: parent
                         onEntered: {

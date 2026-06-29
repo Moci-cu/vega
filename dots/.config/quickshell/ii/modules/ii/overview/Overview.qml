@@ -39,6 +39,8 @@ Scope {
 
                 readonly property bool isScrollingLayout: Persistent.states.hyprland.layout === "scrolling"
                 property string searchingText: ""
+                readonly property bool hasSearchQuery: searchingText.length > 0
+                readonly property bool showWorkspaceOverview: !hasSearchQuery
 
                 WlrLayershell.namespace: "quickshell:overview"
                 WlrLayershell.layer: WlrLayer.Top
@@ -194,10 +196,10 @@ Scope {
                         scale: root.effectiveScale
                         anchors.top: searchWidgetWrapper.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        active: root.visible && (Config?.options.overview.enable ?? true) && !root.isScrollingLayout
+                        active: root.visible && root.showWorkspaceOverview && (Config?.options.overview.enable ?? true) && !root.isScrollingLayout
                         sourceComponent: OverviewWidget {
                             panelWindow: root
-                            visible: (root.searchingText == "")
+                            visible: root.showWorkspaceOverview
                             monitorIndex: root.monitorIndex
                         }
                     }
@@ -206,11 +208,11 @@ Scope {
                         id: scrollingOverviewLoader
                         scale: root.effectiveScale
                         anchors.fill: parent
-                        active: root.visible && (Config?.options.overview.enable ?? true) && root.isScrollingLayout
+                        active: root.visible && root.showWorkspaceOverview && (Config?.options.overview.enable ?? true) && root.isScrollingLayout
                         sourceComponent: ScrollingOverviewWidget {
                             anchors.fill: parent
                             panelWindow: root
-                            visible: (root.searchingText == "")
+                            visible: root.showWorkspaceOverview
                             monitorIndex: root.monitorIndex
                         }
                     }
