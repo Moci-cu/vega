@@ -9,6 +9,7 @@ RowLayout {
 
     property int baseButtonWidth: 50
     property int baseButtonHeight: 50
+    property real sideButtonScale: 0.9
     property real playPauseButtonWidthScale: 1.5
     property var player: MprisController.activePlayer
 
@@ -23,7 +24,7 @@ RowLayout {
 
         WatchControlButton {
             symbol: "skip_previous"
-            size: root.baseButtonHeight * 0.9
+            size: root.baseButtonHeight * root.sideButtonScale
             backgroundColor: Appearance.m3colors.m3primaryFixedDim
             backgroundHoverColor: Appearance.m3colors.m3primaryFixed
             rippleColor: Appearance.colors.colPrimaryContainerActive
@@ -49,7 +50,7 @@ RowLayout {
 
         WatchControlButton {
             symbol: "skip_next"
-            size: root.baseButtonHeight * 0.9
+            size: root.baseButtonHeight * root.sideButtonScale
             backgroundColor: Appearance.m3colors.m3primaryFixedDim
             backgroundHoverColor: Appearance.m3colors.m3primaryFixed
             rippleColor: Appearance.colors.colPrimaryContainerActive

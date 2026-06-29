@@ -15,6 +15,10 @@ StyledOverlayWidget {
     id: root
     minimumWidth: 300
     minimumHeight: 200
+
+    Component.onCompleted: ResourceUsage.activeInstances++
+    Component.onDestruction: ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
+
     property list<var> resources: [
         {
             "icon": "planner_review",
