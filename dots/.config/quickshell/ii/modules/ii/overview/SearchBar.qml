@@ -15,6 +15,11 @@ RowLayout {
     property alias searchInput: searchInput
     property string searchingText
 
+    function selectedEntry() {
+        const selectedIndex = Math.max(0, appResults.currentIndex);
+        return LauncherSearch.results[selectedIndex];
+    }
+
     function forceFocus() {
         searchInput.forceActiveFocus();
     }
@@ -85,8 +90,7 @@ RowLayout {
 
         onAccepted: {
             if (appResults.count > 0) {
-                const selectedIndex = Math.max(0, appResults.currentIndex);
-                const selectedEntry = LauncherSearch.results[selectedIndex];
+                const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
                 GlobalStates.overviewOpen = false;
                 selectedEntry.execute();
@@ -94,7 +98,8 @@ RowLayout {
         }
 
         Keys.onPressed: event => {
-            if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_N) {
+            const ctrlPressed = event.modifiers & Qt.ControlModifier;
+            if (ctrlPressed && event.key === Qt.Key_N) {
                 if (appResults.count > 0) {
                     appResults.currentIndex = Math.min(appResults.count - 1, appResults.currentIndex + 1);
                     appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
@@ -102,7 +107,7 @@ RowLayout {
                 event.accepted = true;
                 return;
             }
-            if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_P) {
+            if (ctrlPressed && event.key === Qt.Key_P) {
                 if (appResults.count > 0) {
                     appResults.currentIndex = Math.max(0, appResults.currentIndex - 1);
                     appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);

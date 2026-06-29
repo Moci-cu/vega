@@ -328,6 +328,11 @@ Singleton {
             .join(" ")
     }
 
+    function focusWindow(win) {
+        Hyprland.dispatch(`hl.dsp.focus({window = "address:${win.address}"})`)
+        GlobalStates.overviewOpen = false
+    }
+
     function windowResult(win) {
         const appClass = win.class || win.initialClass || ""
         const title = win.title || win.initialTitle || appClass || Translation.tr("Untitled window")
@@ -338,10 +343,7 @@ Singleton {
             iconName: AppSearch.guessIcon(appClass),
             iconType: LauncherSearchResult.IconType.System,
             verb: Translation.tr("Focus"),
-            execute: () => {
-                Hyprland.dispatch(`hl.dsp.focus({window = "address:${win.address}"})`)
-                GlobalStates.overviewOpen = false
-            },
+            execute: () => root.focusWindow(win),
             actions: limit => [
                 {
                     name: Translation.tr("Close"),
