@@ -123,6 +123,12 @@ Singleton {
         if (freqMatch) root.cpuFreq = parseInt(freqMatch[1]) + " MHz"
     }
 
+    function parseCpuMaxFreq(textFreq) {
+        const khz = Number(textFreq.trim())
+        if (!Number.isFinite(khz) || khz <= 0) return
+        root.maxAvailableCpuString = (khz / 1000000).toFixed(1).replace(/\.0$/, "") + " GHz"
+    }
+
     function refreshCpuInfo() {
         fileCpuInfo.reload()
         root.parseCpuInfo(fileCpuInfo.text())
@@ -151,6 +157,12 @@ Singleton {
         onLoaded: root.parseCpuInfo(text())
     }
     FileView {
+        id: fileCpuMaxFreq
+        path: "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+        printErrors: false
+        onLoaded: root.parseCpuMaxFreq(text())
+    }
+    FileView {
         id: fileCpuTemp
         path: root.cpuTempInputPath
         printErrors: false
@@ -163,22 +175,6 @@ Singleton {
         }
     }
 
-    Process {
-        id: findCpuMaxFreqProc
-        environment: ({
-            LANG: "C",
-            LC_ALL: "C"
-        })
-        command: ["bash", "-c", "lscpu | grep 'CPU max MHz' | awk '{print $4}'"]
-        running: true
-        stdout: StdioCollector {
-            id: outputCollector
-            onStreamFinished: {
-                root.maxAvailableCpuString = (parseFloat(outputCollector.text) / 1000).toFixed(0) + " GHz"
-            }
-        }
-    }
-    
     Process {
         id: diskProc
         command: ["bash", "-c", "df -k / | awk 'NR==2{print $2, $3}'"]
@@ -209,5 +205,6 @@ Singleton {
 
     Component.onCompleted: {
         root.refreshCpuInfo()
+        fileCpuMaxFreq.reload()
     }
 }

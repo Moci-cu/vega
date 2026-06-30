@@ -145,7 +145,7 @@ Item { // Bar content region
         }
     }
 
-    Row { // Middle section
+    Item { // Middle section
         id: middleSection
         anchors {
             top: parent.top

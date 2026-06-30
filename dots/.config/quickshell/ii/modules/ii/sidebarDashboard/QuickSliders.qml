@@ -52,18 +52,19 @@ Rectangle {
         Repeater {
             id: repeater
             model: [
-                { show: showBrightness, icon: "brightness_6", 
-                getVal: () => root.brightnessMonitor.brightness, 
-                setVal: (v) => root.brightnessMonitor.setBrightness(v) },
-                { show: showVolume, icon: "volume_up", 
-                getVal: () => Audio.sink.audio.volume, 
-                setVal: (v) => { Audio.sink.audio.volume = v } },
-                { show: showMic, icon: "mic", 
-                getVal: () => Audio.source.audio.volume, 
-                setVal: (v) => { Audio.source.audio.volume = v } },
-                { show: showGamma, icon: "light_mode",  secondaryIcon: "wb_twilight",
-                getVal: () => Hyprsunset.gamma === 100 ? 0.3 + root.brightnessMonitor?.brightness * 0.7 : (Hyprsunset.gamma - Hyprsunset.gammaLowerLimit) / (100 - Hyprsunset.gammaLowerLimit) * 0.3,
+                { show: showBrightness && !!root.brightnessMonitor, icon: "brightness_6",
+                getVal: () => root.brightnessMonitor?.brightness ?? 0,
+                setVal: (v) => root.brightnessMonitor?.setBrightness(v) },
+                { show: showVolume && !!Audio.sink?.audio, icon: "volume_up",
+                getVal: () => Audio.sink?.audio?.volume ?? 0,
+                setVal: (v) => { if (Audio.sink?.audio) Audio.sink.audio.volume = v } },
+                { show: showMic && !!Audio.source?.audio, icon: "mic",
+                getVal: () => Audio.source?.audio?.volume ?? 0,
+                setVal: (v) => { if (Audio.source?.audio) Audio.source.audio.volume = v } },
+                { show: showGamma && !!root.brightnessMonitor, icon: "light_mode",  secondaryIcon: "wb_twilight",
+                getVal: () => Hyprsunset.gamma === 100 ? 0.3 + (root.brightnessMonitor?.brightness ?? 0) * 0.7 : (Hyprsunset.gamma - Hyprsunset.gammaLowerLimit) / (100 - Hyprsunset.gammaLowerLimit) * 0.3,
                 setVal: (v) => {
+                    if (!root.brightnessMonitor) return;
                     if (v >= 0.3) {
                         // 0.3 - 1.0 brightness
                         root.brightnessMonitor.setBrightness((v - 0.3) / 0.7);

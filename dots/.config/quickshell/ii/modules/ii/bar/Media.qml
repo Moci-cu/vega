@@ -120,7 +120,6 @@ Item {
         ClippedFilledCircularProgress {
             id: mediaCircProg
             anchors.fill: parent
-            visible: !loadingIndLoader.active
             implicitSize: root.progressButtonSize
 
             lineWidth: Appearance.rounding.unsharpen
