@@ -10,6 +10,8 @@ Item {
     id: root
 
     property list<var> sections: []
+    property bool indexReady: false
+    property bool indexing: false
 
     property string currentSearch: ""
     onCurrentSearchChanged: {
@@ -17,6 +19,8 @@ Item {
     }
 
     function startIndexing() {
+        indexing = true
+        indexReady = false
         sections = []
         pageFile.start([
             Directories.generalConfigPath,
@@ -28,12 +32,24 @@ Item {
         ])
     }
 
-    Component.onCompleted: startIndexing()
+    function ensureIndexed() {
+        if (indexReady || indexing) return
+        startIndexing()
+    }
+
+    Timer {
+        interval: 700
+        running: true
+        repeat: false
+        onTriggered: root.ensureIndexed()
+    }
 
     Connections {
         target: Translation
         function onLanguageCodeChanged() {
-            startIndexing()
+            root.indexReady = false
+            root.indexing = false
+            Qt.callLater(root.ensureIndexed)
         }
     }
 
@@ -51,8 +67,11 @@ Item {
         }
 
         function loadNext() {
-            if (currentIndex >= files.length)
+            if (currentIndex >= files.length) {
+                root.indexing = false
+                root.indexReady = true
                 return
+            }
 
             path = files[currentIndex]
         }
@@ -261,6 +280,7 @@ Item {
 
     function getSearchResult(query) {
         if (!query || query.trim() === "") return []
+        ensureIndexed()
 
         query = query.toLowerCase().trim()
         let queryTokens = tokenize(query)

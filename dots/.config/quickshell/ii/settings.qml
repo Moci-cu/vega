@@ -218,16 +218,15 @@ ApplicationWindow {
                     } */
 
                     onAccepted: {
-                        const result = SearchRegistry.getResultsRanked(searchInput.text)
+                        const normalizedText = searchInput.text.toLowerCase()
+                        const results = SearchRegistry.getResultsRanked(normalizedText)
 
-                        if (result == null) {
+                        if (results == null) {
                             noMoreResultsAnim.restart();
                             return
                         }
 
-                        let length = SearchRegistry.getResultsRanked(searchInput.text).length
-
-                        if (length == 0) {
+                        if (results.length == 0) {
                             noMoreResultsAnim.restart();
                             return
                         }
@@ -238,13 +237,11 @@ ApplicationWindow {
                             
                         } else {
                             root.lastSearchIndex++
-                            if (SearchRegistry.getResultsRanked(searchInput.text).length === 1) {
+                            if (results.length === 1) {
                                 noMoreResultsAnim.restart()
                             }
                         }
 
-                        let normalizedText = searchInput.text.toLowerCase()
-                        let results = SearchRegistry.getResultsRanked(normalizedText)
                         if (results.length > 0) {
                             let index = root.lastSearchIndex % results.length
                             let result = results[index]
