@@ -37,7 +37,7 @@ MouseArea {
 
         Resource {
             iconName: "device_thermostat"
-            percentage: Math.min(ResourceUsage.cpuTempCelsius / 100, 1)
+            percentage: ResourceUsage.cpuTempCelsius > 0 ? Math.min(ResourceUsage.cpuTempCelsius / 100, 1) : 0
             valueText: ResourceUsage.cpuTempCelsius > 0 ? `${ResourceUsage.cpuTempCelsius}°` : "--"
             shown: true
             Layout.leftMargin: shown ? 6 : 0

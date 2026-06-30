@@ -98,26 +98,34 @@ Singleton {
         root.updateHistories()
     }
 
-    function refreshCpuInfo() {
-        fileCpuInfo.reload()
-        const textCpu = fileCpuInfo.text()
-        if (root.cpuModel === "Unknown CPU" && textCpu.length > 0) {
-            const modelMatch = textCpu.match(/model name\s+:\s+(.*)/)
-            if (modelMatch) {
-                root.cpuModel = modelMatch[1]
-                    .replace(/\(.*?\)/g, "")              // (R), (TM) vs
-                    .replace(/with.*$/i, "")              // with Radeon...
-                    .replace(/@\s*[\d.]+\s*GHz/i, "")     // @ 2.60GHz
-                    .replace(/\b\d+-Core\b/gi, "")        // 6-Core
-                    .replace(/\b\d+\s*Cores?\b/gi, "")    // 6 Cores
-                    .replace(/\bCPU\b/gi, "")
-                    .replace(/\bProcessor\b/gi, "")
-                    .replace(/\s+/g, " ")
-                    .trim()
-            }
+    function cleanCpuModel(model) {
+        return model
+            .replace(/\(.*?\)/g, "")              // (R), (TM) vs
+            .replace(/with.*$/i, "")              // with Radeon...
+            .replace(/@\s*[\d.]+\s*GHz/i, "")     // @ 2.60GHz
+            .replace(/\b\d+-Core\b/gi, "")        // 6-Core
+            .replace(/\b\d+\s*Cores?\b/gi, "")    // 6 Cores
+            .replace(/\bCPU\b/gi, "")
+            .replace(/\bProcessor\b/gi, "")
+            .replace(/\s+/g, " ")
+            .trim()
+    }
+
+    function parseCpuInfo(textCpu) {
+        if (!textCpu || textCpu.length === 0) return
+        if (root.cpuModel === "Unknown CPU") {
+            const modelMatch = textCpu.match(/model name\s+:\s+(.*)/i)
+                ?? textCpu.match(/Hardware\s+:\s+(.*)/i)
+                ?? textCpu.match(/Processor\s+:\s+(.*)/i)
+            if (modelMatch) root.cpuModel = root.cleanCpuModel(modelMatch[1]) || root.cpuModel
         }
         const freqMatch = textCpu.match(/cpu MHz\s+:\s+([\d.]+)/)
         if (freqMatch) root.cpuFreq = parseInt(freqMatch[1]) + " MHz"
+    }
+
+    function refreshCpuInfo() {
+        fileCpuInfo.reload()
+        root.parseCpuInfo(fileCpuInfo.text())
     }
 
     function refreshDiskUsage() {
@@ -135,9 +143,13 @@ Singleton {
 		onTriggered: root.refreshUsage()
 	}
 
-	FileView { id: fileMeminfo; path: "/proc/meminfo" }
+    FileView { id: fileMeminfo; path: "/proc/meminfo" }
     FileView { id: fileStat; path: "/proc/stat" }
-    FileView { id: fileCpuInfo; path: "/proc/cpuinfo" }
+    FileView {
+        id: fileCpuInfo
+        path: "/proc/cpuinfo"
+        onLoaded: root.parseCpuInfo(text())
+    }
     FileView {
         id: fileCpuTemp
         path: root.cpuTempInputPath

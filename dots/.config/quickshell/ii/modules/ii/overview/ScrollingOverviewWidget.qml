@@ -222,7 +222,11 @@ Item {
                     y: (root.workspaceImplicitHeight + root.workspaceSpacing) * rowIndex - 3
                     implicitWidth: isScrolledWorkspace ? root.workspaceImplicitWidth * 1.5 : root.workspaceImplicitWidth
                     implicitHeight: root.workspaceImplicitHeight
-                    color: hovering ? ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 0.7) : "transparent"
+                    color: hovering
+                        ? ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 0.7)
+                        : (Config.options.overview.scrollingStyle.showWorkspaceNumbers
+                            ? "transparent"
+                            : ColorUtils.transparentize(Appearance.colors.colLayer1, 0.9))
                     radius: root.windowRounding
 
                     Behavior on color {
