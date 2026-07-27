@@ -21,6 +21,8 @@ Singleton {
     property bool wifiScanning: false
     property bool wifiConnecting: connectProc.running
     property WifiAccessPoint wifiConnectTarget
+    property bool scanAfterWifiEnabled: false
+    property bool initialScanRequested: false
     readonly property list<WifiAccessPoint> wifiNetworks: []
     readonly property WifiAccessPoint active: wifiNetworks.find(n => n.active) ?? null
     readonly property list<var> friendlyWifiNetworks: [...wifiNetworks].sort((a, b) => {
@@ -55,6 +57,7 @@ Singleton {
 
     // Control
     function enableWifi(enabled = true): void {
+        if (enableWifiProc.running) return;
         const cmd = enabled ? "on" : "off";
         enableWifiProc.exec(["nmcli", "radio", "wifi", cmd]);
     }
@@ -64,8 +67,24 @@ Singleton {
     }
 
     function rescanWifi(): void {
+        if (wifiScanning) return;
+        if (!wifiEnabled) {
+            scanAfterWifiEnabled = true;
+            return;
+        }
+
+        scanAfterWifiEnabled = false;
         wifiScanning = true;
         rescanProcess.running = true;
+    }
+
+    function requestWifiScan(): void {
+        if (wifiEnabled) {
+            rescanWifi();
+            return;
+        }
+        scanAfterWifiEnabled = true;
+        enableWifi(true);
     }
 
     function connectToWifiNetwork(accessPoint: WifiAccessPoint): void {
@@ -98,6 +117,10 @@ Singleton {
 
     Process {
         id: enableWifiProc
+        onExited: exitCode => {
+            wifiStatusProcess.running = true;
+            if (exitCode !== 0) root.scanAfterWifiEnabled = false;
+        }
     }
 
     Process {
@@ -141,14 +164,19 @@ Singleton {
         }
     }
 
+    Timer {
+        id: delayedWifiScan
+        interval: 1200
+        repeat: false
+        onTriggered: root.rescanWifi()
+    }
+
     Process {
         id: rescanProcess
         command: ["nmcli", "dev", "wifi", "list", "--rescan", "yes"]
-        stdout: SplitParser {
-            onRead: {
-                wifiScanning = false;
-                getNetworks.running = true;
-            }
+        onExited: {
+            root.wifiScanning = false;
+            getNetworks.running = true;
         }
     }
 
@@ -252,6 +280,18 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.wifiEnabled = text.trim() === "enabled";
+                if (!root.wifiEnabled) return;
+
+                if (root.scanAfterWifiEnabled) {
+                    root.scanAfterWifiEnabled = false;
+                    root.initialScanRequested = true;
+                    delayedWifiScan.restart();
+                    return;
+                }
+                if (root.initialScanRequested) return;
+
+                root.initialScanRequested = true;
+                delayedWifiScan.restart();
             }
         }
     }

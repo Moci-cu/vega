@@ -149,8 +149,7 @@ Item {
         dialog: WifiDialog {}
         onShownChanged: {
             if (!shown) return;
-            Network.enableWifi();
-            Network.rescanWifi();
+            Network.requestWifiScan();
         }
     }
 
