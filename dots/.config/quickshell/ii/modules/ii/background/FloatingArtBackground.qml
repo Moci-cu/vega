@@ -1,9 +1,9 @@
 import QtQuick
 import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import qs
 import qs.modules.common
 import qs.modules.common.widgets
-import Qt5Compat.GraphicalEffects
 
 Item {
     id: root
@@ -28,7 +28,7 @@ Item {
     property real parallaxY: {
         return verticalParallax ? (workspaceNorm - 0.5) * -2 * workspaceParallaxStrength : 0
     }
-    
+
     // using normal animations feels too flat
     Behavior on parallaxX {
         NumberAnimation { duration: 600; easing.type: Easing.OutCubic }
