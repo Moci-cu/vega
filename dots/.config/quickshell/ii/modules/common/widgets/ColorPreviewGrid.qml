@@ -30,7 +30,7 @@ GridLayout {
     property int loadInterval: 80
     property list<string> colorSchemes: customTheme ? customColorSchemes : builtInTheme ? builtInColorSchemes : root.wallpaperColorSchemes
     property var previewResults: ({})
-    property string previewRequestPath: ""
+    property Process wallpaperPreviewProcess: null
 
     readonly property bool wallpaperTheme: !customTheme && !builtInTheme
     readonly property string wallpaperPath: Config.options.background.wallpaperPath
@@ -47,6 +47,7 @@ GridLayout {
     function resetLoadingState() {
         startTimer.stop()
         loadTimer.stop()
+        root.stopWallpaperPreview()
         root.loadedCount = 0
         root.previewResults = ({})
     }
@@ -54,6 +55,21 @@ GridLayout {
     function scheduleLoading() {
         root.resetLoadingState()
         startTimer.start()
+    }
+
+    function stopWallpaperPreview() {
+        const process = root.wallpaperPreviewProcess
+        root.wallpaperPreviewProcess = null
+        if (!process) return
+        if (process.running) process.running = false
+        else process.destroy()
+    }
+
+    function startWallpaperPreview(path) {
+        root.stopWallpaperPreview()
+        root.wallpaperPreviewProcess = wallpaperPreviewProcessComponent.createObject(root, {
+            "requestPath": path
+        })
     }
 
     Repeater {
@@ -72,20 +88,30 @@ GridLayout {
         }
     }
 
-    Process {
-        id: wallpaperPreviewProcess
-        running: false
-        command: [root.materialPreviewScript, "--path", root.wallpaperPath, "--preview-all"]
+    Component {
+        id: wallpaperPreviewProcessComponent
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (root.previewRequestPath !== root.wallpaperPath) return
-                try {
-                    root.previewResults = JSON.parse(this.text || "{}")
-                    root.loadedCount = root.colorSchemes.length
-                } catch (e) {
-                    console.log("[ColorPreviewGrid] Batch preview parse error:", this.text)
+        Process {
+            id: previewProcess
+            required property string requestPath
+            running: true
+            command: [root.materialPreviewScript, "--path", requestPath, "--preview-all"]
+
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    if (root.wallpaperPreviewProcess !== previewProcess || previewProcess.requestPath !== root.wallpaperPath) return
+                    try {
+                        root.previewResults = JSON.parse(this.text || "{}")
+                        root.loadedCount = root.colorSchemes.length
+                    } catch (e) {
+                        console.log("[ColorPreviewGrid] Batch preview parse error:", this.text)
+                    }
                 }
+            }
+
+            onExited: {
+                if (root.wallpaperPreviewProcess === previewProcess) root.wallpaperPreviewProcess = null
+                destroy()
             }
         }
     }
@@ -113,8 +139,7 @@ GridLayout {
         onTriggered: {
             if (root.wallpaperTheme) {
                 if (root.wallpaperPath === "") return
-                root.previewRequestPath = root.wallpaperPath
-                wallpaperPreviewProcess.running = true
+                root.startWallpaperPreview(root.wallpaperPath)
                 return
             }
             loadTimer.start()

@@ -289,17 +289,25 @@ if [ "$DO_PULL" = true ]; then
     if [ -d "$SCRIPT_DIR/.git" ]; then
         log_verbose "Git repository found at $SCRIPT_DIR/.git"
         cd "$SCRIPT_DIR"
-        git pull
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}An error occurred while running git pull!${NC}"
-            exit 1
+        CURRENT_BRANCH="$(git branch --show-current)"
+        TRACKING_BRANCH="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)"
+
+        if [ -z "$TRACKING_BRANCH" ]; then
+            echo -e "${YELLOW}No tracking branch is configured for ${CURRENT_BRANCH:-the current checkout}; skipping git pull.${NC}"
+            echo -e "${YELLOW}The setup will continue using the current local files.${NC}"
+        else
+            log_verbose "Pulling updates from $TRACKING_BRANCH"
+            if ! git pull; then
+                echo -e "${RED}An error occurred while running git pull!${NC}"
+                exit 1
+            fi
         fi
-        git submodule update --init --recursive
-        if [ $? -ne 0 ]; then
+
+        if ! git submodule update --init --recursive; then
             echo -e "${RED}An error occurred while updating git submodules!${NC}"
             exit 1
         fi
-        echo -e "${GREEN}✓ Repository updated${NC}"
+        echo -e "${GREEN}✓ Repository ready${NC}"
         echo ""
     else
         log_verbose "Git repository not found"

@@ -91,7 +91,7 @@ WindowDialog {
         StyledText {
             anchors.centerIn: parent
             visible: wifiList.count === 0 && !Network.wifiScanning
-            text: root.filterText.length > 0 ? Translation.tr("No matching networks") : Translation.tr("No networks found")
+            text: root.filterText.trim().length > 0 ? Translation.tr("No matching networks") : Translation.tr("No networks found")
             color: Appearance.colors.colSubtext
         }
     }

@@ -26,27 +26,16 @@ for arg in "$@"; do
     esac
 done
 
-SETUP_FLAGS=""
-[[ "$VERBOSE" == "true" ]]      && SETUP_FLAGS="$SETUP_FLAGS -v"
-[[ "$DO_PULL" == "false" ]]     && SETUP_FLAGS="$SETUP_FLAGS --no-pull"
-[[ "$BACKUP" == "false" ]]      && SETUP_FLAGS="$SETUP_FLAGS --no-backup"
-[[ "$FORCE_INSTALL" == "true" ]] && SETUP_FLAGS="$SETUP_FLAGS --force-install"
-[[ "$FULL_INSTALL" == "true" ]]  && SETUP_FLAGS="$SETUP_FLAGS --full-install"
-[[ "$NO_CONFIRM" == "true" ]]   && SETUP_FLAGS="$SETUP_FLAGS --no-confirm"
+SETUP_FLAGS=()
+[[ "$VERBOSE" == "true" ]]       && SETUP_FLAGS+=("-v")
+[[ "$DO_PULL" == "false" ]]      && SETUP_FLAGS+=("--no-pull")
+[[ "$BACKUP" == "false" ]]       && SETUP_FLAGS+=("--no-backup")
+[[ "$FORCE_INSTALL" == "true" ]] && SETUP_FLAGS+=("--force-install")
+[[ "$FULL_INSTALL" == "true" ]]  && SETUP_FLAGS+=("--full-install")
+[[ "$NO_CONFIRM" == "true" ]]    && SETUP_FLAGS+=("--no-confirm")
 
 if [ -d "$BASE_DIR" ]; then
-    cd "$BASE_DIR"
-    if [[ "$DO_PULL" == "true" ]]; then
-        if [[ "$VERBOSE" == "true" ]]; then
-            git pull
-        else
-            git pull > /dev/null 2>&1
-        fi
-        
-        echo -e "${GREEN}Vynx repo updated successfully!${NC}"
-    fi
-    
-    bash setup-ii-vynx.sh $SETUP_FLAGS
+    bash "$BASE_DIR/setup-ii-vynx.sh" "${SETUP_FLAGS[@]}"
 else
     echo -e "${RED}Error: Cannot find install path.${NC}"
     exit 1

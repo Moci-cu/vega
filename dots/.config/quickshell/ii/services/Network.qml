@@ -19,7 +19,7 @@ Singleton {
 
     property bool wifiEnabled: false
     property bool wifiScanning: false
-    property bool wifiConnecting: connectProc.running
+    property bool wifiConnecting: connectProc.running || changePasswordProc.running
     property WifiAccessPoint wifiConnectTarget
     property bool scanAfterWifiEnabled: false
     property bool initialScanRequested: false
@@ -105,14 +105,12 @@ Singleton {
 
     function changePassword(network: WifiAccessPoint, password: string, username = ""): void {
         // TODO: enterprise wifi with username
+        if (changePasswordProc.running) return;
         network.askingPassword = false;
-        changePasswordProc.exec({
-            "environment": {
-                "PASSWORD": password,
-                "SSID": network.ssid
-            },
-            "command": ["bash", "-c", 'nmcli connection modify "$SSID" wifi-sec.psk "$PASSWORD"']
-        })
+        root.wifiConnectTarget = network;
+        changePasswordProc.pendingPassword = password;
+        changePasswordProc.stdinEnabled = true;
+        changePasswordProc.exec(["nmcli", "connection", "up", "id", network.ssid, "passwd-file", "/dev/stdin"]);
     }
 
     Process {
@@ -138,13 +136,13 @@ Singleton {
         stderr: SplitParser {
             onRead: line => {
                 // print("err:", line)
-                if (line.includes("Secrets were required")) {
+                if (line.includes("Secrets were required") && root.wifiConnectTarget) {
                     root.wifiConnectTarget.askingPassword = true
                 }
             }
         }
         onExited: (exitCode, exitStatus) => {
-            root.wifiConnectTarget.askingPassword = (exitCode !== 0)
+            if (root.wifiConnectTarget) root.wifiConnectTarget.askingPassword = (exitCode !== 0);
             root.wifiConnectTarget = null
         }
     }
@@ -158,9 +156,22 @@ Singleton {
 
     Process {
         id: changePasswordProc
-        onExited: { // Re-attempt connection after changing password
-            connectProc.running = false
-            connectProc.running = true
+        property string pendingPassword
+
+        environment: ({
+            LANG: "C",
+            LC_ALL: "C"
+        })
+        onRunningChanged: {
+            if (!running) return;
+            write("802-11-wireless-security.psk:" + pendingPassword + "\n");
+            pendingPassword = "";
+            stdinEnabled = false;
+        }
+        onExited: exitCode => {
+            if (root.wifiConnectTarget) root.wifiConnectTarget.askingPassword = (exitCode !== 0);
+            root.wifiConnectTarget = null;
+            getNetworks.running = true;
         }
     }
 
@@ -280,7 +291,10 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.wifiEnabled = text.trim() === "enabled";
-                if (!root.wifiEnabled) return;
+                if (!root.wifiEnabled) {
+                    root.initialScanRequested = false;
+                    return;
+                }
 
                 if (root.scanAfterWifiEnabled) {
                     root.scanAfterWifiEnabled = false;

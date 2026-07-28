@@ -23,7 +23,10 @@ Singleton {
 
     function refreshUsage() {
         fileNetDev.reload()
-        const netLines = fileNetDev.text().split('\n')
+    }
+
+    function parseUsage(contents) {
+        const netLines = contents.split('\n')
         let totalRx = 0, totalTx = 0
 
         // Typical lines: interface: rx_bytes ... tx_bytes ...
@@ -77,5 +80,11 @@ Singleton {
         onTriggered: root.refreshUsage()
     }
 
-    FileView { id: fileNetDev; path: "/proc/net/dev" }
+    FileView {
+        id: fileNetDev
+        path: "/proc/net/dev"
+        onLoaded: {
+            if (root.activeInstances > 0) root.parseUsage(text())
+        }
+    }
 }
