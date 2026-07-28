@@ -294,6 +294,7 @@ Item {
             Image {
                 anchors.fill: parent
                 source: manga ? manga.image : ""
+                sourceSize.width: 1080
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 opacity: 0.24
@@ -330,6 +331,7 @@ Item {
                         id: heroCover
                         anchors.fill: parent
                         source: manga ? manga.image : ""
+                        sourceSize.width: 360
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true

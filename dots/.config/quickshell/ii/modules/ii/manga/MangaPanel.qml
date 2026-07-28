@@ -58,6 +58,9 @@ Item {
     function closePanel() {
         if (!panelOpen)
             return
+        if (page === "reader")
+            readerView.saveProgressNow()
+        service.releaseAfterIdle()
         if (isFullscreen) {
             panelOpen = false
             focusTimer.stop()
@@ -138,6 +141,8 @@ Item {
         if (index < 0 || nextIndex < 0 || nextIndex >= chapters.length)
             return
         var chapter = chapters[nextIndex]
+        readerView.saveProgressNow()
+        readerView.prepareInitialPage(1)
         service.fetchChapterPages(chapter.id)
         if (service.currentManga)
             service.updateLastRead(service.currentManga.id, chapter.id, chapter.chapter)
@@ -411,6 +416,7 @@ Item {
                     }
                     onBackRequested: root.page = root.detailOrigin
                     onChapterSelected: function(chapter) {
+                        readerView.prepareInitialPage(1)
                         service.fetchChapterPages(chapter.id)
                         if (service.currentManga)
                             service.updateLastRead(
@@ -423,11 +429,13 @@ Item {
                     onContinueReadingRequested: function(entry) {
                         if (!entry || !entry.lastReadChapterId)
                             return
+                        readerView.prepareInitialPage(entry.lastReadPage || 1)
                         service.fetchChapterPages(entry.lastReadChapterId)
                         root.page = "reader"
                     }
                     onReadLatestRequested: {
                         if (service.currentManga && service.currentManga.latestChapterId) {
+                            readerView.prepareInitialPage(1)
                             service.fetchChapterPages(service.currentManga.latestChapterId)
                             root.page = "reader"
                         }
@@ -438,6 +446,7 @@ Item {
                     id: readerView
                     anchors.fill: parent
                     visible: root.page === "reader"
+                    readerActive: root.panelOpen && root.page === "reader" && service.backendState === "ready"
                     service: service
                     style: mangaStyle
                     onVisibleChanged: {
@@ -449,11 +458,13 @@ Item {
                     }
                     onPreviousChapterRequested: root.openRelativeChapter(-1)
                     onChapterListRequested: {
+                        readerView.saveProgressNow()
                         service.clearChapterPages()
                         root.page = "detail"
                     }
                     onNextChapterRequested: root.openRelativeChapter(1)
                     onBackRequested: {
+                        readerView.saveProgressNow()
                         service.clearChapterPages()
                         root.page = "detail"
                     }

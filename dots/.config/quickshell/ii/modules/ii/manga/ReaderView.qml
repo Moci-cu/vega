@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -17,6 +18,9 @@ Item {
 
     property bool headerVisible: true
     property bool gPending: false
+    property bool readerActive: true
+    property bool restorePending: false
+    property int requestedPage: 1
     property var pageSizeCache: ({})
     property alias pagesView: pages
     readonly property var sortedChapters: {
@@ -82,9 +86,40 @@ Item {
         var nextCache = Object.assign({}, root.pageSizeCache)
         nextCache[key] = { width: width, height: height }
         root.pageSizeCache = nextCache
-        pageColumn.forceLayout()
+        pages.forceLayout()
         pages.clampContentY()
         pages.updateCurrentIndex()
+    }
+
+    function prepareInitialPage(page) {
+        requestedPage = Math.max(1, Number(page) || 1)
+        restorePending = true
+    }
+
+    function restoreRequestedPage() {
+        if (!restorePending || pages.count === 0)
+            return
+        var index = Math.min(pages.count - 1, requestedPage - 1)
+        restorePending = false
+        pages.currentIndex = index
+        pages.positionViewAtIndex(index, ListView.Beginning)
+    }
+
+    function saveProgressNow() {
+        saveTimer.stop()
+        if (!root.service.currentManga || root.service.chapterPages.length === 0)
+            return
+        var page = pages.currentIndex >= 0 ? pages.currentIndex + 1 : 1
+        var chapterId = root.service.currentChapterId
+        var chapterNum = ""
+        var chapters = Array.isArray(root.service.currentChapters) ? root.service.currentChapters : []
+        for (var i = 0; i < chapters.length; i++) {
+            if (chapters[i].id === chapterId) {
+                chapterNum = chapters[i].chapter
+                break
+            }
+        }
+        root.progressSaved(root.service.currentManga.id, chapterId, chapterNum, page)
     }
 
     component ReaderCircleButton: RippleButton {
@@ -144,31 +179,21 @@ Item {
     Timer {
         id: saveTimer
         interval: 2000
-        onTriggered: {
-            if (!root.service.currentManga || root.service.chapterPages.length === 0)
-                return
-            var page = pages.currentIndex >= 0 ? pages.currentIndex + 1 : 1
-            var chapterId = root.service.currentChapterId
-            var chapterNum = ""
-            var chapters = root.service.currentChapters
-            for (var i = 0; i < chapters.length; i++) {
-                if (chapters[i].id === chapterId) {
-                    chapterNum = chapters[i].chapter
-                    break
-                }
-            }
-            root.progressSaved(root.service.currentManga.id, chapterId, chapterNum, page)
-        }
+        onTriggered: root.saveProgressNow()
     }
 
     Connections {
         target: root.service
         function onCurrentChapterIdChanged() {
             root.pageSizeCache = ({})
+            root.restorePending = true
             Qt.callLater(function() {
-                pages.contentY = 0
                 pages.currentIndex = 0
+                pages.positionViewAtBeginning()
             })
+        }
+        function onChapterPagesChanged() {
+            Qt.callLater(root.restoreRequestedPage)
         }
     }
 
@@ -177,17 +202,17 @@ Item {
         color: "#090909"
     }
 
-    Flickable {
+    ListView {
         id: pages
-        property int currentIndex: 0
-        readonly property real lazyMargin: Math.max(height * 2.5, 1600)
 
         anchors {
             fill: parent
             topMargin: root.headerVisible ? header.height : 0
         }
-        contentWidth: width
-        contentHeight: pageColumn.height
+        model: root.service.chapterPages
+        spacing: 4
+        cacheBuffer: Math.max(height * 2.5, 1600)
+        reuseItems: true
         clip: true
         focus: true
         boundsBehavior: Flickable.StopAtBounds
@@ -214,12 +239,14 @@ Item {
         }
 
         function positionViewAtBeginning() {
-            contentY = 0
+            if (count > 0)
+                positionViewAtIndex(0, ListView.Beginning)
             updateCurrentIndex()
         }
 
         function positionViewAtEnd() {
-            contentY = Math.max(0, contentHeight - height)
+            if (count > 0)
+                positionViewAtIndex(count - 1, ListView.End)
             updateCurrentIndex()
         }
 
@@ -230,20 +257,9 @@ Item {
                 return
             }
 
-            var centerY = contentY + height / 2
-            var candidate = Math.min(currentIndex, pageCount - 1)
-            for (var i = 0; i < pageCount; i++) {
-                var item = pageRepeater.itemAt(i)
-                if (!item)
-                    continue
-                if (centerY >= item.y && centerY <= item.y + item.height) {
-                    candidate = i
-                    break
-                }
-                if (item.y < centerY)
-                    candidate = i
-            }
-
+            var candidate = indexAt(width / 2, contentY + height / 2)
+            if (candidate < 0)
+                candidate = Math.min(Math.max(currentIndex, 0), pageCount - 1)
             if (currentIndex !== candidate)
                 currentIndex = candidate
         }
@@ -300,119 +316,111 @@ Item {
             }
         }
 
-        Column {
-            id: pageColumn
+        delegate: Item {
+            id: pageDelegate
+            required property var modelData
+            property int retryAttempts: 0
+            property int retryNonce: 0
+
+            ListView.onReused: {
+                pageRetryTimer.stop()
+                pageDelegate.retryAttempts = 0
+                pageDelegate.retryNonce = 0
+            }
+
+            readonly property real imageWidth: Math.max(1, Math.min(pages.width, 720))
+            readonly property real estimatedHeight: imageWidth * root.cachedPageRatio(modelData)
+            readonly property bool hasImageSize: pageImage.status === Image.Ready
+                && pageImage.sourceSize.width > 0
+                && pageImage.sourceSize.height > 0
+            readonly property real imageHeight: hasImageSize
+                ? pageImage.sourceSize.height * (imageWidth / pageImage.sourceSize.width)
+                : estimatedHeight
+
             width: pages.width
-            spacing: 4
+            height: imageHeight
 
-            Repeater {
-                id: pageRepeater
-                model: root.service.chapterPages
+            Rectangle {
+                anchors.fill: parent
+                color: "#111111"
+            }
 
-                delegate: Item {
-                    id: pageDelegate
-                    required property var modelData
-                    property int retryAttempts: 0
-                    property int retryNonce: 0
-                    property bool imageEverLoaded: false
+            Image {
+                id: pageImage
+                width: pageDelegate.imageWidth
+                height: pageDelegate.imageHeight
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                source: root.readerActive && modelData.url
+                    ? modelData.url + (pageDelegate.retryNonce > 0 ? "&retry=" + pageDelegate.retryNonce : "")
+                    : ""
+                sourceSize.width: Math.ceil(pageDelegate.imageWidth * Math.max(1, Screen.devicePixelRatio))
+                fillMode: Image.Stretch
+                asynchronous: true
+                cache: false
 
-                    readonly property real imageWidth: Math.max(1, Math.min(pages.width, 720))
-                    readonly property real estimatedHeight: imageWidth * root.cachedPageRatio(modelData)
-                    readonly property bool nearViewport: y + estimatedHeight >= pages.contentY - pages.lazyMargin
-                        && y <= pages.contentY + pages.height + pages.lazyMargin
-                    readonly property bool hasImageSize: pageImage.status === Image.Ready
-                        && pageImage.sourceSize.width > 0
-                        && pageImage.sourceSize.height > 0
-                    readonly property real imageHeight: hasImageSize
-                        ? pageImage.sourceSize.height * (imageWidth / pageImage.sourceSize.width)
-                        : estimatedHeight
+                onStatusChanged: {
+                    if (status === Image.Ready) {
+                        pageDelegate.retryAttempts = 0
+                        root.rememberPageSize(modelData, sourceSize.width, sourceSize.height)
+                    } else if (status === Image.Error && pageDelegate.retryAttempts < 2) {
+                        pageRetryTimer.restart()
+                    }
+                }
+            }
 
-                    width: pages.width
-                    height: imageHeight
+            Timer {
+                id: pageRetryTimer
+                interval: 700 + pageDelegate.retryAttempts * 600
+                repeat: false
+                onTriggered: pageDelegate.retryPage()
+            }
 
-                    Rectangle {
+            function retryPage() {
+                pageDelegate.retryAttempts++
+                pageDelegate.retryNonce = Date.now()
+            }
+
+            MaterialLoadingIndicator {
+                anchors.centerIn: parent
+                visible: pageImage.status === Image.Loading
+                loading: visible
+                implicitSize: 44
+            }
+
+            Column {
+                anchors.centerIn: parent
+                visible: pageImage.status === Image.Error
+                spacing: 10
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "PAGE " + (modelData.index + 1) + " FAILED"
+                    color: root.style.accent
+                    font.family: root.style.font
+                    font.pixelSize: 10
+                    font.letterSpacing: 2
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 84
+                    height: 28
+                    color: "transparent"
+                    border.color: root.style.accent
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "RETRY"
+                        color: root.style.accent
+                        font.family: root.style.font
+                        font.pixelSize: 10
+                    }
+
+                    MouseArea {
                         anchors.fill: parent
-                        color: "#111111"
-                    }
-
-                    Image {
-                        id: pageImage
-                        width: pageDelegate.imageWidth
-                        height: pageDelegate.imageHeight
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        source: modelData.url && pageDelegate.nearViewport
-                            ? modelData.url + (pageDelegate.retryNonce > 0 ? "&retry=" + pageDelegate.retryNonce : "")
-                            : ""
-                        fillMode: Image.Stretch
-                        asynchronous: true
-                        cache: true
-
-                        onStatusChanged: {
-                            if (status === Image.Ready) {
-                                pageDelegate.retryAttempts = 0
-                                pageDelegate.imageEverLoaded = true
-                                root.rememberPageSize(modelData, sourceSize.width, sourceSize.height)
-                            } else if (status === Image.Error && pageDelegate.retryAttempts < 2) {
-                                pageRetryTimer.restart()
-                            }
-                        }
-                    }
-
-                    Timer {
-                        id: pageRetryTimer
-                        interval: 700 + pageDelegate.retryAttempts * 600
-                        repeat: false
-                        onTriggered: pageDelegate.retryPage()
-                    }
-
-                    function retryPage() {
-                        pageDelegate.retryAttempts++
-                        pageDelegate.retryNonce = Date.now()
-                    }
-
-                    MaterialLoadingIndicator {
-                        anchors.centerIn: parent
-                        visible: pageImage.status === Image.Loading
-                        loading: visible
-                        implicitSize: 44
-                    }
-
-                    Column {
-                        anchors.centerIn: parent
-                        visible: pageImage.status === Image.Error
-                        spacing: 10
-
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: "PAGE " + (modelData.index + 1) + " FAILED"
-                            color: root.style.accent
-                            font.family: root.style.font
-                            font.pixelSize: 10
-                            font.letterSpacing: 2
-                        }
-
-                        Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: 84
-                            height: 28
-                            color: "transparent"
-                            border.color: root.style.accent
-                            border.width: 1
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "RETRY"
-                                color: root.style.accent
-                                font.family: root.style.font
-                                font.pixelSize: 10
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: pageDelegate.retryPage()
-                            }
-                        }
+                        onClicked: pageDelegate.retryPage()
                     }
                 }
             }

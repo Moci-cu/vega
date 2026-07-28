@@ -7,6 +7,7 @@ import socket
 import sqlite3
 import threading
 import time
+from collections import OrderedDict
 from datetime import datetime
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -20,8 +21,13 @@ PORT = int(os.environ.get("UNIT4_MANGA_PORT", "5150"))
 API_BASE = os.environ.get("UNIT4_MANGA_API_BASE", "https://api.shngm.io/v1")
 ASSET_BASE = "https://assets.shngm.id"
 PAGE_SIZE = 24
-FILTER_SCAN_SIZE = 1000
+FILTER_SCAN_SIZE = 200
 DISCOVERY_TTL = 600
+CHAPTER_CACHE_TTL = 24 * 60 * 60
+PAGE_CACHE_TTL = 7 * 24 * 60 * 60
+IMAGE_CACHE_MAX_BYTES = int(os.environ.get("UNIT4_MANGA_IMAGE_CACHE_MB", "96")) * 1024 * 1024
+IMAGE_MAX_BYTES = 32 * 1024 * 1024
+IMAGE_DOWNLOAD_TIMEOUT = 30
 DATA_HOME = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
 DATA_DIR = os.path.join(DATA_HOME, "unit-4", "manga")
 LIBRARY_FILE = os.path.join(DATA_DIR, "library.json")
@@ -33,13 +39,15 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
 }
 
-SESSION = requests.Session()
+HTTP_LOCAL = threading.local()
 CACHE = {}
 CACHE_LOCK = threading.Lock()
 LIBRARY_LOCK = threading.Lock()
-IMAGE_CACHE = {}
+IMAGE_CACHE = OrderedDict()
 IMAGE_CACHE_LOCK = threading.Lock()
+IMAGE_CACHE_BYTES = 0
 IMAGE_SEMAPHORE = threading.Semaphore(8)
+IMAGE_FETCH_LOCKS = [threading.Lock() for _ in range(32)]
 CHAPTER_PROGRESS_LOCK = threading.Lock()
 _chapter_progress = {"current": 0, "mangaId": ""}
 CHAPTER_JOBS = {}
@@ -64,6 +72,19 @@ def _get_db():
 
 _db = _get_db()
 
+with _db_lock:
+    _db.execute("DELETE FROM cache WHERE expires_at IS NOT NULL AND expires_at < ?", (time.time(),))
+    _db.execute("DELETE FROM cache WHERE expires_at IS NULL AND (key LIKE 'pages:%' OR key LIKE 'chapters:%')")
+    _db.commit()
+
+
+def http_session():
+    session = getattr(HTTP_LOCAL, "session", None)
+    if session is None:
+        session = requests.Session()
+        HTTP_LOCAL.session = session
+    return session
+
 
 def cached(key, ttl, callback, use_file=False):
     with CACHE_LOCK:
@@ -75,7 +96,7 @@ def cached(key, ttl, callback, use_file=False):
         try:
             with _db_lock:
                 row = _db.execute("SELECT value, expires_at FROM cache WHERE key = ?", (key,)).fetchone()
-            if row and (row[1] is None or time.time() < row[1]):
+            if row and ((row[1] is None and ttl is None) or (row[1] is not None and time.time() < row[1])):
                 value = json.loads(row[0])
                 with CACHE_LOCK:
                     CACHE[key] = (value, None if ttl is None else time.monotonic() + ttl)
@@ -113,7 +134,7 @@ def cache_get(key, ttl=None, use_file=False):
     try:
         with _db_lock:
             row = _db.execute("SELECT value, expires_at FROM cache WHERE key = ?", (key,)).fetchone()
-        if row and (row[1] is None or time.time() < row[1]):
+        if row and ((row[1] is None and ttl is None) or (row[1] is not None and time.time() < row[1])):
             value = json.loads(row[0])
             with CACHE_LOCK:
                 CACHE[key] = (value, None if ttl is None else time.monotonic() + ttl)
@@ -142,7 +163,7 @@ def cache_set(key, value, ttl=None, use_file=False):
 
 
 def api_get(path, params=None, timeout=30):
-    response = SESSION.get(
+    response = http_session().get(
         f"{API_BASE}{path}",
         params=params,
         headers=HEADERS,
@@ -266,6 +287,7 @@ def filtered_manga_list(manga_type, offset, query=None):
         if not items:
             break
 
+        seen_before = len(seen)
         for item in items:
             manga_id = item.get("manga_id", "")
             if not manga_id or manga_id in seen:
@@ -274,7 +296,7 @@ def filtered_manga_list(manga_type, offset, query=None):
             if str(item.get("country_id", "")).upper() == wanted_country:
                 matches.append(normalize_list_item(item))
 
-        if len(items) < FILTER_SCAN_SIZE:
+        if len(seen) == seen_before:
             break
         source_page += 1
 
@@ -457,7 +479,7 @@ def discover_chapters(manga_id, latest_chapter_id):
         for path in _chapter_endpoint_candidates(manga_id):
             endpoints_checked = True
             try:
-                response = SESSION.get(f"{API_BASE}{path}", headers=HEADERS, timeout=10)
+                response = http_session().get(f"{API_BASE}{path}", headers=HEADERS, timeout=10)
             except requests.RequestException as error:
                 print(f"[manga-server] chapter discovery request failed for {path}: {error}")
                 continue
@@ -504,7 +526,7 @@ def chapters(manga_id, latest_chapter_id):
             }
 
     cache_key = f"chapters:{manga_id}:{latest_chapter_id}"
-    cached_chapters = cache_get(cache_key, use_file=True)
+    cached_chapters = cache_get(cache_key, ttl=CHAPTER_CACHE_TTL, use_file=True)
     if cached_chapters is not None:
         return {
             "chapters": cached_chapters,
@@ -515,7 +537,7 @@ def chapters(manga_id, latest_chapter_id):
 
     discovered_chapters = discover_chapters(manga_id, latest_chapter_id)
     if discovered_chapters:
-        cache_set(cache_key, discovered_chapters, use_file=True)
+        cache_set(cache_key, discovered_chapters, ttl=CHAPTER_CACHE_TTL, use_file=True)
         return {
             "chapters": discovered_chapters,
             "complete": True,
@@ -554,7 +576,7 @@ def chapters(manga_id, latest_chapter_id):
             complete_chapters = list(reversed(job["raw"]))
         update_progress(len(complete_chapters))
         if not job["error"]:
-            cache_set(cache_key, complete_chapters, use_file=True)
+            cache_set(cache_key, complete_chapters, ttl=CHAPTER_CACHE_TTL, use_file=True)
         with CHAPTER_JOBS_LOCK:
             if CHAPTER_JOBS.get(cache_key) is job:
                 del CHAPTER_JOBS[cache_key]
@@ -595,7 +617,7 @@ def pages(chapter_id):
             for index, filename in enumerate(chapter.get("data") or [])
         ]
 
-    return cached(f"pages:{chapter_id}", None, fetch, use_file=True)
+    return cached(f"pages:{chapter_id}", PAGE_CACHE_TTL, fetch, use_file=True)
 
 
 def load_library():
@@ -686,47 +708,100 @@ def validate_image_url(url):
         raise ValueError("private image URL is not allowed")
 
 
+def get_cached_image(url):
+    with IMAGE_CACHE_LOCK:
+        value = IMAGE_CACHE.get(url)
+        if value is not None:
+            IMAGE_CACHE.move_to_end(url)
+        return value
+
+
+def remove_cached_image(url):
+    global IMAGE_CACHE_BYTES
+    with IMAGE_CACHE_LOCK:
+        value = IMAGE_CACHE.pop(url, None)
+        if value is not None:
+            IMAGE_CACHE_BYTES -= len(value[0])
+
+
+def store_cached_image(url, value):
+    global IMAGE_CACHE_BYTES
+    size = len(value[0])
+    if size > IMAGE_CACHE_MAX_BYTES:
+        return
+    with IMAGE_CACHE_LOCK:
+        previous = IMAGE_CACHE.pop(url, None)
+        if previous is not None:
+            IMAGE_CACHE_BYTES -= len(previous[0])
+        while IMAGE_CACHE and IMAGE_CACHE_BYTES + size > IMAGE_CACHE_MAX_BYTES:
+            _, evicted = IMAGE_CACHE.popitem(last=False)
+            IMAGE_CACHE_BYTES -= len(evicted[0])
+        IMAGE_CACHE[url] = value
+        IMAGE_CACHE_BYTES += size
+
+
 def fetch_image(url):
     validate_image_url(url)
-    with IMAGE_CACHE_LOCK:
-        cached_image = IMAGE_CACHE.get(url)
+    cached_image = get_cached_image(url)
     if cached_image:
         return cached_image
 
-    with IMAGE_SEMAPHORE:
-        last_error = None
-        for attempt in range(3):
-            try:
-                response = SESSION.get(
-                    url,
-                    headers={
-                        "User-Agent": HEADERS["User-Agent"],
-                        "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
-                        "Referer": HEADERS["Referer"],
-                        "Origin": HEADERS["Origin"],
-                        "Cache-Control": "no-cache" if attempt else "max-age=0",
-                    },
-                    allow_redirects=False,
-                    timeout=30,
-                )
-                if 300 <= response.status_code < 400:
-                    raise ValueError("image redirects are not allowed")
-                response.raise_for_status()
-                result = (response.content, response.headers.get("Content-Type", "image/jpeg"))
-                break
-            except (requests.RequestException, ValueError) as error:
-                last_error = error
-                if isinstance(error, ValueError) or attempt == 2:
-                    raise
-                time.sleep(0.35 * (attempt + 1))
-        else:
-            raise last_error
+    fetch_lock = IMAGE_FETCH_LOCKS[hash(url) % len(IMAGE_FETCH_LOCKS)]
+    with fetch_lock:
+        cached_image = get_cached_image(url)
+        if cached_image:
+            return cached_image
 
-    with IMAGE_CACHE_LOCK:
-        if len(IMAGE_CACHE) >= 300:
-            IMAGE_CACHE.pop(next(iter(IMAGE_CACHE)))
-        IMAGE_CACHE[url] = result
-    return result
+        with IMAGE_SEMAPHORE:
+            last_error = None
+            for attempt in range(3):
+                try:
+                    started_at = time.monotonic()
+                    response = http_session().get(
+                        url,
+                        headers={
+                            "User-Agent": HEADERS["User-Agent"],
+                            "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+                            "Referer": HEADERS["Referer"],
+                            "Origin": HEADERS["Origin"],
+                            "Cache-Control": "no-cache" if attempt else "max-age=0",
+                        },
+                        allow_redirects=False,
+                        timeout=30,
+                        stream=True,
+                    )
+                    with response:
+                        if 300 <= response.status_code < 400:
+                            raise ValueError("image redirects are not allowed")
+                        response.raise_for_status()
+                        content_type_header = response.headers.get("Content-Type", "")
+                        content_type = content_type_header.split(";", 1)[0].strip().lower()
+                        if not content_type.startswith("image/"):
+                            raise ValueError(f"unexpected content type: {content_type or 'missing'}")
+                        content_length = int(response.headers.get("Content-Length", "0") or 0)
+                        if content_length > IMAGE_MAX_BYTES:
+                            raise ValueError("image exceeds size limit")
+                        body = bytearray()
+                        for chunk in response.iter_content(chunk_size=64 * 1024):
+                            body.extend(chunk)
+                            if len(body) > IMAGE_MAX_BYTES:
+                                raise ValueError("image exceeds size limit")
+                            if time.monotonic() - started_at > IMAGE_DOWNLOAD_TIMEOUT:
+                                raise ValueError("image download exceeded time limit")
+                        if time.monotonic() - started_at > IMAGE_DOWNLOAD_TIMEOUT:
+                            raise ValueError("image download exceeded time limit")
+                        result = (bytes(body), content_type)
+                    break
+                except (requests.RequestException, ValueError) as error:
+                    last_error = error
+                    if isinstance(error, ValueError) or attempt == 2:
+                        raise
+                    time.sleep(0.35 * (attempt + 1))
+            else:
+                raise last_error
+
+        store_cached_image(url, result)
+        return result
 
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
@@ -822,6 +897,8 @@ class Handler(BaseHTTPRequestHandler):
                 image_url = unquote(param("url"))
                 if not image_url:
                     return self.send_error_json("missing url", 400)
+                if param("retry").strip().lower() not in ("", "0", "false"):
+                    remove_cached_image(image_url)
                 body, content_type = fetch_image(image_url)
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)

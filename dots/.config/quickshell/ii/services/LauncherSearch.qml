@@ -15,14 +15,34 @@ Singleton {
     property string query: ""
     property int resultLimit: 15
 
-    readonly property list<string> searchPrefixes: [Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch, Config.options.search.prefix.window]
+    readonly property list<var> searchPrefixEntries: [
+        { name: "action", prefix: Config.options.search.prefix.action },
+        { name: "app", prefix: Config.options.search.prefix.app },
+        { name: "clipboard", prefix: Config.options.search.prefix.clipboard },
+        { name: "emojis", prefix: Config.options.search.prefix.emojis },
+        { name: "math", prefix: Config.options.search.prefix.math },
+        { name: "shellCommand", prefix: Config.options.search.prefix.shellCommand },
+        { name: "webSearch", prefix: Config.options.search.prefix.webSearch },
+        { name: "fileSearch", prefix: Config.options.search.prefix.fileSearch },
+        { name: "window", prefix: Config.options.search.prefix.window }
+    ]
 
-    function hasPrefix(prefix) {
-        return prefix.length > 0 && root.query.startsWith(prefix);
+    function matchedPrefixEntry(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        let match = null;
+        for (const entry of root.searchPrefixEntries) {
+            if (!entry.prefix || !queryString.startsWith(entry.prefix)) continue;
+            if (!match || entry.prefix.length > match.prefix.length) match = entry;
+        }
+        return match;
     }
 
-    function matchedPrefix() {
-        return root.searchPrefixes.find(prefix => prefix.length > 0 && root.query.startsWith(prefix)) ?? "";
+    function matchedPrefixName(queryText = root.query) {
+        return root.matchedPrefixEntry(queryText)?.name ?? "";
+    }
+
+    function matchedPrefix(queryText = root.query) {
+        return root.matchedPrefixEntry(queryText)?.prefix ?? "";
     }
 
     function ensurePrefix(prefix) {
@@ -164,10 +184,11 @@ Singleton {
     }
 
     function mathExpression(query) {
-        if (Config.options.search.prefix.math.length > 0 && query.startsWith(Config.options.search.prefix.math)) {
+        const prefixName = root.matchedPrefixName(query);
+        if (prefixName === "math") {
             return query.slice(Config.options.search.prefix.math.length).trim();
         }
-        if (/^\d/.test(query)) {
+        if (prefixName === "" && /^\d/.test(query)) {
             return query.trim();
         }
         return "";
@@ -186,7 +207,7 @@ Singleton {
             root.mathResult = "";
         }
 
-        if (!root.hasPrefix(Config.options.search.prefix.fileSearch)) {
+        if (root.matchedPrefixName(query) !== "fileSearch") {
             fileSearchTimer.stop();
             fileProc.running = false;
             if (root.fileResults.length > 0) root.fileResults = [];
@@ -494,7 +515,7 @@ Singleton {
         }
         stdout: StdioCollector {
             onStreamFinished: {
-                const currentExpr = root.hasPrefix(Config.options.search.prefix.fileSearch)
+                const currentExpr = root.matchedPrefixName() === "fileSearch"
                     ? root.query.slice(Config.options.search.prefix.fileSearch.length).trim()
                     : "";
                 if (currentExpr !== fileProc.activeExpression) return;
@@ -514,15 +535,16 @@ Singleton {
             return [];
 
         ///////////// Special cases ///////////////
-        if (root.hasPrefix(Config.options.search.prefix.clipboard)) {
+        const prefixName = root.matchedPrefixName();
+        if (prefixName === "clipboard") {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.clipboard);
             return Cliphist.fuzzyQuery(searchString).map((entry, index, array) => root.clipboardResult(entry, index, array));
-        } else if (root.hasPrefix(Config.options.search.prefix.emojis)) {
+        } else if (prefixName === "emojis") {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.emojis);
             return Emojis.fuzzyQuery(searchString).map(entry => root.emojiResult(entry));
-        } else if (root.hasPrefix(Config.options.search.prefix.window)) {
+        } else if (prefixName === "window") {
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.window).trim();
             return root.windowResults(searchString).map(entry => root.windowResult(entry));
         }
@@ -530,13 +552,13 @@ Singleton {
         //////// Prioritized by prefix /////////
         let result = [];
         const startsWithNumber = /^\d/.test(root.query);
-        const startsWithActionPrefix = root.hasPrefix(Config.options.search.prefix.action);
-        const startsWithAppPrefix = root.hasPrefix(Config.options.search.prefix.app);
-        const startsWithFileSearchPrefix = root.hasPrefix(Config.options.search.prefix.fileSearch);
-        const startsWithMathPrefix = root.hasPrefix(Config.options.search.prefix.math);
-        const startsWithShellCommandPrefix = root.hasPrefix(Config.options.search.prefix.shellCommand);
-        const startsWithWebSearchPrefix = root.hasPrefix(Config.options.search.prefix.webSearch);
-        const startsWithWindowPrefix = root.hasPrefix(Config.options.search.prefix.window);
+        const startsWithActionPrefix = prefixName === "action";
+        const startsWithAppPrefix = prefixName === "app";
+        const startsWithFileSearchPrefix = prefixName === "fileSearch";
+        const startsWithMathPrefix = prefixName === "math";
+        const startsWithShellCommandPrefix = prefixName === "shellCommand";
+        const startsWithWebSearchPrefix = prefixName === "webSearch";
+        const startsWithWindowPrefix = prefixName === "window";
         if ((startsWithNumber || startsWithMathPrefix) && root.mathResult.length > 0) {
             result.push(root.mathResultEntry());
         } else if (startsWithShellCommandPrefix) {
