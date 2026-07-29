@@ -24,18 +24,21 @@ RowLayout {
         searchInput.forceActiveFocus();
     }
 
-    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, Window, DefaultSearch }
+    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, FileSearch, Window, DefaultSearch }
 
     property var searchPrefixType: {
-        if (root.searchingText.startsWith(Config.options.search.prefix.action)) return SearchBar.SearchPrefixType.Action;
-        if (root.searchingText.startsWith(Config.options.search.prefix.app)) return SearchBar.SearchPrefixType.App;
-        if (root.searchingText.startsWith(Config.options.search.prefix.clipboard)) return SearchBar.SearchPrefixType.Clipboard;
-        if (root.searchingText.startsWith(Config.options.search.prefix.emojis)) return SearchBar.SearchPrefixType.Emojis;
-        if (root.searchingText.startsWith(Config.options.search.prefix.math)) return SearchBar.SearchPrefixType.Math;
-        if (root.searchingText.startsWith(Config.options.search.prefix.shellCommand)) return SearchBar.SearchPrefixType.ShellCommand;
-        if (root.searchingText.startsWith(Config.options.search.prefix.webSearch)) return SearchBar.SearchPrefixType.WebSearch;
-        if (Config.options.search.prefix.window.length > 0 && root.searchingText.startsWith(Config.options.search.prefix.window)) return SearchBar.SearchPrefixType.Window;
-        return SearchBar.SearchPrefixType.DefaultSearch;
+        switch (LauncherSearch.matchedPrefixName(root.searchingText)) {
+        case "action": return SearchBar.SearchPrefixType.Action;
+        case "app": return SearchBar.SearchPrefixType.App;
+        case "clipboard": return SearchBar.SearchPrefixType.Clipboard;
+        case "emojis": return SearchBar.SearchPrefixType.Emojis;
+        case "math": return SearchBar.SearchPrefixType.Math;
+        case "shellCommand": return SearchBar.SearchPrefixType.ShellCommand;
+        case "webSearch": return SearchBar.SearchPrefixType.WebSearch;
+        case "fileSearch": return SearchBar.SearchPrefixType.FileSearch;
+        case "window": return SearchBar.SearchPrefixType.Window;
+        default: return SearchBar.SearchPrefixType.DefaultSearch;
+        }
     }
     
     MaterialShapeWrappedMaterialSymbol {
@@ -50,6 +53,7 @@ RowLayout {
             case SearchBar.SearchPrefixType.Math: return MaterialShape.Shape.PuffyDiamond;
             case SearchBar.SearchPrefixType.ShellCommand: return MaterialShape.Shape.PixelCircle;
             case SearchBar.SearchPrefixType.WebSearch: return MaterialShape.Shape.SoftBurst;
+            case SearchBar.SearchPrefixType.FileSearch: return MaterialShape.Shape.Cookie4Sided;
             case SearchBar.SearchPrefixType.Window: return MaterialShape.Shape.Cookie9Sided;
             default: return MaterialShape.Shape.Cookie7Sided;
         }
@@ -61,6 +65,7 @@ RowLayout {
             case SearchBar.SearchPrefixType.Math: return "calculate";
             case SearchBar.SearchPrefixType.ShellCommand: return "terminal";
             case SearchBar.SearchPrefixType.WebSearch: return "travel_explore";
+            case SearchBar.SearchPrefixType.FileSearch: return "folder_search";
             case SearchBar.SearchPrefixType.Window: return "select_window";
             case SearchBar.SearchPrefixType.DefaultSearch: return "search";
             default: return "search";

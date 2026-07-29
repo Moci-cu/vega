@@ -142,7 +142,6 @@ Singleton {
             }
         }
         onExited: (exitCode, exitStatus) => {
-            if (root.wifiConnectTarget) root.wifiConnectTarget.askingPassword = (exitCode !== 0);
             root.wifiConnectTarget = null
         }
     }

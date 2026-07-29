@@ -14,6 +14,8 @@ Item {
     property string backendState: "idle"
     property string backendError: ""
     property bool initialized: false
+    property bool backendWanted: false
+    property bool stoppingBackend: false
 
     property var mangaList: []
     property bool isFetchingManga: false
@@ -48,6 +50,7 @@ Item {
 
     property var libraryList: []
     property bool libraryLoaded: false
+    property int libraryRequestId: 0
 
     Process {
         id: serverProcess
@@ -66,6 +69,10 @@ Item {
             }
         }
         onExited: function(code) {
+            if (root.stoppingBackend) {
+                root.stoppingBackend = false
+                return
+            }
             if (root.backendState !== "ready" && code !== 0)
                 root.backendError = "Backend exited with code " + code
         }
@@ -86,6 +93,7 @@ Item {
             var xhr = new XMLHttpRequest()
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== 4) return
+                if (!root.backendWanted) return
                 if (xhr.status !== 200) {
                     backendState = "idle"
                     keepAliveTimer.stop()
@@ -99,22 +107,10 @@ Item {
     }
 
     Timer {
-        id: progressTimer
-        interval: 500
-        repeat: true
-        onTriggered: {
-            if (backendState !== "ready") return
-            var xhr = new XMLHttpRequest()
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState !== 4 || xhr.status < 200 || xhr.status >= 300) return
-                try {
-                    var data = JSON.parse(xhr.responseText)
-                    chaptersProgress = data.current || 0
-                } catch (e) {}
-            }
-            xhr.open("GET", apiUrl + "/chapters_progress?_=" + Date.now())
-            xhr.send()
-        }
+        id: idleStopTimer
+        interval: 120000
+        repeat: false
+        onTriggered: root.stopBackend()
     }
 
     Timer {
@@ -127,6 +123,8 @@ Item {
     property int healthAttempts: 0
 
     function ensureStarted() {
+        backendWanted = true
+        idleStopTimer.stop()
         if (backendState === "ready") {
             _bootstrap()
             return
@@ -143,10 +141,38 @@ Item {
         ensureStarted()
     }
 
+    function releaseAfterIdle() {
+        if (backendState !== "idle")
+            idleStopTimer.restart()
+    }
+
+    function stopBackend() {
+        backendWanted = false
+        healthTimer.stop()
+        keepAliveTimer.stop()
+        chaptersPollTimer.stop()
+        listRequestId++
+        detailRequestId++
+        chaptersRequestId++
+        pagesRequestId++
+        libraryRequestId++
+        isFetchingManga = false
+        isFetchingDetail = false
+        isFetchingChapters = false
+        isFetchingPages = false
+        backendState = "idle"
+        if (serverProcess.running) {
+            stoppingBackend = true
+            serverProcess.running = false
+        }
+    }
+
     function _probeBackend() {
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== 4)
+                return
+            if (!root.backendWanted)
                 return
             if (xhr.status === 200) {
                 healthTimer.stop()
@@ -232,10 +258,11 @@ Item {
             : currentOffset + items.length
     }
 
-    function fetchByOrigin(origin, reset) {
+    function fetchByOrigin(origin, reset, requestedLatestPage) {
         if (backendState !== "ready")
             return
         var shouldReset = reset !== false
+        var requestLatestPage = requestedLatestPage || (shouldReset ? 1 : latestPage)
         currentOrigin = origin
         currentSearchText = ""
         if (shouldReset) {
@@ -251,7 +278,7 @@ Item {
         if (origin === "")
             path = "/hot"
         else if (origin === "latest")
-            path = "/latest?page=" + latestPage
+            path = "/latest?page=" + requestLatestPage
         else
             path = "/browse?type=" + encodeURIComponent(_originType(origin))
                 + "&offset=" + currentOffset
@@ -264,6 +291,8 @@ Item {
                 mangaError = error
                 return
             }
+            if (origin === "latest")
+                latestPage = requestLatestPage
             _applyListResponse(data, shouldReset)
         })
     }
@@ -306,12 +335,10 @@ Item {
             return
         if (currentSearchText)
             searchManga(currentSearchText, false)
-        else if (currentOrigin === "latest") {
-            latestPage++
-            fetchByOrigin("latest", false)
-        } else {
+        else if (currentOrigin === "latest")
+            fetchByOrigin("latest", false, latestPage + 1)
+        else
             fetchByOrigin(currentOrigin, false)
-        }
     }
 
     function retryList() {
@@ -325,12 +352,20 @@ Item {
         if (backendState !== "ready")
             return
         var requestId = ++detailRequestId
+        chaptersRequestId++
+        pagesRequestId++
         pendingMangaId = mangaId
         currentManga = null
         currentChapters = []
+        chapterPages = []
+        currentChapterId = ""
+        pagesError = ""
+        chaptersProgress = 0
         chaptersPollTimer.stop()
-        progressTimer.stop()
+        chaptersPollPath = ""
         chaptersPollInFlight = false
+        isFetchingChapters = false
+        isFetchingPages = false
         isFetchingDetail = true
         detailError = ""
         chaptersLoaded = false
@@ -358,7 +393,6 @@ Item {
         chaptersError = ""
         chaptersProgress = 0
         chaptersPollTimer.stop()
-        progressTimer.stop()
         chaptersPollInFlight = false
         chaptersPollPath = "/chapters?mangaId=" + encodeURIComponent(manga.id)
             + "&latestChapterId=" + encodeURIComponent(manga.latestChapterId)
@@ -374,9 +408,9 @@ Item {
     function _requestChapters(requestId) {
         chaptersPollInFlight = true
         _request("GET", chaptersPollPath, null, function(error, data) {
-            chaptersPollInFlight = false
             if (requestId !== chaptersRequestId)
                 return
+            chaptersPollInFlight = false
             isFetchingDetail = false
             if (error) {
                 console.warn("[MangaService] chapters error:", error)
@@ -416,17 +450,24 @@ Item {
     function refetchChapters() {
         if (backendState !== "ready" || !currentManga)
             return
+        var manga = currentManga
+        var detailId = detailRequestId
+        var requestId = ++chaptersRequestId
         isFetchingChapters = true
         chaptersLoaded = false
         currentChapters = []
         chaptersError = ""
         chaptersProgress = 0
         chaptersPollTimer.stop()
-        progressTimer.stop()
         chaptersPollInFlight = false
-        _request("GET", "/clear_cache?mangaId=" + encodeURIComponent(currentManga.id), null, function(error) {
+        _request("GET", "/clear_cache?mangaId=" + encodeURIComponent(manga.id), null, function(error) {
+            if (requestId !== chaptersRequestId
+                    || detailId !== detailRequestId
+                    || !currentManga
+                    || currentManga.id !== manga.id)
+                return
             if (!error)
-                _fetchChaptersForManga(currentManga)
+                _fetchChaptersForManga(manga)
             else {
                 isFetchingChapters = false
                 chaptersPollTimer.stop()
@@ -491,10 +532,12 @@ Item {
     }
 
     function fetchLibrary() {
+        var requestId = ++libraryRequestId
         _request("GET", "/library", null, function(error, data) {
+            if (requestId !== libraryRequestId || error || !Array.isArray(data))
+                return
+            libraryList = _sortLibrary(data)
             libraryLoaded = true
-            if (!error && Array.isArray(data))
-                libraryList = _sortLibrary(data)
         })
     }
 

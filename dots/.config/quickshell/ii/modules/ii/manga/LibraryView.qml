@@ -51,6 +51,7 @@ Item {
                             id: cover
                             anchors.fill: parent
                             source: modelData.coverUrl || ""
+                            sourceSize.width: 360
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: true

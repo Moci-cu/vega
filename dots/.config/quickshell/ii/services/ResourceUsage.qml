@@ -24,6 +24,7 @@ Singleton {
     property real diskUsedPercentage: diskTotal > 0 ? (diskUsed / diskTotal) : 0
     property real cpuUsage: 0
     property var previousCpuStats
+    property bool usagePollingActive: false
     property string cpuModel: "Unknown CPU"
     property string cpuFreq: "-- MHz"
     property string cpuTemp: "--°C"
@@ -139,7 +140,14 @@ Singleton {
     }
 
     onActiveInstancesChanged: {
-        if (activeInstances > 0) root.refreshUsage()
+        if (activeInstances > 0 && !root.usagePollingActive) {
+            root.usagePollingActive = true
+            root.refreshUsage()
+        } else if (activeInstances === 0) {
+            root.usagePollingActive = false
+            root.previousCpuStats = undefined
+            root.cpuUsage = 0
+        }
     }
 
 	Timer {

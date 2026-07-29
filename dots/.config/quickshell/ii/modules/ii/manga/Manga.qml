@@ -9,6 +9,19 @@ Scope {
 
     signal toggleRequested()
     signal fullscreenRequested()
+    property string pendingAction: ""
+
+    function dispatch(action) {
+        if (!mangaPanelLoader.active || !mangaPanelLoader.item) {
+            pendingAction = action
+            mangaPanelLoader.active = true
+            return
+        }
+        if (action === "fullscreen")
+            mangaPanelLoader.item.toggleFullscreen()
+        else
+            mangaPanelLoader.item.togglePanel()
+    }
 
     readonly property var focusedScreen: {
         const focused = Hyprland.focusedMonitor
@@ -25,36 +38,46 @@ Scope {
     FloatingWindow {
         id: mangaWindow
 
-        visible: mangaPanel.panelOpen || mangaPanel.animRunning
+        readonly property var panel: mangaPanelLoader.item
+
+        visible: panel ? panel.panelOpen || panel.animRunning : false
         color: "transparent"
         screen: root.focusedScreen
-        fullscreen: mangaPanel.isFullscreen
-        implicitWidth: mangaPanel.normalPanelWidth
-        implicitHeight: mangaPanel.normalPanelHeight
-        minimumSize: mangaPanel.isFullscreen
+        fullscreen: panel ? panel.isFullscreen : false
+        implicitWidth: panel ? panel.normalPanelWidth : Math.min(root.screenW - 48, 1080)
+        implicitHeight: panel ? panel.normalPanelHeight : Math.min(root.screenH - 48, 820)
+        minimumSize: panel && panel.isFullscreen
             ? Qt.size(1, 1)
-            : Qt.size(mangaPanel.normalPanelWidth, mangaPanel.normalPanelHeight)
-        maximumSize: mangaPanel.isFullscreen
+            : Qt.size(implicitWidth, implicitHeight)
+        maximumSize: panel && panel.isFullscreen
             ? Qt.size(root.screenW, root.screenH)
-            : Qt.size(mangaPanel.normalPanelWidth, mangaPanel.normalPanelHeight)
+            : Qt.size(implicitWidth, implicitHeight)
         title: "Manga Reader"
 
-        MangaPanel {
-            id: mangaPanel
+        Loader {
+            id: mangaPanelLoader
             anchors.fill: parent
-            screenW: root.screenW
-            screenH: root.screenH
+            active: false
+            sourceComponent: MangaPanel {
+                screenW: root.screenW
+                screenH: root.screenH
+            }
+            onLoaded: {
+                var action = root.pendingAction
+                root.pendingAction = ""
+                root.dispatch(action || "toggle")
+            }
         }
 
         Connections {
             target: root
 
             function onToggleRequested() {
-                mangaPanel.togglePanel()
+                root.dispatch("toggle")
             }
 
             function onFullscreenRequested() {
-                mangaPanel.toggleFullscreen()
+                root.dispatch("fullscreen")
             }
         }
     }
