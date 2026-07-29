@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Window
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -354,8 +353,7 @@ Item {
                 source: root.readerActive && modelData.url
                     ? modelData.url + (pageDelegate.retryNonce > 0 ? "&retry=" + pageDelegate.retryNonce : "")
                     : ""
-                sourceSize.width: Math.ceil(pageDelegate.imageWidth * Math.max(1, Screen.devicePixelRatio))
-                fillMode: Image.Stretch
+                fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 cache: false
 
