@@ -10,6 +10,9 @@ Item {
     id: root
 
     property list<var> sections: []
+    property bool indexReady: false
+    property bool indexing: false
+    property bool reindexRequested: false
 
     property string currentSearch: ""
     onCurrentSearchChanged: {
@@ -17,6 +20,14 @@ Item {
     }
 
     function startIndexing() {
+        if (indexing) {
+            reindexRequested = true
+            return
+        }
+
+        indexing = true
+        indexReady = false
+        reindexRequested = false
         sections = []
         pageFile.start([
             Directories.generalConfigPath,
@@ -28,12 +39,31 @@ Item {
         ])
     }
 
-    Component.onCompleted: startIndexing()
+    function ensureIndexed() {
+        if (indexReady || indexing) return
+        startIndexing()
+    }
+
+    function requestReindex() {
+        indexReady = false
+        if (indexing) {
+            reindexRequested = true
+            return
+        }
+        startIndexing()
+    }
+
+    Timer {
+        interval: 700
+        running: true
+        repeat: false
+        onTriggered: root.ensureIndexed()
+    }
 
     Connections {
         target: Translation
         function onLanguageCodeChanged() {
-            startIndexing()
+            root.requestReindex()
         }
     }
 
@@ -51,8 +81,15 @@ Item {
         }
 
         function loadNext() {
-            if (currentIndex >= files.length)
+            if (currentIndex >= files.length) {
+                root.indexing = false
+                if (root.reindexRequested) {
+                    root.startIndexing()
+                    return
+                }
+                root.indexReady = true
                 return
+            }
 
             path = files[currentIndex]
         }
@@ -246,7 +283,7 @@ Item {
 
     function getBestResult(text) {
         let results = getSearchResult(text)
-        if (results.length === 0)
+        if (results === null || results.length === 0)
             return null
 
         results.sort((a, b) => b.score - a.score)
@@ -255,12 +292,16 @@ Item {
 
     function getResultsRanked(text) {
         let results = getSearchResult(text)
+        if (results === null)
+            return null
         results.sort((a, b) => b.score - a.score)
         return results
     }
 
     function getSearchResult(query) {
         if (!query || query.trim() === "") return []
+        ensureIndexed()
+        if (!indexReady) return null
 
         query = query.toLowerCase().trim()
         let queryTokens = tokenize(query)

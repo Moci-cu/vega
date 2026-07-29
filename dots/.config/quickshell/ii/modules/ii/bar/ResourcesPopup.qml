@@ -9,6 +9,10 @@ StyledPopup {
     id: root
     popupRadius: Appearance.rounding.large
 
+    onActiveChanged: {
+        if (active) ResourceUsage.refreshDiskUsage()
+    }
+
     // Helper function to format KB to GB
     function formatGB(kb) {
         return (kb / (1024 * 1024)).toFixed(1) + " GB";

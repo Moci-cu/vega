@@ -19,8 +19,10 @@ Singleton {
 
     property bool wifiEnabled: false
     property bool wifiScanning: false
-    property bool wifiConnecting: connectProc.running
+    property bool wifiConnecting: connectProc.running || changePasswordProc.running
     property WifiAccessPoint wifiConnectTarget
+    property bool scanAfterWifiEnabled: false
+    property bool initialScanRequested: false
     readonly property list<WifiAccessPoint> wifiNetworks: []
     readonly property WifiAccessPoint active: wifiNetworks.find(n => n.active) ?? null
     readonly property list<var> friendlyWifiNetworks: [...wifiNetworks].sort((a, b) => {
@@ -55,6 +57,7 @@ Singleton {
 
     // Control
     function enableWifi(enabled = true): void {
+        if (enableWifiProc.running) return;
         const cmd = enabled ? "on" : "off";
         enableWifiProc.exec(["nmcli", "radio", "wifi", cmd]);
     }
@@ -64,8 +67,24 @@ Singleton {
     }
 
     function rescanWifi(): void {
+        if (wifiScanning) return;
+        if (!wifiEnabled) {
+            scanAfterWifiEnabled = true;
+            return;
+        }
+
+        scanAfterWifiEnabled = false;
         wifiScanning = true;
         rescanProcess.running = true;
+    }
+
+    function requestWifiScan(): void {
+        if (wifiEnabled) {
+            rescanWifi();
+            return;
+        }
+        scanAfterWifiEnabled = true;
+        enableWifi(true);
     }
 
     function connectToWifiNetwork(accessPoint: WifiAccessPoint): void {
@@ -86,18 +105,20 @@ Singleton {
 
     function changePassword(network: WifiAccessPoint, password: string, username = ""): void {
         // TODO: enterprise wifi with username
+        if (changePasswordProc.running) return;
         network.askingPassword = false;
-        changePasswordProc.exec({
-            "environment": {
-                "PASSWORD": password,
-                "SSID": network.ssid
-            },
-            "command": ["bash", "-c", 'nmcli connection modify "$SSID" wifi-sec.psk "$PASSWORD"']
-        })
+        root.wifiConnectTarget = network;
+        changePasswordProc.pendingPassword = password;
+        changePasswordProc.stdinEnabled = true;
+        changePasswordProc.exec(["nmcli", "connection", "up", "id", network.ssid, "passwd-file", "/dev/stdin"]);
     }
 
     Process {
         id: enableWifiProc
+        onExited: exitCode => {
+            wifiStatusProcess.running = true;
+            if (exitCode !== 0) root.scanAfterWifiEnabled = false;
+        }
     }
 
     Process {
@@ -115,13 +136,13 @@ Singleton {
         stderr: SplitParser {
             onRead: line => {
                 // print("err:", line)
-                if (line.includes("Secrets were required")) {
+                if (line.includes("Secrets were required") && root.wifiConnectTarget) {
                     root.wifiConnectTarget.askingPassword = true
                 }
             }
         }
         onExited: (exitCode, exitStatus) => {
-            root.wifiConnectTarget.askingPassword = (exitCode !== 0)
+            if (root.wifiConnectTarget) root.wifiConnectTarget.askingPassword = (exitCode !== 0);
             root.wifiConnectTarget = null
         }
     }
@@ -135,20 +156,38 @@ Singleton {
 
     Process {
         id: changePasswordProc
-        onExited: { // Re-attempt connection after changing password
-            connectProc.running = false
-            connectProc.running = true
+        property string pendingPassword
+
+        environment: ({
+            LANG: "C",
+            LC_ALL: "C"
+        })
+        onRunningChanged: {
+            if (!running) return;
+            write("802-11-wireless-security.psk:" + pendingPassword + "\n");
+            pendingPassword = "";
+            stdinEnabled = false;
         }
+        onExited: exitCode => {
+            if (root.wifiConnectTarget) root.wifiConnectTarget.askingPassword = (exitCode !== 0);
+            root.wifiConnectTarget = null;
+            getNetworks.running = true;
+        }
+    }
+
+    Timer {
+        id: delayedWifiScan
+        interval: 1200
+        repeat: false
+        onTriggered: root.rescanWifi()
     }
 
     Process {
         id: rescanProcess
         command: ["nmcli", "dev", "wifi", "list", "--rescan", "yes"]
-        stdout: SplitParser {
-            onRead: {
-                wifiScanning = false;
-                getNetworks.running = true;
-            }
+        onExited: {
+            root.wifiScanning = false;
+            getNetworks.running = true;
         }
     }
 
@@ -252,6 +291,21 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.wifiEnabled = text.trim() === "enabled";
+                if (!root.wifiEnabled) {
+                    root.initialScanRequested = false;
+                    return;
+                }
+
+                if (root.scanAfterWifiEnabled) {
+                    root.scanAfterWifiEnabled = false;
+                    root.initialScanRequested = true;
+                    delayedWifiScan.restart();
+                    return;
+                }
+                if (root.initialScanRequested) return;
+
+                root.initialScanRequested = true;
+                delayedWifiScan.restart();
             }
         }
     }

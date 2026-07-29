@@ -29,6 +29,42 @@ ApplicationWindow {
     property string lastSearch: ""
     property int lastSearchIndex: -1
     property int resultsCount: 0
+    property string pendingSearch: ""
+
+    function runSettingsSearch(searchText) {
+        if (searchText.trim() === "") {
+            root.pendingSearch = ""
+            return
+        }
+
+        const normalizedText = searchText.toLowerCase()
+        const results = SearchRegistry.getResultsRanked(normalizedText)
+
+        if (results === null) {
+            root.pendingSearch = searchText
+            return
+        }
+
+        root.pendingSearch = ""
+        if (results.length === 0) {
+            noMoreResultsAnim.restart()
+            return
+        }
+
+        if (root.lastSearch !== searchText) {
+            root.lastSearchIndex = 0
+            root.lastSearch = searchText
+        } else {
+            root.lastSearchIndex++
+            if (results.length === 1) noMoreResultsAnim.restart()
+        }
+
+        const index = root.lastSearchIndex % results.length
+        const result = results[index]
+        root.resultsCount = results.length
+        root.currentPage = result.pageIndex
+        SearchRegistry.currentSearch = result.matchedString
+    }
 
     property var pages: [
         {
@@ -85,9 +121,21 @@ ApplicationWindow {
     title: "illogical-impulse Settings"
     
     Component.onCompleted: {
+        ExtensionManager.watchFileChanges = false // Settings app doesn't need file watching to prevent loops
         MaterialThemeLoader.reapplyTheme()
         Config.readWriteDelay = 0 // Settings app always only sets one var at a time so delay isn't needed
-        ExtensionManager.watchFileChanges = false // Settings app doesn't need file watching to prevent loops
+    }
+
+    Connections {
+        target: SearchRegistry
+        function onIndexReadyChanged() {
+            if (!SearchRegistry.indexReady || root.pendingSearch === "") return
+            const searchText = root.pendingSearch
+            Qt.callLater(() => {
+                if (root.pendingSearch !== searchText) return
+                root.runSettingsSearch(searchText)
+            })
+        }
     }
 
     minimumWidth: 750
@@ -198,6 +246,7 @@ ApplicationWindow {
                     onTextChanged: {
                         root.lastSearchIndex = -1
                         root.resultsCount = 0
+                        root.pendingSearch = ""
                     }
 
                     // We may use this in the future, this only searches the best result
@@ -217,44 +266,7 @@ ApplicationWindow {
                         SearchRegistry.currentSearch = bestResult.matchedString
                     } */
 
-                    onAccepted: {
-                        const result = SearchRegistry.getResultsRanked(searchInput.text)
-
-                        if (result == null) {
-                            noMoreResultsAnim.restart();
-                            return
-                        }
-
-                        let length = SearchRegistry.getResultsRanked(searchInput.text).length
-
-                        if (length == 0) {
-                            noMoreResultsAnim.restart();
-                            return
-                        }
-                        
-                        if (root.lastSearch != searchInput.text) {
-                            root.lastSearchIndex = 0
-                            root.lastSearch = searchInput.text
-                            
-                        } else {
-                            root.lastSearchIndex++
-                            if (SearchRegistry.getResultsRanked(searchInput.text).length === 1) {
-                                noMoreResultsAnim.restart()
-                            }
-                        }
-
-                        let normalizedText = searchInput.text.toLowerCase()
-                        let results = SearchRegistry.getResultsRanked(normalizedText)
-                        if (results.length > 0) {
-                            let index = root.lastSearchIndex % results.length
-                            let result = results[index]
-                            
-                            root.resultsCount = results.length
-                            root.currentPage = result.pageIndex
-                            //root.scrollPos = result.yPos
-                            SearchRegistry.currentSearch = result.matchedString
-                        }
-                    }
+                    onAccepted: root.runSettingsSearch(searchInput.text)
                 }
             }
             

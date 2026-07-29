@@ -65,8 +65,13 @@ Singleton {
         running: true
         onTriggered: () => {
             const index = root.list.findIndex((notif) => notif.notificationId === notificationId);
+            if (index === -1) {
+                destroy();
+                return;
+            }
             const notifObject = root.list[index];
-            print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject?.isTransient);
+            notifObject.timer = null;
+            print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject.isTransient);
             if (notifObject.isTransient) root.discardNotification(notificationId);
             else root.timeoutNotification(notificationId);
             destroy()
@@ -189,11 +194,20 @@ Singleton {
         root.unread = 0;
     }
 
+    function clearNotificationTimer(notif) {
+        if (!notif?.timer) return;
+        const timer = notif.timer;
+        notif.timer = null;
+        timer.stop();
+        timer.destroy();
+    }
+
     function discardNotification(id) {
         console.log("[Notifications] Discarding notification with ID: " + id);
         const index = root.list.findIndex((notif) => notif.notificationId === id);
         const notifServerIndex = notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id);
         if (index !== -1) {
+            clearNotificationTimer(root.list[index]);
             root.list.splice(index, 1);
             notifFileView.setText(stringifyList(root.list));
             triggerListChange()
@@ -205,6 +219,7 @@ Singleton {
     }
 
     function discardAllNotifications() {
+        root.list.forEach((notif) => clearNotificationTimer(notif));
         root.list = []
         triggerListChange()
         notifFileView.setText(stringifyList(root.list));
@@ -216,23 +231,23 @@ Singleton {
 
     function cancelTimeout(id) {
         const index = root.list.findIndex((notif) => notif.notificationId === id);
-        if (root.list[index] != null)
-            root.list[index].timer.stop();
+        if (index !== -1) clearNotificationTimer(root.list[index]);
     }
 
     function timeoutNotification(id) {
         const index = root.list.findIndex((notif) => notif.notificationId === id);
-        if (root.list[index] != null)
+        if (index !== -1) {
+            clearNotificationTimer(root.list[index]);
             root.list[index].popup = false;
+        }
         root.timeout(id);
     }
 
     function timeoutAll() {
         root.popupList.forEach((notif) => {
-            root.timeout(notif.notificationId);
-        })
-        root.popupList.forEach((notif) => {
+            clearNotificationTimer(notif);
             notif.popup = false;
+            root.timeout(notif.notificationId);
         });
     }
 

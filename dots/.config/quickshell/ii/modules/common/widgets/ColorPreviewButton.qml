@@ -18,16 +18,11 @@ RippleButton {
 
     property bool builtInTheme: false
     readonly property string builtInThemeFilePath: builtInThemeDirectory + "/" + colorScheme + ".json"
-    readonly property string builtInThemeCommand: `jq -r '.primary, .primary_container, .secondary' ${builtInThemeFilePath}`
 
     property bool customTheme: false
     readonly property string customThemeFilePath: customThemeDirectory + "/" + colorScheme + ".json"
-    readonly property string customThemeCommand: `jq -r '.primary, .primary_container, .secondary' ${customThemeFilePath}`  
 
-    readonly property string wallpaperPath: Config.options.background.wallpaperPath
-    readonly property string scriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/colors/generate_colors_material.py`)
-
-    property string fullCommand: `python3 ${root.scriptPath} --path ${root.wallpaperPath} --scheme ${root.colorScheme} --preview`
+    property var previewData: null
 
     // these are not actually primary, secondary and tertiary, they are just the three colors we get from the script
     property color primaryColor: "transparent"
@@ -62,45 +57,45 @@ RippleButton {
         }
     }
 
-    property var effectiveCommand:  root.customTheme ? root.customThemeCommand
-                                    : root.builtInTheme ? root.builtInThemeCommand
-                                    : root.fullCommand
+    function applyPreview(data) {
+        root.primaryColor = data?.primary || "transparent"
+        root.secondaryColor = data?.primary_container || "transparent"
+        root.tertiaryColor = data?.secondary || "transparent"
+        root.loaded = true
+        myCanvas.requestPaint()
+    }
 
-    onShouldLoadChanged: {
-        if (shouldLoad && !loaded) {
-            colorFetchProcess.running = true
+    function applyThemePreview(fileContent) {
+        try {
+            const data = JSON.parse(fileContent || "{}")
+            root.applyPreview({
+                primary: data.primary,
+                primary_container: data.primary_container,
+                secondary: data.secondary
+            })
+        } catch (e) {
+            console.log("[ColorPreviewButton] Theme parse error:", root.colorScheme)
         }
     }
 
-    Process {
-        id: colorFetchProcess
-        running: false
-        command: ["bash", "-c", root.effectiveCommand]
+    onPreviewDataChanged: {
+        if (previewData) root.applyPreview(previewData)
+    }
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    //console.log("[ColorPreviewButton] Command:", root.effectiveCommand)
-                    if (root.customTheme || root.builtInTheme) {
-                        const colors = this.text.trim().split("\n")
-                        root.primaryColor   = colors[0] || "transparent"
-                        root.secondaryColor = colors[1] || "transparent"
-                        root.tertiaryColor  = colors[2] || "transparent"
-                    } else {
-                        const data = JSON.parse(this.text)
-
-                        root.primaryColor   = data.primary   || "transparent"
-                        root.secondaryColor = data.primary_container || "transparent"
-                        root.tertiaryColor  = data.secondary  || "transparent"
-                    }
-
-                    root.loaded = true
-                    myCanvas.requestPaint()
-                } catch (e) {
-                    console.log("[ColorPreviewButton] Parse error:", this.text)
-                }
-            }
+    onShouldLoadChanged: {
+        if (!shouldLoad || loaded) return
+        if (root.customTheme || root.builtInTheme) {
+            themeFileView.reload()
+            return
         }
+        if (root.previewData) root.applyPreview(root.previewData)
+    }
+
+    FileView {
+        id: themeFileView
+        path: root.shouldLoad && (root.customTheme || root.builtInTheme) ? (root.customTheme ? root.customThemeFilePath : root.builtInThemeFilePath) : ""
+        watchChanges: false
+        onLoaded: root.applyThemePreview(themeFileView.text())
     }
 
     StyledToolTip {

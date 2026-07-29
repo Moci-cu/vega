@@ -16,7 +16,7 @@ Item {
     id: root
 
     Component.onCompleted: {
-        Network.rescanWifi();
+        if (Network.wifiEnabled) Network.rescanWifi();
     }
 
     WPanelPageColumn {
@@ -47,9 +47,12 @@ Item {
                             id: toggleSwitch
                             Layout.rightMargin: 12
                             checked: Network.wifiStatus !== "disabled"
-                            onCheckedChanged: {
-                                Network.enableWifi(checked);
-                                Network.rescanWifi();
+                            onToggled: {
+                                if (checked) {
+                                    Network.requestWifiScan();
+                                } else {
+                                    Network.enableWifi(false);
+                                }
                             }
                         }
                     }
@@ -107,7 +110,7 @@ Item {
                 enabled: !Network.wifiScanning
 
                 onClicked: {
-                    Network.rescanWifi();
+                    Network.requestWifiScan();
                 }
 
                 contentItem: FluentIcon {

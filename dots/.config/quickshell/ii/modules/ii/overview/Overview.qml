@@ -39,11 +39,17 @@ Scope {
 
                 readonly property bool isScrollingLayout: Persistent.states.hyprland.layout === "scrolling"
                 property string searchingText: ""
+                readonly property bool hasSearchQuery: searchingText.length > 0
+                readonly property bool showWorkspaceOverview: !hasSearchQuery
 
                 WlrLayershell.namespace: "quickshell:overview"
                 WlrLayershell.layer: WlrLayer.Top
                 WlrLayershell.keyboardFocus: GlobalStates.overviewOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
                 color: "transparent"
+
+                mask: Region {
+                    item: root.contentShown ? contentItem : null
+                }
 
                 property var zoomLevels: {  // has to be reverted compared to background
                     "in": { default: 1, zoomed: 1.04 },
@@ -60,6 +66,12 @@ Scope {
                 property real scaleAnimated: showOpeningAnimation ? GlobalStates.overviewOpen ? zoomedRatio : defaultRatio : 1
 
                 property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1 
+                property bool workspaceContentReady: false
+                readonly property bool contentShown: {
+                    if (!showOpeningAnimation) return GlobalStates.overviewOpen;
+                    if (isResettingZoom) return false;
+                    return isZoomInStyle ? scaleAnimated > defaultRatio : scaleAnimated < defaultRatio;
+                }
 
                 onIsZoomInStyleChanged: isResettingZoom = true
                 onScaleAnimatedChanged: {
@@ -68,12 +80,8 @@ Scope {
                     }
                 }
 
-                visible: {
-                    if (isResettingZoom) return false // not showing when we are resetting 
-                    if (!showOpeningAnimation) return GlobalStates.overviewOpen // no anim
-                    
-                    return isZoomInStyle ? scaleAnimated > defaultRatio : scaleAnimated < defaultRatio
-                }
+                // Keep the input-transparent surface alive so opening only has to reveal its content.
+                visible: true
 
                 Behavior on scaleAnimated {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
@@ -109,6 +117,8 @@ Scope {
                     target: GlobalStates
                     function onOverviewOpenChanged() {
                         if (!GlobalStates.overviewOpen) {
+                            workspaceContentDelayTimer.stop();
+                            root.workspaceContentReady = false;
                             searchWidget.disableExpandAnimation();
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
@@ -139,6 +149,21 @@ Scope {
                     }
                 }
 
+                Timer {
+                    id: workspaceContentDelayTimer
+                    interval: 100
+                    repeat: false
+                    onTriggered: root.workspaceContentReady = root.contentShown
+                }
+
+                onContentShownChanged: {
+                    if (contentShown) workspaceContentDelayTimer.restart();
+                    else {
+                        workspaceContentDelayTimer.stop();
+                        workspaceContentReady = false;
+                    }
+                }
+
                 Connections {
                     target: overviewScope
                     function onSetSearchingTextRequested(text) {
@@ -155,6 +180,7 @@ Scope {
                 Item {
                     id: contentItem
                     anchors.fill: parent
+                    opacity: root.contentShown ? 1 : 0
 
                     MouseArea { // We could have used PanelWindow.mask to detect this, but this is more stable
                         anchors.fill: parent
@@ -194,10 +220,10 @@ Scope {
                         scale: root.effectiveScale
                         anchors.top: searchWidgetWrapper.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        active: root.visible && (Config?.options.overview.enable ?? true) && !root.isScrollingLayout
+                        active: root.contentShown && root.workspaceContentReady && root.showWorkspaceOverview && (Config?.options.overview.enable ?? true) && !root.isScrollingLayout
                         sourceComponent: OverviewWidget {
                             panelWindow: root
-                            visible: (root.searchingText == "")
+                            visible: root.showWorkspaceOverview
                             monitorIndex: root.monitorIndex
                         }
                     }
@@ -206,11 +232,11 @@ Scope {
                         id: scrollingOverviewLoader
                         scale: root.effectiveScale
                         anchors.fill: parent
-                        active: root.visible && (Config?.options.overview.enable ?? true) && root.isScrollingLayout
+                        active: root.contentShown && root.workspaceContentReady && root.showWorkspaceOverview && (Config?.options.overview.enable ?? true) && root.isScrollingLayout
                         sourceComponent: ScrollingOverviewWidget {
                             anchors.fill: parent
                             panelWindow: root
-                            visible: (root.searchingText == "")
+                            visible: root.showWorkspaceOverview
                             monitorIndex: root.monitorIndex
                         }
                     }

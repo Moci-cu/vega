@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 
 /*
     Almost all of the custom color schemes (latte.json, samurai.json etc.) are gotten from https://github.com/snowarch/quickshell-ii-niri/blob/main/modules/common/ThemePresets.qml
@@ -24,7 +26,15 @@ GridLayout {
 
     property bool customTheme: false
     property bool builtInTheme: false
+    property int startDelay: 0
+    property int loadInterval: 80
     property list<string> colorSchemes: customTheme ? customColorSchemes : builtInTheme ? builtInColorSchemes : root.wallpaperColorSchemes
+    property var previewResults: ({})
+    property Process wallpaperPreviewProcess: null
+
+    readonly property bool wallpaperTheme: !customTheme && !builtInTheme
+    readonly property string wallpaperPath: Config.options.background.wallpaperPath
+    readonly property string materialPreviewScript: FileUtils.trimFileProtocol(`${Directories.scriptPath}/colors/generate_colors_material.py`)
 
     function formatText(text) {
         if (customTheme || builtInTheme) return text.charAt(0).toUpperCase() + text.slice(1);
@@ -33,6 +43,34 @@ GridLayout {
     }
 
     property int loadedCount: 0
+
+    function resetLoadingState() {
+        startTimer.stop()
+        loadTimer.stop()
+        root.stopWallpaperPreview()
+        root.loadedCount = 0
+        root.previewResults = ({})
+    }
+
+    function scheduleLoading() {
+        root.resetLoadingState()
+        startTimer.start()
+    }
+
+    function stopWallpaperPreview() {
+        const process = root.wallpaperPreviewProcess
+        root.wallpaperPreviewProcess = null
+        if (!process) return
+        if (process.running) process.running = false
+        else process.destroy()
+    }
+
+    function startWallpaperPreview(path) {
+        root.stopWallpaperPreview()
+        root.wallpaperPreviewProcess = wallpaperPreviewProcessComponent.createObject(root, {
+            "requestPath": path
+        })
+    }
 
     Repeater {
         model: root.colorSchemes
@@ -44,14 +82,43 @@ GridLayout {
             colorSchemeDisplayName: formatText(modelData)
             customTheme: root.customTheme
             builtInTheme: root.builtInTheme
+            previewData: root.previewResults[modelData] ?? null
             
             shouldLoad: index < root.loadedCount
         }
     }
 
+    Component {
+        id: wallpaperPreviewProcessComponent
+
+        Process {
+            id: previewProcess
+            required property string requestPath
+            running: true
+            command: [root.materialPreviewScript, "--path", requestPath, "--preview-all"]
+
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    if (root.wallpaperPreviewProcess !== previewProcess || previewProcess.requestPath !== root.wallpaperPath) return
+                    try {
+                        root.previewResults = JSON.parse(this.text || "{}")
+                        root.loadedCount = root.colorSchemes.length
+                    } catch (e) {
+                        console.log("[ColorPreviewGrid] Batch preview parse error:", this.text)
+                    }
+                }
+            }
+
+            onExited: {
+                if (root.wallpaperPreviewProcess === previewProcess) root.wallpaperPreviewProcess = null
+                destroy()
+            }
+        }
+    }
+
     Timer {
         id: loadTimer
-        interval: 20
+        interval: root.loadInterval
         repeat: true
         running: false
         
@@ -64,7 +131,23 @@ GridLayout {
         }
     }
 
-    Component.onCompleted: {
-        Qt.callLater(() => loadTimer.start())
+    Timer {
+        id: startTimer
+        interval: root.startDelay
+        repeat: false
+        running: false
+        onTriggered: {
+            if (root.wallpaperTheme) {
+                if (root.wallpaperPath === "") return
+                root.startWallpaperPreview(root.wallpaperPath)
+                return
+            }
+            loadTimer.start()
+        }
     }
+
+    onColorSchemesChanged: Qt.callLater(root.scheduleLoading)
+    onWallpaperPathChanged: if (root.wallpaperTheme) Qt.callLater(root.scheduleLoading)
+
+    Component.onCompleted: Qt.callLater(root.scheduleLoading)
 }

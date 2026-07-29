@@ -172,6 +172,7 @@ StyledOverlayWidget {
                     player: root.currentPlayer
                     baseButtonWidth: 30
                     baseButtonHeight: 35
+                    sideButtonScale: 1.15
                     playPauseButtonWidthScale: 1.75
                 }
             }   

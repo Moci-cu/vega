@@ -11,6 +11,9 @@ MouseArea {
     implicitWidth: columnLayout.implicitWidth
     hoverEnabled: !Config.options.bar.tooltips.clickToShow
 
+    Component.onCompleted: ResourceUsage.activeInstances++
+    Component.onDestruction: ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
+
     ColumnLayout {
         id: columnLayout
         spacing: 10

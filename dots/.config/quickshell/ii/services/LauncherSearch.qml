@@ -15,9 +15,20 @@ Singleton {
     property string query: ""
     property int resultLimit: 15
 
+    readonly property list<string> searchPrefixes: [Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch, Config.options.search.prefix.window]
+
+    function hasPrefix(prefix) {
+        return prefix.length > 0 && root.query.startsWith(prefix);
+    }
+
+    function matchedPrefix() {
+        return root.searchPrefixes.find(prefix => prefix.length > 0 && root.query.startsWith(prefix)) ?? "";
+    }
+
     function ensurePrefix(prefix) {
-        if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch].some(i => root.query.startsWith(i))) {
-            root.query = prefix + root.query.slice(1);
+        const currentPrefix = root.matchedPrefix();
+        if (currentPrefix.length > 0) {
+            root.query = prefix + root.query.slice(currentPrefix.length);
         } else {
             root.query = prefix + root.query;
         }
@@ -88,6 +99,15 @@ Singleton {
             }
         },
         {
+            action: "killall",
+            execute: () => {
+                const windows = HyprlandData.windowList.filter(win => win.address)
+                for (const win of windows) {
+                    Hyprland.dispatch(`hl.dsp.window.close({window = "address:${win.address}"})`)
+                }
+            }
+        },
+        {
             action: "superpaste",
             execute: args => {
                 if (!/^(\d+)/.test(args.trim())) {
@@ -144,7 +164,7 @@ Singleton {
     }
 
     function mathExpression(query) {
-        if (query.startsWith(Config.options.search.prefix.math)) {
+        if (Config.options.search.prefix.math.length > 0 && query.startsWith(Config.options.search.prefix.math)) {
             return query.slice(Config.options.search.prefix.math.length).trim();
         }
         if (/^\d/.test(query)) {
@@ -157,6 +177,8 @@ Singleton {
         const query = root.query;
         const mathExpr = root.mathExpression(query);
         if (mathExpr.length > 0) {
+            root.mathResult = "";
+            mathProc.running = false;
             nonAppResultsTimer.restart();
         } else {
             nonAppResultsTimer.stop();
@@ -164,7 +186,7 @@ Singleton {
             root.mathResult = "";
         }
 
-        if (!query.startsWith(Config.options.search.prefix.fileSearch)) {
+        if (!root.hasPrefix(Config.options.search.prefix.fileSearch)) {
             fileSearchTimer.stop();
             fileProc.running = false;
             if (root.fileResults.length > 0) root.fileResults = [];
@@ -311,6 +333,59 @@ Singleton {
         };
     }
 
+    function windowSearchText(win) {
+        return [win.class, win.initialClass, win.title, win.initialTitle]
+            .filter(value => value && String(value).length > 0)
+            .join(" ")
+    }
+
+    function focusWindow(win) {
+        Hyprland.dispatch(`hl.dsp.focus({window = "address:${win.address}"})`)
+        GlobalStates.overviewOpen = false
+    }
+
+    function windowResult(win) {
+        const appClass = win.class || win.initialClass || ""
+        const title = win.title || win.initialTitle || appClass || Translation.tr("Untitled window")
+        return {
+            key: `window:${win.address}`,
+            type: Translation.tr("Window"),
+            name: title,
+            iconName: AppSearch.guessIcon(appClass),
+            iconType: LauncherSearchResult.IconType.System,
+            verb: Translation.tr("Focus"),
+            execute: () => root.focusWindow(win),
+            actions: limit => [
+                {
+                    name: Translation.tr("Close"),
+                    iconName: "close",
+                    iconType: LauncherSearchResult.IconType.Material,
+                    execute: () => Hyprland.dispatch(`hl.dsp.window.close({window = "address:${win.address}"})`)
+                }
+            ].slice(0, limit ?? 1)
+        }
+    }
+
+    function windowResults(search) {
+        const activeWorkspaceId = HyprlandData.activeWorkspace?.id ?? Hyprland.focusedWorkspace?.id ?? 0
+        const windows = HyprlandData.windowList
+            .filter(win => win.workspace?.id === activeWorkspaceId)
+            .sort((a, b) => (a.focusHistoryID ?? 999999) - (b.focusHistoryID ?? 999999))
+
+        if (search.length === 0) return windows.slice(0, root.resultLimit)
+
+        const preppedWindows = windows.map(win => ({
+            name: Fuzzy.prepare(root.windowSearchText(win)),
+            entry: win
+        }))
+
+        return Fuzzy.go(search, preppedWindows, {
+            all: true,
+            key: "name",
+            limit: root.resultLimit
+        }).map(r => r.obj.entry)
+    }
+
     function commandResult() {
         return {
             key: "command",
@@ -352,7 +427,9 @@ Singleton {
 
     function launcherActionResult(action) {
         const actionString = `${Config.options.search.prefix.action}${action.action}`;
-        if (!actionString.startsWith(root.query) && !root.query.startsWith(actionString)) return null;
+        const isPartialMatch = actionString.startsWith(root.query);
+        const isExecutableMatch = root.query === actionString || root.query.startsWith(`${actionString} `);
+        if (!isPartialMatch && !isExecutableMatch) return null;
         return {
             key: `action:${action.action}`,
             name: root.query.startsWith(actionString) ? root.query : actionString,
@@ -361,7 +438,8 @@ Singleton {
             iconName: "settings_suggest",
             iconType: LauncherSearchResult.IconType.Material,
             execute: () => {
-                action.execute(root.query.split(" ").slice(1).join(" "));
+                const args = root.query.startsWith(`${actionString} `) ? root.query.slice(actionString.length).trimStart() : "";
+                action.execute(args);
             }
         };
     }
@@ -385,17 +463,19 @@ Singleton {
 
     onQueryChanged: updateNonAppSearches()
 
-
     Process {
         id: mathProc
         property list<string> baseCommand: ["qalc", "-t"]
+        property string activeExpression: ""
         function calculateExpression(expression) {
             mathProc.running = false;
+            mathProc.activeExpression = expression;
             mathProc.command = baseCommand.concat(expression);
             mathProc.running = true;
         }
         stdout: SplitParser {
             onRead: data => {
+                if (root.mathExpression(root.query) !== mathProc.activeExpression) return;
                 root.mathResult = data;
             }
         }
@@ -414,7 +494,7 @@ Singleton {
         }
         stdout: StdioCollector {
             onStreamFinished: {
-                const currentExpr = root.query.startsWith(Config.options.search.prefix.fileSearch)
+                const currentExpr = root.hasPrefix(Config.options.search.prefix.fileSearch)
                     ? root.query.slice(Config.options.search.prefix.fileSearch.length).trim()
                     : "";
                 if (currentExpr !== fileProc.activeExpression) return;
@@ -434,26 +514,30 @@ Singleton {
             return [];
 
         ///////////// Special cases ///////////////
-        if (root.query.startsWith(Config.options.search.prefix.clipboard)) {
+        if (root.hasPrefix(Config.options.search.prefix.clipboard)) {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.clipboard);
             return Cliphist.fuzzyQuery(searchString).map((entry, index, array) => root.clipboardResult(entry, index, array));
-        } else if (root.query.startsWith(Config.options.search.prefix.emojis)) {
+        } else if (root.hasPrefix(Config.options.search.prefix.emojis)) {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.emojis);
             return Emojis.fuzzyQuery(searchString).map(entry => root.emojiResult(entry));
+        } else if (root.hasPrefix(Config.options.search.prefix.window)) {
+            const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.window).trim();
+            return root.windowResults(searchString).map(entry => root.windowResult(entry));
         }
 
         //////// Prioritized by prefix /////////
         let result = [];
         const startsWithNumber = /^\d/.test(root.query);
-        const startsWithActionPrefix = root.query.startsWith(Config.options.search.prefix.action);
-        const startsWithAppPrefix = root.query.startsWith(Config.options.search.prefix.app);
-        const startsWithFileSearchPrefix = root.query.startsWith(Config.options.search.prefix.fileSearch);
-        const startsWithMathPrefix = root.query.startsWith(Config.options.search.prefix.math);
-        const startsWithShellCommandPrefix = root.query.startsWith(Config.options.search.prefix.shellCommand);
-        const startsWithWebSearchPrefix = root.query.startsWith(Config.options.search.prefix.webSearch);
-        if (startsWithNumber || startsWithMathPrefix) {
+        const startsWithActionPrefix = root.hasPrefix(Config.options.search.prefix.action);
+        const startsWithAppPrefix = root.hasPrefix(Config.options.search.prefix.app);
+        const startsWithFileSearchPrefix = root.hasPrefix(Config.options.search.prefix.fileSearch);
+        const startsWithMathPrefix = root.hasPrefix(Config.options.search.prefix.math);
+        const startsWithShellCommandPrefix = root.hasPrefix(Config.options.search.prefix.shellCommand);
+        const startsWithWebSearchPrefix = root.hasPrefix(Config.options.search.prefix.webSearch);
+        const startsWithWindowPrefix = root.hasPrefix(Config.options.search.prefix.window);
+        if ((startsWithNumber || startsWithMathPrefix) && root.mathResult.length > 0) {
             result.push(root.mathResultEntry());
         } else if (startsWithShellCommandPrefix) {
             result.push(root.commandResult());
@@ -467,7 +551,7 @@ Singleton {
         }
 
         //////////////// Apps //////////////////
-        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithNumber;
+        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !startsWithNumber;
         if (shouldSearchApps || startsWithAppPrefix) {
             result = result.concat(AppSearch.fuzzyQuery(StringUtils.cleanPrefix(root.query, Config.options.search.prefix.app), root.resultLimit).map(entry => root.appResult(entry)));
         }
@@ -481,7 +565,7 @@ Singleton {
         if (Config.options.search.prefix.showDefaultActionsWithoutPrefix) {
             if (!startsWithShellCommandPrefix)
                 result.push(root.commandResult());
-            if (!startsWithNumber && !startsWithMathPrefix)
+            if (!startsWithNumber && !startsWithMathPrefix && root.mathResult.length > 0)
                 result.push(root.mathResultEntry());
             if (!startsWithWebSearchPrefix)
                 result.push(root.webSearchResult());

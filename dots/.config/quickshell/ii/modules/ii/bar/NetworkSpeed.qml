@@ -89,7 +89,7 @@ Item {
         }
         updateVisibility();
     }
-    Component.onDestruction: NetworkUsage.activeInstances--
+    Component.onDestruction: NetworkUsage.activeInstances = Math.max(0, NetworkUsage.activeInstances - 1)
 
     function formatSpeed(bytesPerSecond) {
         var bits = bytesPerSecond * 8;

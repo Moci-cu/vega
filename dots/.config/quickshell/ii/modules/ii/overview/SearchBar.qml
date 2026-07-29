@@ -15,11 +15,16 @@ RowLayout {
     property alias searchInput: searchInput
     property string searchingText
 
+    function selectedEntry() {
+        const selectedIndex = Math.max(0, appResults.currentIndex);
+        return LauncherSearch.results[selectedIndex];
+    }
+
     function forceFocus() {
         searchInput.forceActiveFocus();
     }
 
-    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, DefaultSearch }
+    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, Window, DefaultSearch }
 
     property var searchPrefixType: {
         if (root.searchingText.startsWith(Config.options.search.prefix.action)) return SearchBar.SearchPrefixType.Action;
@@ -29,6 +34,7 @@ RowLayout {
         if (root.searchingText.startsWith(Config.options.search.prefix.math)) return SearchBar.SearchPrefixType.Math;
         if (root.searchingText.startsWith(Config.options.search.prefix.shellCommand)) return SearchBar.SearchPrefixType.ShellCommand;
         if (root.searchingText.startsWith(Config.options.search.prefix.webSearch)) return SearchBar.SearchPrefixType.WebSearch;
+        if (Config.options.search.prefix.window.length > 0 && root.searchingText.startsWith(Config.options.search.prefix.window)) return SearchBar.SearchPrefixType.Window;
         return SearchBar.SearchPrefixType.DefaultSearch;
     }
     
@@ -44,6 +50,7 @@ RowLayout {
             case SearchBar.SearchPrefixType.Math: return MaterialShape.Shape.PuffyDiamond;
             case SearchBar.SearchPrefixType.ShellCommand: return MaterialShape.Shape.PixelCircle;
             case SearchBar.SearchPrefixType.WebSearch: return MaterialShape.Shape.SoftBurst;
+            case SearchBar.SearchPrefixType.Window: return MaterialShape.Shape.Cookie9Sided;
             default: return MaterialShape.Shape.Cookie7Sided;
         }
         text: switch (root.searchPrefixType) {
@@ -54,6 +61,7 @@ RowLayout {
             case SearchBar.SearchPrefixType.Math: return "calculate";
             case SearchBar.SearchPrefixType.ShellCommand: return "terminal";
             case SearchBar.SearchPrefixType.WebSearch: return "travel_explore";
+            case SearchBar.SearchPrefixType.Window: return "select_window";
             case SearchBar.SearchPrefixType.DefaultSearch: return "search";
             default: return "search";
         }
@@ -82,15 +90,31 @@ RowLayout {
 
         onAccepted: {
             if (appResults.count > 0) {
-                // Get the first visible delegate and trigger its click
-                let firstItem = appResults.itemAtIndex(0);
-                if (firstItem && firstItem.clicked) {
-                    firstItem.clicked();
-                }
+                const selectedEntry = root.selectedEntry();
+                if (!selectedEntry) return;
+                GlobalStates.overviewOpen = false;
+                selectedEntry.execute();
             }
         }
 
         Keys.onPressed: event => {
+            const ctrlPressed = event.modifiers & Qt.ControlModifier;
+            if (ctrlPressed && event.key === Qt.Key_N) {
+                if (appResults.count > 0) {
+                    appResults.currentIndex = Math.min(appResults.count - 1, appResults.currentIndex + 1);
+                    appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
+                }
+                event.accepted = true;
+                return;
+            }
+            if (ctrlPressed && event.key === Qt.Key_P) {
+                if (appResults.count > 0) {
+                    appResults.currentIndex = Math.max(0, appResults.currentIndex - 1);
+                    appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
+                }
+                event.accepted = true;
+                return;
+            }
             if (event.key === Qt.Key_Tab) {
                 if (LauncherSearch.results.length === 0) return;
                 const tabbedText = LauncherSearch.results[0].name;

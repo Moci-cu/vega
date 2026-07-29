@@ -9,6 +9,9 @@ MouseArea {
     implicitHeight: Appearance.sizes.barHeight
     hoverEnabled: !Config.options.bar.tooltips.clickToShow
 
+    Component.onCompleted: ResourceUsage.activeInstances++
+    Component.onDestruction: ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
+
     RowLayout {
         id: rowLayout
 
@@ -25,19 +28,28 @@ MouseArea {
         }
 
         Resource {
-            iconName: "swap_horiz"
-            percentage: ResourceUsage.swapUsedPercentage
-            shown: true
-            Layout.leftMargin: shown ? 6 : 0
-            warningThreshold: Config.options.bar.resources.swapWarningThreshold
-        }
-
-        Resource {
             iconName: "planner_review"
             percentage: ResourceUsage.cpuUsage
             shown: true
             Layout.leftMargin: shown ? 6 : 0
             warningThreshold: Config.options.bar.resources.cpuWarningThreshold
+        }
+
+        Resource {
+            iconName: "device_thermostat"
+            percentage: ResourceUsage.cpuTempCelsius > 0 ? Math.min(ResourceUsage.cpuTempCelsius / 100, 1) : 0
+            valueText: ResourceUsage.cpuTempCelsius > 0 ? `${ResourceUsage.cpuTempCelsius}°` : "--"
+            shown: true
+            Layout.leftMargin: shown ? 6 : 0
+            warningThreshold: 85
+        }
+
+        Resource {
+            iconName: "swap_horiz"
+            percentage: ResourceUsage.swapUsedPercentage
+            shown: true
+            Layout.leftMargin: shown ? 6 : 0
+            warningThreshold: Config.options.bar.resources.swapWarningThreshold
         }
 
     }

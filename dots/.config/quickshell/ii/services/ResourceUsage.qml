@@ -27,6 +27,9 @@ Singleton {
     property string cpuModel: "Unknown CPU"
     property string cpuFreq: "-- MHz"
     property string cpuTemp: "--°C"
+    property real cpuTempCelsius: 0
+    property int activeInstances: 0
+    property string cpuTempInputPath: ""
 
     property string maxAvailableMemoryString: kbToGbString(ResourceUsage.memoryTotal)
     property string maxAvailableSwapString: kbToGbString(ResourceUsage.swapTotal)
@@ -65,84 +68,113 @@ Singleton {
         updateCpuUsageHistory()
     }
 
+    function refreshUsage() {
+        fileMeminfo.reload()
+        fileStat.reload()
+
+        const textMeminfo = fileMeminfo.text()
+        memoryTotal = Number(textMeminfo.match(/MemTotal: *(\d+)/)?.[1] ?? 1)
+        memoryFree = Number(textMeminfo.match(/MemAvailable: *(\d+)/)?.[1] ?? 0)
+        swapTotal = Number(textMeminfo.match(/SwapTotal: *(\d+)/)?.[1] ?? 1)
+        swapFree = Number(textMeminfo.match(/SwapFree: *(\d+)/)?.[1] ?? 0)
+
+        const textStat = fileStat.text()
+        const cpuLine = textStat.match(/^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/)
+        if (cpuLine) {
+            const stats = cpuLine.slice(1).map(Number)
+            const total = stats.reduce((a, b) => a + b, 0)
+            const idle = stats[3]
+
+            if (previousCpuStats) {
+                const totalDiff = total - previousCpuStats.total
+                const idleDiff = idle - previousCpuStats.idle
+                cpuUsage = totalDiff > 0 ? (1 - idleDiff / totalDiff) : 0
+            }
+
+            previousCpuStats = { total, idle }
+        }
+
+        fileCpuTemp.reload()
+        root.updateHistories()
+    }
+
+    function cleanCpuModel(model) {
+        return model
+            .replace(/\(.*?\)/g, "")              // (R), (TM) vs
+            .replace(/with.*$/i, "")              // with Radeon...
+            .replace(/@\s*[\d.]+\s*GHz/i, "")     // @ 2.60GHz
+            .replace(/\b\d+-Core\b/gi, "")        // 6-Core
+            .replace(/\b\d+\s*Cores?\b/gi, "")    // 6 Cores
+            .replace(/\bCPU\b/gi, "")
+            .replace(/\bProcessor\b/gi, "")
+            .replace(/\s+/g, " ")
+            .trim()
+    }
+
+    function parseCpuInfo(textCpu) {
+        if (!textCpu || textCpu.length === 0) return
+        if (root.cpuModel === "Unknown CPU") {
+            const modelMatch = textCpu.match(/model name\s+:\s+(.*)/i)
+                ?? textCpu.match(/Hardware\s+:\s+(.*)/i)
+                ?? textCpu.match(/Processor\s+:\s+(.*)/i)
+            if (modelMatch) root.cpuModel = root.cleanCpuModel(modelMatch[1]) || root.cpuModel
+        }
+        const freqMatch = textCpu.match(/cpu MHz\s+:\s+([\d.]+)/)
+        if (freqMatch) root.cpuFreq = parseInt(freqMatch[1]) + " MHz"
+    }
+
+    function parseCpuMaxFreq(textFreq) {
+        const khz = Number(textFreq.trim())
+        if (!Number.isFinite(khz) || khz <= 0) return
+        root.maxAvailableCpuString = (khz / 1000000).toFixed(1).replace(/\.0$/, "") + " GHz"
+    }
+
+    function refreshCpuInfo() {
+        fileCpuInfo.reload()
+        root.parseCpuInfo(fileCpuInfo.text())
+    }
+
+    function refreshDiskUsage() {
+        if (!diskProc.running) diskProc.running = true
+    }
+
+    onActiveInstancesChanged: {
+        if (activeInstances > 0) root.refreshUsage()
+    }
+
 	Timer {
 		interval: Config.options?.resources?.updateInterval ?? 3000
-        running: true 
+        running: root.activeInstances > 0
         repeat: true
-		onTriggered: {
-            // Reload files
-            fileMeminfo.reload()
-            fileStat.reload()
-
-            // Parse memory and swap usage
-            const textMeminfo = fileMeminfo.text()
-            memoryTotal = Number(textMeminfo.match(/MemTotal: *(\d+)/)?.[1] ?? 1)
-            memoryFree = Number(textMeminfo.match(/MemAvailable: *(\d+)/)?.[1] ?? 0)
-            swapTotal = Number(textMeminfo.match(/SwapTotal: *(\d+)/)?.[1] ?? 1)
-            swapFree = Number(textMeminfo.match(/SwapFree: *(\d+)/)?.[1] ?? 0)
-
-            // Parse CPU usage
-            const textStat = fileStat.text()
-            const cpuLine = textStat.match(/^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/)
-            if (cpuLine) {
-                const stats = cpuLine.slice(1).map(Number)
-                const total = stats.reduce((a, b) => a + b, 0)
-                const idle = stats[3]
-
-                if (previousCpuStats) {
-                    const totalDiff = total - previousCpuStats.total
-                    const idleDiff = idle - previousCpuStats.idle
-                    cpuUsage = totalDiff > 0 ? (1 - idleDiff / totalDiff) : 0
-                }
-
-                previousCpuStats = { total, idle }
-            }
-
-            // Parse CPU info
-            fileCpuInfo.reload()
-            const textCpu = fileCpuInfo.text()
-            if (root.cpuModel === "Unknown CPU" && textCpu.length > 0) {
-                const modelMatch = textCpu.match(/model name\s+:\s+(.*)/)
-                if (!modelMatch) return
-                // i hope these are enough to shorten the string
-                root.cpuModel = modelMatch[1]
-                    .replace(/\(.*?\)/g, "")              // (R), (TM) vs
-                    .replace(/with.*$/i, "")              // with Radeon...
-                    .replace(/@\s*[\d.]+\s*GHz/i, "")     // @ 2.60GHz
-                    .replace(/\b\d+-Core\b/gi, "")        // 6-Core
-                    .replace(/\b\d+\s*Cores?\b/gi, "")    // 6 Cores
-                    .replace(/\bCPU\b/gi, "")
-                    .replace(/\bProcessor\b/gi, "")
-                    .replace(/\s+/g, " ")
-                    .trim() 
-            }
-            const freqMatch = textCpu.match(/cpu MHz\s+:\s+([\d.]+)/)
-            if (freqMatch) root.cpuFreq = parseInt(freqMatch[1]) + " MHz"
-
-            root.updateHistories()
-        }
+		onTriggered: root.refreshUsage()
 	}
 
-	FileView { id: fileMeminfo; path: "/proc/meminfo" }
+    FileView { id: fileMeminfo; path: "/proc/meminfo" }
     FileView { id: fileStat; path: "/proc/stat" }
-    FileView { id: fileCpuInfo; path: "/proc/cpuinfo" }
-
-    Process {
-        id: findCpuMaxFreqProc
-        environment: ({
-            LANG: "C",
-            LC_ALL: "C"
-        })
-        command: ["bash", "-c", "lscpu | grep 'CPU max MHz' | awk '{print $4}'"]
-        running: true
-        stdout: StdioCollector {
-            id: outputCollector
-            onStreamFinished: {
-                root.maxAvailableCpuString = (parseFloat(outputCollector.text) / 1000).toFixed(0) + " GHz"
+    FileView {
+        id: fileCpuInfo
+        path: "/proc/cpuinfo"
+        onLoaded: root.parseCpuInfo(text())
+    }
+    FileView {
+        id: fileCpuMaxFreq
+        path: "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+        printErrors: false
+        onLoaded: root.parseCpuMaxFreq(text())
+    }
+    FileView {
+        id: fileCpuTemp
+        path: root.cpuTempInputPath
+        printErrors: false
+        onLoaded: {
+            const milli = Number(text().trim())
+            if (Number.isFinite(milli)) {
+                root.cpuTempCelsius = Math.round(milli / 1000)
+                root.cpuTemp = root.cpuTempCelsius + "°C"
             }
         }
     }
-    
+
     Process {
         id: diskProc
         command: ["bash", "-c", "df -k / | awk 'NR==2{print $2, $3}'"]
@@ -159,34 +191,20 @@ Singleton {
         }
     }
 
-    Timer {
-        interval: 60000
-        running: true
-        repeat: true
-        onTriggered: diskProc.running = true
-    }
-
     Process {
-        id: tempProc
-        command: ["bash", "-c", "sensors | awk '/Tctl:/ {print $2}; /Package id 0:/ {print $4}' | head -1 | tr -d '+' | cut -d'.' -f1"]
+        id: findCpuTempPathProc
+        command: ["bash", "-c", "for h in /sys/class/hwmon/hwmon*; do [ -d \"$h\" ] || continue; name=$(cat \"$h/name\" 2>/dev/null); for t in \"$h\"/temp*_input; do [ -r \"$t\" ] || continue; label=$(cat \"${t%_input}_label\" 2>/dev/null); case \"$label $name\" in *Tctl*|*Package*id*0*|*k10temp*|*coretemp*|*zenpower*) echo \"$t\"; exit 0;; esac; fallback=${fallback:-$t}; done; done; if [ -n \"$fallback\" ]; then echo \"$fallback\"; elif [ -r /sys/class/thermal/thermal_zone0/temp ]; then echo /sys/class/thermal/thermal_zone0/temp; fi"]
+        running: true
         stdout: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
-                    root.cpuTemp = text.trim() + "°C";
-                }
+                root.cpuTempInputPath = text.trim().split("\n")[0] ?? ""
+                if (root.cpuTempInputPath.length > 0 && root.activeInstances > 0) fileCpuTemp.reload()
             }
         }
     }
 
-    Timer {
-        interval: 3000
-        running: true
-        repeat: true
-        onTriggered: tempProc.running = true
-    }
-
     Component.onCompleted: {
-        diskProc.running = true
-        tempProc.running = true
+        root.refreshCpuInfo()
+        fileCpuMaxFreq.reload()
     }
 }
