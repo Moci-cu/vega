@@ -589,6 +589,10 @@ Singleton {
                 property int timeout: 2500
             }
 
+            property JsonObject languageSwitcher: JsonObject {
+                property bool enable: false
+            }
+
             property JsonObject osk: JsonObject {
                 property string layout: "qwerty_full"
                 property bool pinnedOnStartup: false

@@ -10,6 +10,7 @@ Item {
     required property string icon
     required property string name
     property var shape
+    property bool showProgressBar: true
     property bool rotateIcon: false
     property bool scaleIcon: false
     property alias from: valueProgressBar.from
@@ -81,12 +82,14 @@ Item {
                         Layout.fillWidth: false
                         Layout.preferredWidth: 30
                         horizontalAlignment: Text.AlignRight
+                        visible: root.showProgressBar
                         text: Math.round(root.value * 100)
                     }
                 }
                 
                 StyledProgressBar {
                     id: valueProgressBar
+                    visible: root.showProgressBar
                     Layout.fillWidth: true
                     value: root.value
                 }

@@ -33,6 +33,10 @@ Scope {
             id: "gamma",
             sourceUrl: "indicators/GammaIndicator.qml"
         },
+        {
+            id: "language",
+            sourceUrl: "indicators/LanguageIndicator.qml"
+        },
     ]
 
     function triggerOsd() {
@@ -48,6 +52,17 @@ Scope {
         onTriggered: {
             GlobalStates.osdVolumeOpen = false;
             root.protectionMessage = "";
+        }
+    }
+
+    Connections {
+        target: HyprlandXkb
+        function onCurrentLayoutNameChanged() {
+            if (!(Config.options?.languageSwitcher?.enable ?? true))
+                return;
+            root.protectionMessage = "";
+            root.currentIndicator = "language";
+            root.triggerOsd();
         }
     }
 

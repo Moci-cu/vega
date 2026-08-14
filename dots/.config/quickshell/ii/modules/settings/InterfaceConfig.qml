@@ -902,6 +902,23 @@ ContentPage {
     }
 
     ContentSection {
+        icon: "translate"
+        title: Translation.tr("Language switcher notification")
+        tooltip: Translation.tr("To add keyboard layouts (max 4 per device with XKB), set kb_layout in general.lua.\nSet kb_options = \"grp:alt_shift_toggle\" to switch with Alt+Shift.\nRefer to Hyprland wiki documentation for more details.")
+
+        ConfigRow {
+            ConfigSwitch {
+                buttonIcon: "check"
+                text: Translation.tr("Enable switcher notification")
+                checked: Config.options.languageSwitcher.enable ?? true
+                onCheckedChanged: {
+                    Config.options.languageSwitcher.enable = checked;
+                }
+            }
+        }
+    }
+
+    ContentSection {
         icon: "overview_key"
         title: Translation.tr("Overview")
 
