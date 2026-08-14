@@ -14,8 +14,49 @@ import Quickshell.Hyprland
 Scope {
     id: overviewScope
     property bool dontAutoCancelSearch: false
+    property string focusRestoreAddress: ""
+    property int focusRestoreGeneration: 0
 
     signal setSearchingTextRequested(string text)
+
+    function activeToplevelAddress() {
+        const address = ToplevelManager.activeToplevel?.HyprlandToplevel?.address
+        return address === undefined || address === null ? "" : `0x${address}`
+    }
+
+    function rememberFocusedToplevel() {
+        focusRestoreGeneration++
+        focusRestoreAddress = activeToplevelAddress()
+    }
+
+    function restoreFocusedToplevel() {
+        const address = focusRestoreAddress
+        const generation = focusRestoreGeneration
+        focusRestoreAddress = ""
+        if (!address)
+            return
+
+        // Release the layer-shell keyboard grab before returning input to the client.
+        Qt.callLater(function() {
+            if (generation !== focusRestoreGeneration || GlobalStates.overviewOpen)
+                return
+            const activeAddress = overviewScope.activeToplevelAddress()
+            if (activeAddress && activeAddress !== address)
+                return
+            Hyprland.dispatch(`hl.dsp.focus({window = "address:${address}"})`)
+        })
+    }
+
+    Connections {
+        target: GlobalStates
+
+        function onOverviewOpenChanged() {
+            if (GlobalStates.overviewOpen)
+                overviewScope.rememberFocusedToplevel()
+            else
+                overviewScope.restoreFocusedToplevel()
+        }
+    }
 
     Variants {
         id: overviewVariant
@@ -117,6 +158,8 @@ Scope {
                     target: GlobalStates
                     function onOverviewOpenChanged() {
                         if (!GlobalStates.overviewOpen) {
+                            delayedGrabTimer.stop();
+                            grab.active = false;
                             workspaceContentDelayTimer.stop();
                             root.workspaceContentReady = false;
                             searchWidget.disableExpandAnimation();
