@@ -113,18 +113,155 @@ MouseArea {
 
         // Fingerprint
         Loader {
-            Layout.leftMargin: 10
-            Layout.rightMargin: 6
+            Layout.leftMargin: 4
+            Layout.rightMargin: 4
             Layout.alignment: Qt.AlignVCenter
             active: root.context.fingerprintsConfigured
+                && root.context.targetAction === LockContext.ActionEnum.Unlock
             visible: active
 
-            sourceComponent: MaterialSymbol {
-                id: fingerprintIcon
-                fill: 1
-                text: "fingerprint"
-                iconSize: Appearance.font.pixelSize.hugeass
-                color: Appearance.colors.colOnSurfaceVariant
+            sourceComponent: RowLayout {
+                spacing: 4
+
+                IconToolbarButton {
+                    id: fingerprintButton
+                    readonly property bool accepted: root.context.fingerprintState === root.context.fingerprintSuccess
+                    readonly property bool retryAllowed: root.context.fingerprintState !== root.context.fingerprintScanning
+                        && root.context.fingerprintState !== root.context.fingerprintRetryPending
+                        && !fingerprintButton.accepted
+
+                    Layout.preferredWidth: 40
+                    Layout.preferredHeight: 40
+                    pointingHandCursor: fingerprintButton.retryAllowed
+                    toggled: fingerprintButton.accepted
+                    text: fingerprintButton.accepted
+                        ? "check_circle"
+                        : root.context.fingerprintState === root.context.fingerprintFailed
+                        ? "fingerprint_off"
+                        : "fingerprint"
+                    iconFill: root.context.fingerprintState === root.context.fingerprintScanning
+                        || fingerprintButton.accepted
+                    colBackgroundToggled: Appearance.colors.colPrimary
+                    colBackgroundToggledHover: Appearance.colors.colPrimary
+                    colText: fingerprintButton.accepted
+                        ? Appearance.colors.colOnPrimary
+                        : root.context.fingerprintState === root.context.fingerprintFailed
+                        ? Appearance.colors.colError
+                        : Appearance.colors.colOnSurfaceVariant
+                    onClicked: {
+                        if (fingerprintButton.retryAllowed)
+                            root.context.retryFingerUnlock();
+                    }
+
+                    Connections {
+                        target: root.context
+                        function onFingerprintStateChanged() {
+                            if (root.context.fingerprintState === root.context.fingerprintSuccess)
+                                fingerprintSuccessPulse.restart();
+                        }
+                    }
+
+                    SequentialAnimation {
+                        id: fingerprintSuccessPulse
+
+                        NumberAnimation {
+                            target: fingerprintButton
+                            property: "scale"
+                            from: 1
+                            to: 1.18
+                            duration: 140
+                            easing.type: Easing.OutCubic
+                        }
+                        NumberAnimation {
+                            target: fingerprintButton
+                            property: "scale"
+                            to: 1
+                            duration: 220
+                            easing.type: Easing.OutBack
+                        }
+                    }
+
+                    StyledToolTip {
+                        text: root.context.fingerprintStatusText
+                    }
+                }
+            }
+        }
+
+        // Face unlock
+        Loader {
+            Layout.leftMargin: 4
+            Layout.rightMargin: 4
+            Layout.alignment: Qt.AlignVCenter
+            active: root.context.faceUnlockEnabled
+                && root.context.faceAvailable
+                && root.context.targetAction === LockContext.ActionEnum.Unlock
+            visible: active
+
+            sourceComponent: RowLayout {
+                spacing: 4
+
+                IconToolbarButton {
+                    id: faceButton
+                    readonly property bool accepted: root.context.faceState === root.context.faceSuccess
+                    readonly property bool retryAllowed: root.context.faceState !== root.context.faceScanning
+                        && !faceButton.accepted
+
+                    Layout.preferredWidth: 40
+                    Layout.preferredHeight: 40
+                    pointingHandCursor: faceButton.retryAllowed
+                    toggled: faceButton.accepted
+                    text: faceButton.accepted
+                        ? "check_circle"
+                        : root.context.faceState === root.context.faceFailed
+                        ? "face_retouching_off"
+                        : "face"
+                    iconFill: root.context.faceState === root.context.faceScanning
+                        || faceButton.accepted
+                    colBackgroundToggled: Appearance.colors.colPrimary
+                    colBackgroundToggledHover: Appearance.colors.colPrimary
+                    colText: faceButton.accepted
+                        ? Appearance.colors.colOnPrimary
+                        : root.context.faceState === root.context.faceFailed
+                        ? Appearance.colors.colError
+                        : Appearance.colors.colOnSurfaceVariant
+                    onClicked: {
+                        if (faceButton.retryAllowed)
+                            root.context.retryFaceUnlock();
+                    }
+
+                    Connections {
+                        target: root.context
+                        function onFaceStateChanged() {
+                            if (root.context.faceState === root.context.faceSuccess)
+                                faceSuccessPulse.restart();
+                        }
+                    }
+
+                    SequentialAnimation {
+                        id: faceSuccessPulse
+
+                        NumberAnimation {
+                            target: faceButton
+                            property: "scale"
+                            from: 1
+                            to: 1.18
+                            duration: 140
+                            easing.type: Easing.OutCubic
+                        }
+                        NumberAnimation {
+                            target: faceButton
+                            property: "scale"
+                            to: 1
+                            duration: 220
+                            easing.type: Easing.OutBack
+                        }
+                    }
+
+                    StyledToolTip {
+                        text: root.context.faceStatusText
+                    }
+                }
             }
         }
 
@@ -331,6 +468,7 @@ MouseArea {
         id: guardedBtn
         required property var targetAction
 
+        enabled: !root.context.unlockInProgress
         toggled: root.context.targetAction === guardedBtn.targetAction
 
         onClicked: {

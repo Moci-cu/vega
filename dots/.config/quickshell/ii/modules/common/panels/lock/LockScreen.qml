@@ -63,7 +63,10 @@ Scope {
                         GlobalStates.overlayOpen = false;
                     }
                     lockContext.reset();
+                    lockContext.refreshFingerprintAvailability();
+                    lockContext.refreshFaceAvailability();
                     lockContext.tryFingerUnlock();
+                    lockContext.scheduleFaceUnlock();
                 }
             }
         }
@@ -79,7 +82,8 @@ Scope {
             }
 
             // Unlock the keyring if configured to do so
-            if (Config.options.lock.security.unlockKeyring) root.unlockKeyring(); // Async
+            if (Config.options.lock.security.unlockKeyring && lockContext.passwordAuthenticated)
+                root.unlockKeyring(); // Async
 
             // Unlock the screen before exiting, or the compositor will display a
             // fallback lock you can't interact with.
