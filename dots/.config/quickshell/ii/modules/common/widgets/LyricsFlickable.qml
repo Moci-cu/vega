@@ -14,12 +14,29 @@ Item {
     property string geniusLyricsString: LyricsService.geniusHasLyrics ? LyricsService.plainLyrics : ""
 
     property bool hasSyncedLines: LyricsService.syncedLines.length > 0
+    readonly property real playerLength: {
+        if (!root.player?.lengthSupported)
+            return 0
+
+        const length = Number(root.player?.length ?? 0)
+        return isFinite(length) && length > 0 ? length : 0
+    }
+    readonly property real playerPosition: {
+        const position = Number(root.player?.position ?? 0)
+        return isFinite(position) ? Math.max(0, position) : 0
+    }
 
     Timer {
-        running: root.player?.playbackState == MprisPlaybackState.Playing && hasSyncedLines
+        running: root.player?.playbackState == MprisPlaybackState.Playing
+            && !root.hasSyncedLines
+            && LyricsService.geniusHasLyrics
+            && root.playerLength > 0
         interval: 250
         repeat: true
-        onTriggered: root.player.positionChanged()
+        onTriggered: {
+            if (root.player)
+                root.player.positionChanged()
+        }
     }
 
     MaterialLoadingIndicator {
@@ -48,15 +65,13 @@ Item {
         property bool isSyncing: true
 
         readonly property real rawTargetY: {
-            var lines = root.geniusLyricsString.split('\n')
-            var totalLines = lines.length
-            
-            var currentLineIndex = (root.player.position / root.player.length) * totalLines
-            
-            var averageLineHeight = contentHeight / totalLines
-            var targetY = (currentLineIndex * averageLineHeight)
-            
-            return Math.max(0, targetY - (geniusFlickable.height / 2))
+            if (!root.player || root.playerLength <= 0 || root.geniusLyricsString.trim().length === 0)
+                return 0
+
+            const progress = Math.max(0, Math.min(1, root.playerPosition / root.playerLength))
+            const maxContentY = Math.max(0, contentHeight - height)
+            const targetY = progress * contentHeight - height / 2
+            return Math.max(0, Math.min(maxContentY, targetY))
         }
 
         property real userScrollOffset: Persistent.states.background.mediaMode.userScrollOffset
@@ -76,9 +91,12 @@ Item {
         }
 
         function updateScrolling() {
-            if (isSyncing && !dragging && !flicking) {
-                contentY = Math.min(contentHeight - height, rawTargetY + Persistent.states.background.mediaMode.userScrollOffset)
-            }
+            if (!isSyncing || dragging || flicking)
+                return
+
+            const maxContentY = Math.max(0, contentHeight - height)
+            const targetY = rawTargetY + Persistent.states.background.mediaMode.userScrollOffset
+            contentY = Math.max(0, Math.min(maxContentY, targetY))
         }
 
         Behavior on contentY {

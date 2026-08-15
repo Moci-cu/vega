@@ -1,9 +1,7 @@
 import qs.modules.common
 import qs.services
 import QtQuick
-import QtQuick.Controls
-import Qt5Compat.GraphicalEffects 
-import Quickshell.Services.Mpris
+import Qt5Compat.GraphicalEffects
 
 // An animated version on LyricsSyllable (i have no idea why it is named as syllable dont judge me)
 
@@ -13,9 +11,36 @@ Item {
 
     readonly property int highlightStyle: Config.options.background.mediaMode.syllable.textHighlightStyle
     readonly property int currentIndex: LyricsService.currentIndex
-    readonly property bool isPlaying: LyricsService.activePlayer?.isPlaying ?? false
-    
+    readonly property real playbackPosition: {
+        const position = Number(LyricsService.activePlayer?.position ?? 0)
+        return isFinite(position) ? Math.max(0, position) : 0
+    }
+
     property real largeFontSize: Appearance.font.pixelSize.hugeass * 2.0
+
+    function lineProgress(lineIndex) {
+        const lines = LyricsService.syncedLines
+        if (!lines || lineIndex < 0 || lineIndex >= lines.length || lineIndex !== root.currentIndex)
+            return 0
+
+        const lineStart = Number(lines[lineIndex].time)
+        if (!isFinite(lineStart))
+            return 0
+
+        let lineEnd = lineIndex + 1 < lines.length ? Number(lines[lineIndex + 1].time) : 0
+
+        if (!isFinite(lineEnd) || lineEnd <= lineStart) {
+            const player = LyricsService.activePlayer
+            const playerLength = Number(player?.length ?? 0)
+            const hasValidLength = player?.lengthSupported
+                && isFinite(playerLength)
+                && playerLength > lineStart
+            lineEnd = hasValidLength ? playerLength : lineStart + 5
+        }
+
+        const progress = (root.playbackPosition - lineStart) / (lineEnd - lineStart)
+        return Math.max(0, Math.min(1, progress))
+    }
 
     Component.onCompleted: {
         LyricsService.initiliazeLyrics()
@@ -62,7 +87,7 @@ Item {
             highlightRangeMode: highlightFollowsCurrentItem ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
             preferredHighlightBegin: parent.height / 2 - 60
             preferredHighlightEnd: parent.height / 2
-            highlightMoveDuration: 300
+            highlightMoveDuration: Math.max(60, Math.min(160, LyricsService.getLineDuration(root.currentIndex) * 80))
 
             function scrollToCurrentItem() {
                 if (!lyricsList.currentItem || lyricsList.moving) return
@@ -106,8 +131,11 @@ Item {
                     anchors.fill: parent
                     scale: isCurrent ? 1.0 : 0.85
                     
-                    Behavior on scale { 
-                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: lyricsList.highlightMoveDuration
+                            easing.type: Easing.OutCubic
+                        }
                     }
 
                     // Maske için kullanılan görünmez metin
@@ -173,17 +201,10 @@ Item {
 
     component HorizontalHighlight: LinearGradient {
         anchors.fill: parent
-        visible: false 
-        
-        property real currentX: -150
+        visible: false
 
-        NumberAnimation on currentX {
-            from: -150
-            to: lyricsList.width + 150
-            duration: isCurrent ? LyricsService.getLineDuration(index) * 1300 : 0
-            running: isCurrent && root.isPlaying
-            easing.type: Easing.Linear
-        }
+        readonly property real progress: isCurrent ? root.lineProgress(index) : 0
+        readonly property real currentX: -150 + progress * (lyricsList.width + 300)
 
         start: Qt.point(currentX, 0)
         end: Qt.point(currentX + 200, 0)
@@ -197,17 +218,10 @@ Item {
 
     component VerticalHighlight: LinearGradient {
         anchors.fill: parent
-        visible: false 
+        visible: false
 
-        property real currentY: -20 
-
-        NumberAnimation on currentY {
-            from: -20
-            to: lyricText.height + 20
-            duration: isCurrent ? LyricsService.getLineDuration(index) * 1500 : 0
-            running: isCurrent && root.isPlaying
-            easing.type: Easing.Linear
-        }
+        readonly property real progress: isCurrent ? root.lineProgress(index) : 0
+        readonly property real currentY: -20 + progress * (lyricText.height + 40)
 
         start: Qt.point(0, currentY)
         end: Qt.point(0, currentY + 100)

@@ -21,13 +21,22 @@ Singleton {
     readonly property bool lyricsEnabled: Config.options.lyricsService.enable
     readonly property bool geniusEnabled: Config.options.lyricsService.enableGenius
     readonly property bool lrclibEnabled: Config.options.lyricsService.enableLrclib
-    
+
     property bool isInitialized: false
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
-    readonly property string currentTrackId: root.activePlayer?.trackTitle ?? ""
+    readonly property string currentTrackId: root.activePlayer
+        ? `${root.activePlayer.trackTitle ?? ""}||${root.activePlayer.trackArtist ?? ""}`
+        : ""
 
     readonly property bool effectiveLrclibEnabled: lyricsEnabled && lrclibEnabled && isInitialized && (root.activePlayer?.trackTitle?.length > 0) && (root.activePlayer?.trackArtist?.length > 0)
     readonly property bool effectiveGeniusEnabled: lyricsEnabled && geniusEnabled && isInitialized
+    readonly property string geniusApiKey: KeyringStorage.keyringData?.apiKeys?.genius ?? ""
+    readonly property bool geniusCredentialsReady: KeyringStorage.loaded && root.geniusApiKey.length > 0
+    readonly property string geniusRequestKey: effectiveGeniusEnabled && geniusCredentialsReady
+        && root.activePlayer?.trackTitle?.length > 0
+        && root.activePlayer?.trackArtist?.length > 0
+        ? root.currentTrackId
+        : ""
 
     readonly property alias syncedLines: lrclib.lines
     readonly property alias currentIndex: lrclib.currentIndex
@@ -73,28 +82,16 @@ Singleton {
     }
 
     function changeDurationToIndex(index) { // for lrclib, called by LyricsSyllable
-        if (!hasSyncedLines) return;
+        if (!hasSyncedLines || !root.activePlayer?.positionSupported || !root.activePlayer?.canSeek || index < 0 || index >= root.syncedLines.length) return;
         root.activePlayer.position = root.syncedLines[index].time
     }
     
     // https://quickshell.org/docs/master/types/Quickshell.Services.Mpris/MprisPlayer/#position
     Timer {
         running: root.activePlayer?.playbackState == MprisPlaybackState.Playing && root.hasSyncedLines && root.isInitialized
-        interval: 150
+        interval: 50
         repeat: true
         onTriggered: root.activePlayer.positionChanged()
-    }
-
-    Component.onCompleted: geniusFirstFetchDelay.restart()
-    Timer {
-        id: geniusFirstFetchDelay
-        running: false
-        interval: 1000
-        onTriggered: {
-            if (root.activePlayer && effectiveGeniusEnabled) {
-                genius.fetchLyrics(root.activePlayer.trackArtist, root.activePlayer.trackTitle)
-            }
-        }
     }
 
     LrclibLyrics {
@@ -102,20 +99,13 @@ Singleton {
         enabled: effectiveLrclibEnabled
         title: root.activePlayer?.trackTitle ?? ""
         artist: root.activePlayer?.trackArtist ?? ""
-        duration: root.activePlayer?.length ?? 0
+        album: root.activePlayer?.trackAlbum ?? ""
+        duration: root.activePlayer?.lengthSupported ? (root.activePlayer.length ?? 0) : 0
         position: root.activePlayer?.position ?? 0
     }
 
     GeniusLyrics {
         id: genius
-        readonly property string trackTitle: root.activePlayer?.trackTitle
-        onTrackTitleChanged: {
-            if (root.activePlayer) {
-                if (!effectiveGeniusEnabled) return;
-                genius.hasString = false
-                genius.fetchLyrics(root.activePlayer.trackArtist, root.activePlayer.trackTitle)
-            }
-        }
         property string lyricsString: ""
         property bool hasString: false
         onLyricsUpdated: (lyrics) => {
@@ -125,16 +115,21 @@ Singleton {
             genius.lyricsString = genius.hasString ? filteredLyrics : ""
         }
     }
-    
-    onCurrentTrackIdChanged: {
+
+    onGeniusRequestKeyChanged: {
         genius.hasString = false
         genius.lyricsString = ""
-        shellColorChanged = false // reseting at each track change
-
-        if (!effectiveGeniusEnabled) return;
-        if (currentTrackId !== "" && root.activePlayer?.trackArtist) {
+        if (root.geniusRequestKey.length > 0)
             genius.fetchLyrics(root.activePlayer.trackArtist, root.activePlayer.trackTitle)
-        }
+    }
+
+    onEffectiveGeniusEnabledChanged: {
+        if (root.effectiveGeniusEnabled && !KeyringStorage.loaded)
+            KeyringStorage.fetchKeyringData()
+    }
+
+    onCurrentTrackIdChanged: {
+        shellColorChanged = false // reseting at each track change
     }
 
     // I dont know if this is the correct place for this, but we only call this from MediaMode so it should be fine

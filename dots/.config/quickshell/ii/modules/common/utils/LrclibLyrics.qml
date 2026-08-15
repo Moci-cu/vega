@@ -18,6 +18,7 @@ Item {
     property bool enabled: false
     property string title: ""
     property string artist: ""
+    property string album: ""
     property real duration: 0
     property real position: 0
     property int selectedId: 0
@@ -34,10 +35,14 @@ Item {
     property int attempt: 0
     property bool startPending: false
 
+    readonly property int cacheSchemaVersion: 2
+    readonly property real cacheTtlMs: 30 * 24 * 60 * 60 * 1000
+
     readonly property string queryTitle: normalizeTitle(title)
     readonly property string queryArtist: normalizeArtist(artist)
-    readonly property int queryDuration: Math.round(duration ?? 0)
-    readonly property string queryKey: `${queryTitle}||${queryArtist}||${queryDuration}`
+    readonly property string queryAlbum: album.trim()
+    readonly property int queryDuration: isFinite(duration) && duration > 0 ? Math.round(duration) : 0
+    readonly property string queryKey: `${queryTitle}||${queryArtist}||${queryAlbum}||${queryDuration}`
     readonly property string fetchKey: `${queryKey}||${selectedId}`
 
     readonly property int currentIndex: syncedLyricIndexForPosition(position)
@@ -68,7 +73,8 @@ Item {
         const parts = cleaned.split(" - ");
         let main = parts[0].trim();
         let suffix = parts.slice(1).join(" - ").trim();
-        if (suffix && /\b(remix|version|edit|mix|rework)\b/i.test(suffix))
+        const versionMarker = /\b(remix|version|edit|mix|rework|live|acoustic|remaster(?:ed)?|sped[ -]?up|slowed|nightcore|instrumental|karaoke|tv size)\b/i;
+        if (suffix && versionMarker.test(suffix))
             cleaned = `${main} ${suffix}`;
         else
             cleaned = main;
@@ -79,6 +85,8 @@ Item {
                 const m = inner.replace(/^(?:feat\.?|ft\.?|featuring)\s*/i, '').trim();
                 return m ? ` feat. ${m} ` : ' ';
             }
+            if (versionMarker.test(inner))
+                return ` ${inner} `;
             return ' ';
         }).replace(/\s+/g, " ").trim();
 
@@ -106,6 +114,8 @@ Item {
         const parsed = [];
         const rawLines = lrcText.split(/\r?\n/);
         const timeTag = /\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g;
+        const offsetMatch = lrcText.match(/^\s*\[offset\s*:\s*([+-]?\d+)\s*\]\s*$/im);
+        const offsetSeconds = offsetMatch ? parseInt(offsetMatch[1], 10) / 1000 : 0;
 
         for (const rawLine of rawLines) {
             if (!rawLine)
@@ -127,7 +137,7 @@ Item {
                     else
                         millis = parseInt(fraction.padEnd(3, "0"), 10);
                 }
-                times.push(minutes * 60 + seconds + millis / 1000);
+                times.push(Math.max(0, minutes * 60 + seconds + millis / 1000 + offsetSeconds));
             }
 
             if (times.length === 0)
@@ -166,13 +176,7 @@ Item {
             }
         }
 
-        for (let i = idx; i >= 0; --i) {
-            const text = root.lines[i].text;
-            if (text && text.length > 0)
-                return i;
-        }
-
-        return -1;
+        return idx;
     }
 
     function nextNonEmptyIndex(fromIndex) {
@@ -213,48 +217,35 @@ Item {
         const baseGet = "https://lrclib.net/api/get";
         const title = root.queryTitle;
         const artist = root.queryArtist;
+        const album = root.queryAlbum;
         const duration = root.queryDuration;
 
         if (!title || !artist)
             return "";
 
-        if (root.selectedId > 0 && attempt === 0)
-            return `${baseGet}/${root.selectedId}`;
-
+        const urls = [];
         if (root.selectedId > 0)
-            attempt -= 1;
+            urls.push(`${baseGet}/${root.selectedId}`);
+        if (album && duration > 0)
+            urls.push(`${baseGet}?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}&album_name=${encodeURIComponent(album)}&duration=${duration}`);
 
-        if (attempt === 0) {
-            let url = `${baseGet}?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`;
-            if (duration > 0)
-                url += `&duration=${duration}`;
-            return url;
-        }
+        urls.push(`${baseSearch}?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`);
+        urls.push(`${baseSearch}?q=${encodeURIComponent(`${title} ${artist}`)}`);
+        urls.push(`${baseSearch}?q=${encodeURIComponent(title)}`);
+        return urls[attempt] ?? "";
+    }
 
-        if (attempt === 1) {
-            let url = `${baseSearch}?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`;
-            if (duration > 0)
-                url += `&duration=${duration}`;
-            return url;
-        }
-
-        if (attempt === 2) {
-            return `${baseSearch}?q=${encodeURIComponent(`${title} ${artist}`)}`;
-        }
-
-        if (attempt === 3) {
-            return `${baseSearch}?q=${encodeURIComponent(title)}`;
-        }
-
-        return "";
+    function comparableText(value) {
+        return String(value ?? "").toLowerCase().replace(/[\s\-_()\[\]{},.'\"!:;?/\\]+/g, " ").trim();
     }
 
     function pickBestLyricsResult(results) {
         if (!Array.isArray(results) || results.length === 0)
             return null;
 
-        const titleLower = root.queryTitle.toLowerCase();
-        const artistLower = root.queryArtist.toLowerCase();
+        const titleLower = root.comparableText(root.queryTitle);
+        const artistLower = root.comparableText(root.queryArtist);
+        const albumLower = root.comparableText(root.queryAlbum);
         const duration = root.queryDuration;
 
         let best = null;
@@ -262,26 +253,48 @@ Item {
 
         for (const item of results) {
             const syncedLyrics = item?.syncedLyrics ?? "";
-            if (!syncedLyrics || syncedLyrics.length === 0)
+            if ((!syncedLyrics || syncedLyrics.length === 0) && !item?.instrumental)
                 continue;
 
             let score = 0;
-            const itemTitle = (item?.trackName ?? item?.name ?? "").toLowerCase();
-            const itemArtist = (item?.artistName ?? "").toLowerCase();
+            const itemTitle = root.comparableText(item?.trackName ?? item?.name);
+            const itemArtist = root.comparableText(item?.artistName);
+            const itemAlbum = root.comparableText(item?.albumName);
 
             if (itemArtist && itemArtist === artistLower)
-                score += 100;
+                score += 300;
+            else if (itemArtist && (itemArtist.includes(artistLower) || artistLower.includes(itemArtist)))
+                score += 80;
+            else
+                score -= 300;
+
             if (itemTitle && itemTitle === titleLower)
-                score += 50;
+                score += 300;
+            else if (itemTitle && (itemTitle.includes(titleLower) || titleLower.includes(itemTitle)))
+                score += 80;
+            else
+                score -= 300;
+
+            if (albumLower && itemAlbum === albumLower)
+                score += 100;
 
             if (duration > 0 && typeof item?.duration === "number") {
                 const diff = Math.abs(item.duration - duration);
                 if (diff <= 2)
-                    score += 25;
+                    score += 400;
                 else if (diff <= 5)
-                    score += 10;
+                    score += 200;
+                else if (diff <= 10)
+                    score += 50;
                 else
-                    score -= Math.min(diff, 30);
+                    score -= Math.min(diff * 4, 400);
+            }
+
+            if (duration > 0 && syncedLyrics.length > 0) {
+                const candidateLines = root.parseSyncedLyrics(syncedLyrics);
+                const lastTimestamp = candidateLines.length > 0 ? candidateLines[candidateLines.length - 1].time : 0;
+                if (lastTimestamp > duration + 5)
+                    score -= 500 + Math.min((lastTimestamp - duration) * 5, 500);
             }
 
             if (item?.instrumental)
@@ -290,7 +303,7 @@ Item {
             if (syncedLyrics.length < 32)
                 score -= 60;
 
-            score += Math.min(syncedLyrics.length, 4000) / 20;
+            score += Math.min(syncedLyrics.length, 4000) / 400;
 
             if (score > bestScore) {
                 bestScore = score;
@@ -384,7 +397,7 @@ Item {
             return;
         }
         
-        const cached = getCached(root.queryTitle, root.queryArtist, root.queryDuration);
+        const cached = getCached(root.queryTitle, root.queryArtist, root.queryAlbum, root.queryDuration);
         if (cached) {
             root.instrumental = cached.instrumental || false;
             root.lines = cached.lines || [];
@@ -397,14 +410,32 @@ Item {
     }
 
 
-    function getCached(track, artist, duration) {
-        const key = `${track}||${artist}||${duration}`;
-        return root._cache[key] || null;
+    function cacheKey(track, artist, album, duration) {
+        return `${track}||${artist}||${album}||${duration}`;
     }
 
-    function setCache(track, artist, duration, data) {
-        const key = `${track}||${artist}||${duration}`;
-        root._cache[key] = data;
+    function getCached(track, artist, album, duration) {
+        if (root.selectedId > 0)
+            return null;
+        const key = root.cacheKey(track, artist, album, duration);
+        const cached = root._cache[key] ?? null;
+        if (!cached || cached.schemaVersion !== root.cacheSchemaVersion)
+            return null;
+        if (!cached.fetchedAt || Date.now() - cached.fetchedAt > root.cacheTtlMs)
+            return null;
+        if (duration > 0 && cached.sourceDuration > 0 && Math.abs(cached.sourceDuration - duration) > 5)
+            return null;
+        return cached;
+    }
+
+    function setCache(track, artist, album, duration, data) {
+        if (root.selectedId > 0)
+            return;
+        const key = root.cacheKey(track, artist, album, duration);
+        root._cache[key] = Object.assign({}, data, {
+            schemaVersion: root.cacheSchemaVersion,
+            fetchedAt: Date.now()
+        });
         saveCache();
     }
 
@@ -422,7 +453,16 @@ Item {
             if (isInitialLoad) {
                 try {
                     const loaded = JSON.parse(lyricFileView.text() || "{}");
-                    root._cache = loaded;
+                    const now = Date.now();
+                    const validCache = {};
+                    for (const key of Object.keys(loaded)) {
+                        const entry = loaded[key];
+                        if (entry?.schemaVersion === root.cacheSchemaVersion
+                                && entry.fetchedAt
+                                && now - entry.fetchedAt <= root.cacheTtlMs)
+                            validCache[key] = entry;
+                    }
+                    root._cache = validCache;
                     // console.log("[Cache] Loaded, total songs:", Object.keys(loaded).length);
                 } catch (e) {
                     root._cache = {};
@@ -431,7 +471,7 @@ Item {
                 
                 // Cache yüklendikten sonra tekrar kontrol et
                 if (root.fetchKey) {
-                    const cached = getCached(root.queryTitle, root.queryArtist, root.queryDuration);
+                    const cached = getCached(root.queryTitle, root.queryArtist, root.queryAlbum, root.queryDuration);
                     if (cached) {
                         root.instrumental = cached.instrumental || false;
                         root.lines = cached.lines || [];
@@ -499,9 +539,11 @@ Item {
 
                     let filtered = results;
 
-                    if (fetcher.attempt === 3 && root.queryArtist) {
+                    if (root.queryArtist) {
                         const artistLower = root.queryArtist.toLowerCase();
-                        filtered = results.filter(item => (item?.artistName ?? "").toLowerCase() === artistLower);
+                        const matchingArtist = results.filter(item => (item?.artistName ?? "").toLowerCase() === artistLower);
+                        if (matchingArtist.length > 0)
+                            filtered = matchingArtist;
                     }
 
                     const best = root.pickBestLyricsResult(filtered);
@@ -520,22 +562,11 @@ Item {
                         return;
                     }
 
-                    root.loading = false;
-                    root.error = root.lines.length === 0 && root.instrumental ? "Instrumental" : "";
-                    root.loadedKey = requestKey;
-
-                    root.instrumental = best.instrumental ?? false;
-                    root.lines = root.parseSyncedLyrics(best.syncedLyrics ?? "");
-
-                    if (root.lines.length === 0 && !root.instrumental) {
-                        root.attempt += 1;
-                        root.fetchAttempt(requestId);
-                        return;
-                    }
-
-                    root.setCache(root.queryTitle, root.queryArtist, root.queryDuration, {
+                    root.setCache(root.queryTitle, root.queryArtist, root.queryAlbum, root.queryDuration, {
                         instrumental: root.instrumental,
-                        lines: root.lines
+                        lines: root.lines,
+                        sourceId: best.id ?? 0,
+                        sourceDuration: best.duration ?? 0
                     });
 
                     root.loading = false;

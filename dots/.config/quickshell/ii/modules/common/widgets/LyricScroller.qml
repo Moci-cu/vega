@@ -28,21 +28,68 @@ Item {
     property int lastIndex: -1
     property bool isMovingForward: true
     property real scrollOffset: 0
+    property int scrollDuration: 300
 
     readonly property real animProgress: Math.abs(scrollOffset) / rowHeight
+    readonly property real playbackPosition: {
+        const position = Number(LyricsService.activePlayer?.position ?? 0)
+        return isFinite(position) ? Math.max(0, position) : 0
+    }
+
+    function millisecondsUntilNextLine(lineIndex) {
+        const lines = LyricsService.syncedLines
+        if (!lines || lineIndex < 0 || lineIndex >= lines.length)
+            return -1
+
+        for (let i = lineIndex + 1; i < lines.length; ++i) {
+            if (!lines[i].text || lines[i].text.length === 0)
+                continue
+
+            const nextTime = Number(lines[i].time)
+            if (isFinite(nextTime))
+                return Math.max(0, (nextTime - root.playbackPosition) * 1000)
+        }
+
+        return -1
+    }
+
+    function transitionDuration(fromIndex, toIndex) {
+        if (fromIndex < 0 || toIndex < 0)
+            return 0
+
+        const indexJump = Math.abs(toIndex - fromIndex)
+        const remainingTime = root.millisecondsUntilNextLine(toIndex)
+        if (indexJump >= 4 || remainingTime === 0)
+            return 0
+        if (indexJump > 1)
+            return remainingTime < 0 ? 70 : Math.min(70, Math.floor(remainingTime * 0.25))
+        if (remainingTime < 0)
+            return 300
+        if (remainingTime < 80)
+            return 0
+        return Math.min(300, Math.floor(remainingTime * 0.5))
+    }
 
     Component.onCompleted: {
         LyricsService.initiliazeLyrics()
     }
 
     onTargetCurrentIndexChanged: {
-        if (targetCurrentIndex !== lastIndex) {
-            isMovingForward = targetCurrentIndex > lastIndex;
-            lastIndex = targetCurrentIndex;
-            scrollAnimation.stop();
-            root.scrollOffset = root.isMovingForward ? -root.rowHeight : root.rowHeight;
-            scrollAnimation.start();
+        if (targetCurrentIndex === lastIndex)
+            return
+
+        const previousIndex = lastIndex
+        isMovingForward = targetCurrentIndex > previousIndex
+        lastIndex = targetCurrentIndex
+        scrollAnimation.stop()
+        root.scrollDuration = root.transitionDuration(previousIndex, targetCurrentIndex)
+        if (root.scrollDuration === 0) {
+            root.scrollOffset = 0
+            return
         }
+
+        root.scrollOffset = root.isMovingForward ? -root.rowHeight : root.rowHeight
+        scrollAnimation.start()
     }
 
     NumberAnimation {
@@ -50,7 +97,7 @@ Item {
         target: root
         property: "scrollOffset"
         to: 0
-        duration: 400
+        duration: root.scrollDuration
         easing.type: Easing.OutQuart
     }
 

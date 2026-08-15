@@ -14,12 +14,31 @@ Item {
     signal lyricsUpdated(string lyrics)
 
     readonly property var geniusApiKey: KeyringStorage.keyringData?.apiKeys?.genius
-    readonly property alias loading: fetchLyricsProcess.running
+    readonly property bool loading: fetchLyricsProcess.running || pendingRequest !== null
+
+    property int latestRequestId: 0
+    property int activeRequestId: 0
+    property var pendingRequest: null
+
+    function startPendingRequest() {
+        if (fetchLyricsProcess.running || pendingRequest === null) return
+
+        const request = pendingRequest
+        pendingRequest = null
+        activeRequestId = request.id
+        console.log("[Genius Lyrics] Fetching lyrics for", request.artist, "-", request.title)
+        fetchLyricsProcess.command = ["node", Directories.geniusLyricsScriptPath, root.geniusApiKey, request.artist, request.title]
+        fetchLyricsProcess.running = true
+    }
 
     function fetchLyrics(artist, title) {
-        console.log("[Genius Lyrics] Fetching lyrics for", artist, "-", title)
-        fetchLyricsProcess.command = ["node", Directories.geniusLyricsScriptPath, root.geniusApiKey, artist, title]
-        fetchLyricsProcess.running = true
+        const requestId = ++latestRequestId
+        pendingRequest = {
+            id: requestId,
+            artist: artist,
+            title: title
+        }
+        startPendingRequest()
     }
 
     Process {
@@ -28,8 +47,12 @@ Item {
         command: []
         stdout: StdioCollector {
             onStreamFinished: {
-                lyricsUpdated(this.text)
-            }   
+                if (root.activeRequestId === root.latestRequestId) root.lyricsUpdated(this.text)
+            }
         }
-    }   
+
+        onExited: {
+            if (root.pendingRequest !== null) Qt.callLater(root.startPendingRequest)
+        }
+    }
 }

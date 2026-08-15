@@ -284,7 +284,7 @@ Item { // Player instance
                             iconName: "keep"
                             buttonSize: 18
                             fill: MprisController.activePlayer == root.player
-                            downAction: () => MprisController.activePlayer = root.player
+                            downAction: () => MprisController.setActivePlayer(root.player)
                         }
                     }
 

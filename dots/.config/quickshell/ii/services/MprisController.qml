@@ -19,7 +19,11 @@ Singleton {
 	property list<MprisPlayer> allPlayers: Mpris.players.values;
 	property list<MprisPlayer> players: Mpris.players.values.filter(player => isRealPlayer(player));
 	property MprisPlayer trackedPlayer: null;
-	property MprisPlayer activePlayer: trackedPlayer ?? Mpris.players.values[0] ?? null;
+	readonly property MprisPlayer preferredPlayer: {
+		if (root.priorityPlayer.length === 0) return null;
+		return root.players.find(player => player.desktopEntry === root.priorityPlayer) ?? null;
+	}
+	readonly property MprisPlayer activePlayer: trackedPlayer;
 	signal trackChanged(reverse: bool);
 
 	property string priorityPlayer: Config.options.media.priorityPlayer;
@@ -28,14 +32,21 @@ Singleton {
 
 	property var activeTrack;
 
-	onAllPlayersChanged: {
-		const nextPlayer = allPlayers.find(player => player.desktopEntry === root.priorityPlayer);
-		if (nextPlayer) {
-			activePlayer = nextPlayer;
-			return;
-		} else {
-			activePlayer = players[0];
-		}
+	function applyPreferredPlayer() {
+		if (root.preferredPlayer && root.players.includes(root.preferredPlayer))
+			root.trackedPlayer = root.preferredPlayer;
+	}
+
+	onPreferredPlayerChanged: {
+		if (root.preferredPlayer) Qt.callLater(root.applyPreferredPlayer);
+	}
+
+	onPlayersChanged: {
+		if (root.trackedPlayer && root.players.includes(root.trackedPlayer)) return;
+		root.trackedPlayer = root.preferredPlayer
+			?? root.players.find(player => player.isPlaying)
+			?? root.players[0]
+			?? null;
 	}
 
 	property bool hasActivePlasmaIntegration: false
@@ -69,28 +80,22 @@ Singleton {
 			target: modelData;
 
 			Component.onCompleted: {
-				if (root.trackedPlayer == null || modelData.isPlaying) {
+				if (root.isRealPlayer(modelData) && (root.trackedPlayer == null || modelData.isPlaying)) {
 					root.trackedPlayer = modelData;
 				}
 			}
 
 			Component.onDestruction: {
-				if (root.trackedPlayer == null || !root.trackedPlayer.isPlaying) {
-					for (const player of Mpris.players.values) {
-						if (player.playbackState.isPlaying) {
-							root.trackedPlayer = player;
-							break;
-						}
-					}
-
-					if (trackedPlayer == null && Mpris.players.values.length != 0) {
-						trackedPlayer = Mpris.players.values[0];
-					}
-				}
+				if (root.trackedPlayer !== modelData) return;
+				root.trackedPlayer = root.players.find(player => player !== modelData && player.isPlaying)
+					?? root.players.find(player => player !== modelData)
+					?? null;
 			}
 
 			function onPlaybackStateChanged() {
-				if (root.trackedPlayer !== modelData) root.trackedPlayer = modelData;
+				if (modelData.isPlaying && root.isRealPlayer(modelData) && root.trackedPlayer !== modelData) {
+					root.trackedPlayer = modelData;
+				}
 			}
 		}
 	}
