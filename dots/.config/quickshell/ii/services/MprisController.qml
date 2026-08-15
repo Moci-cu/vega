@@ -80,7 +80,10 @@ Singleton {
 			target: modelData;
 
 			Component.onCompleted: {
-				if (root.isRealPlayer(modelData) && (root.trackedPlayer == null || modelData.isPlaying)) {
+				if (!root.isRealPlayer(modelData)) return;
+				if (root.preferredPlayer) {
+					root.trackedPlayer = root.preferredPlayer;
+				} else if (root.trackedPlayer == null || modelData.isPlaying) {
 					root.trackedPlayer = modelData;
 				}
 			}
@@ -93,9 +96,14 @@ Singleton {
 			}
 
 			function onPlaybackStateChanged() {
-				if (modelData.isPlaying && root.isRealPlayer(modelData) && root.trackedPlayer !== modelData) {
-					root.trackedPlayer = modelData;
+				if (!modelData.isPlaying || !root.isRealPlayer(modelData))
+					return;
+				if (root.preferredPlayer && modelData !== root.preferredPlayer) {
+					root.trackedPlayer = root.preferredPlayer;
+					return;
 				}
+				if (root.trackedPlayer === modelData) return;
+				root.trackedPlayer = modelData;
 			}
 		}
 	}
