@@ -107,7 +107,10 @@ MouseArea {
         readonly property bool fingerprintActive: !biometricIndicator.succeeded
             && (root.context.fingerprintState === root.context.fingerprintScanning
                 || root.context.fingerprintState === root.context.fingerprintRetryPending)
+        readonly property bool faceFailureShowing: !biometricIndicator.succeeded
+            && root.context.faceFallbackPending
         readonly property bool scanning: !biometricIndicator.succeeded
+            && !biometricIndicator.faceFailureShowing
             && (biometricIndicator.faceActive || biometricIndicator.fingerprintActive)
         readonly property bool dualScanning: biometricIndicator.faceActive
             && biometricIndicator.fingerprintActive
@@ -118,6 +121,7 @@ MouseArea {
             || !root.context.faceAvailable
             || root.context.faceState === root.context.faceFailed
         readonly property bool failed: !biometricIndicator.succeeded
+            && !biometricIndicator.faceFailureShowing
             && biometricIndicator.fingerprintFinished
             && biometricIndicator.faceFinished
         readonly property color activeColor: biometricIndicator.faceActive
@@ -269,6 +273,20 @@ MouseArea {
         }
 
         Rectangle {
+            id: biometricFailureHalo
+
+            anchors.centerIn: parent
+            width: 64
+            height: 64
+            radius: width / 2
+            color: "transparent"
+            border.width: 2
+            border.color: Appearance.colors.colError
+            opacity: 0
+            scale: 0.72
+        }
+
+        Rectangle {
             id: biometricBadge
 
             anchors.centerIn: parent
@@ -277,7 +295,7 @@ MouseArea {
             radius: width / 2
             color: biometricIndicator.succeeded
                 ? Appearance.colors.colPrimary
-                : biometricIndicator.failed
+                : biometricIndicator.faceFailureShowing || biometricIndicator.failed
                 ? Appearance.colors.colErrorContainer
                 : biometricIndicator.faceActive
                 ? Appearance.colors.colPrimaryContainer
@@ -407,6 +425,8 @@ MouseArea {
                 visible: !biometricIndicator.faceActive
                 text: biometricIndicator.succeeded
                     ? "check"
+                    : biometricIndicator.faceFailureShowing
+                    ? "face_retouching_off"
                     : biometricIndicator.fingerprintActive
                     ? "fingerprint"
                     : biometricIndicator.failed
@@ -419,7 +439,7 @@ MouseArea {
                 animateChange: true
                 color: biometricIndicator.succeeded
                     ? Appearance.colors.colOnPrimary
-                    : biometricIndicator.failed
+                    : biometricIndicator.faceFailureShowing || biometricIndicator.failed
                     ? Appearance.colors.colOnErrorContainer
                     : biometricIndicator.fingerprintActive
                     ? Appearance.colors.colOnSecondaryContainer
@@ -478,8 +498,24 @@ MouseArea {
             }
         }
         onFailedChanged: {
-            if (biometricIndicator.failed)
+            if (biometricIndicator.failed) {
                 biometricFailureShake.restart();
+                biometricFailureRipple.restart();
+            }
+        }
+
+        Connections {
+            target: root.context
+
+            function onFaceFallbackStarted() {
+                biometricFailureShake.restart();
+                biometricFailureRipple.restart();
+            }
+
+            function onFaceFallbackCompleted() {
+                if (!biometricIndicator.succeeded && biometricIndicator.fingerprintActive)
+                    biometricFallbackPop.restart();
+            }
         }
 
         SequentialAnimation {
@@ -528,6 +564,55 @@ MouseArea {
                     duration: 330
                     easing.type: Easing.OutCubic
                 }
+            }
+        }
+
+        ParallelAnimation {
+            id: biometricFailureRipple
+
+            NumberAnimation {
+                target: biometricFailureHalo
+                property: "scale"
+                from: 0.72
+                to: 1.28
+                duration: 420
+                easing.type: Easing.OutCubic
+            }
+            SequentialAnimation {
+                NumberAnimation {
+                    target: biometricFailureHalo
+                    property: "opacity"
+                    from: 0
+                    to: 0.72
+                    duration: 90
+                }
+                NumberAnimation {
+                    target: biometricFailureHalo
+                    property: "opacity"
+                    to: 0
+                    duration: 330
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        SequentialAnimation {
+            id: biometricFallbackPop
+
+            NumberAnimation {
+                target: biometricBadge
+                property: "scale"
+                from: 0.9
+                to: 1.08
+                duration: 150
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: biometricBadge
+                property: "scale"
+                to: 1
+                duration: 180
+                easing.type: Easing.OutBack
             }
         }
 

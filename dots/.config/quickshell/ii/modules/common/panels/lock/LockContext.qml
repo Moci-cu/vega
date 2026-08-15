@@ -14,6 +14,8 @@ Scope {
     signal shouldReFocus()
     signal unlocked(targetAction: var)
     signal failed()
+    signal faceFallbackStarted()
+    signal faceFallbackCompleted()
 
     // These properties are in the context and not individual lock surfaces
     // so all surfaces can share the same state.
@@ -80,6 +82,8 @@ Scope {
     property bool alsoInhibitIdle: false
     property bool fingerprintSessionAllowed: false
     property bool faceSessionAllowed: false
+    property bool faceFallbackPending: false
+    readonly property int faceFallbackAnimationMs: 480
 
     function resetTargetAction() {
         root.targetAction = LockContext.ActionEnum.Unlock;
@@ -193,9 +197,38 @@ Scope {
                 || root.authenticationResolved)
             return;
 
-        root.faceSessionAllowed = true;
         root.faceState = root.faceWaiting;
+        root.faceFallbackPending = false;
+        faceFallbackTimer.stop();
+        root.faceSessionAllowed = true;
         faceStartTimer.restart();
+    }
+
+    function canFallbackToFingerprint() {
+        return root.fingerprintUnlockEnabled
+            && root.fingerprintsConfigured
+            && GlobalStates.screenLocked
+            && root.targetAction === LockContext.ActionEnum.Unlock
+            && !root.authenticationResolved;
+    }
+
+    function failFaceUnlock() {
+        faceScanTimeoutTimer.stop();
+        root.faceSessionAllowed = false;
+        const fallbackAvailable = root.canFallbackToFingerprint();
+
+        if (!fallbackAvailable) {
+            root.faceFallbackPending = false;
+            faceFallbackTimer.stop();
+            root.faceState = root.faceFailed;
+            return;
+        }
+
+        const startingFallback = !root.faceFallbackPending;
+        root.faceFallbackPending = true;
+        root.faceState = root.faceFailed;
+        if (startingFallback) root.faceFallbackStarted();
+        faceFallbackTimer.restart();
     }
 
     function tryFaceUnlock() {
@@ -208,14 +241,12 @@ Scope {
             return;
 
         faceStartTimer.stop();
-        root.faceSessionAllowed = true;
         root.faceState = root.faceScanning;
+        root.faceFallbackPending = false;
+        faceFallbackTimer.stop();
+        root.faceSessionAllowed = true;
         faceScanTimeoutTimer.restart();
-        if (!facePam.start()) {
-            faceScanTimeoutTimer.stop();
-            root.faceSessionAllowed = false;
-            root.faceState = root.faceFailed;
-        }
+        if (!facePam.start()) root.failFaceUnlock();
     }
 
     function retryFaceUnlock() {
@@ -245,8 +276,10 @@ Scope {
 
     function stopFacePam() {
         root.faceSessionAllowed = false;
+        root.faceFallbackPending = false;
         faceStartTimer.stop();
         faceScanTimeoutTimer.stop();
+        faceFallbackTimer.stop();
         if (facePam.active) facePam.abort();
         root.faceState = root.faceAvailable
             ? root.faceReady
@@ -267,6 +300,8 @@ Scope {
         fingerprintRetryTimer.stop();
         faceStartTimer.stop();
         faceScanTimeoutTimer.stop();
+        faceFallbackTimer.stop();
+        root.faceFallbackPending = false;
 
         if (method === "fingerprint") {
             root.fingerprintState = root.fingerprintSuccess;
@@ -299,6 +334,8 @@ Scope {
 
     onFingerprintUnlockEnabledChanged: {
         if (!root.fingerprintUnlockEnabled) {
+            root.faceFallbackPending = false;
+            faceFallbackTimer.stop();
             stopFingerPam();
         } else if (GlobalStates.screenLocked) {
             root.fingerprintRetryCount = 0;
@@ -330,10 +367,26 @@ Scope {
         id: faceScanTimeoutTimer
         interval: 10000
         onTriggered: {
-            root.faceSessionAllowed = false;
             if (facePam.active) facePam.abort();
-            if (!root.authenticationResolved)
-                root.faceState = root.faceFailed;
+            if (!root.authenticationResolved) root.failFaceUnlock();
+        }
+    }
+
+    Timer {
+        id: faceFallbackTimer
+        interval: root.faceFallbackAnimationMs
+        onTriggered: {
+            if (!root.canFallbackToFingerprint()) {
+                root.faceFallbackPending = false;
+                return;
+            }
+
+            if (!fingerPam.active) {
+                root.fingerprintRetryCount = 0;
+                root.tryFingerUnlock();
+            }
+            root.faceFallbackPending = false;
+            root.faceFallbackCompleted();
         }
     }
 
@@ -466,8 +519,7 @@ Scope {
                     && root.faceUnlockEnabled) {
                 root.completeBiometricUnlock("face");
             } else if (root.faceSessionAllowed && !root.authenticationResolved) {
-                root.faceSessionAllowed = false;
-                root.faceState = root.faceFailed;
+                root.failFaceUnlock();
             }
         }
     }
