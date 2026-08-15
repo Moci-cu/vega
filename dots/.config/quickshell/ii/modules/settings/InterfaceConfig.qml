@@ -247,6 +247,24 @@ ContentPage {
             title: Translation.tr("Security")
 
             ConfigSwitch {
+                buttonIcon: "fingerprint"
+                text: Translation.tr('Fingerprint unlock')
+                checked: Config.options.lock.security.fingerprintUnlock
+                onCheckedChanged: {
+                    Config.options.lock.security.fingerprintUnlock = checked;
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "face"
+                text: Translation.tr('Face unlock')
+                checked: Config.options.lock.security.faceUnlock
+                onCheckedChanged: {
+                    Config.options.lock.security.faceUnlock = checked;
+                }
+            }
+
+            ConfigSwitch {
                 buttonIcon: "settings_power"
                 text: Translation.tr('Require password to power off/restart')
                 checked: Config.options.lock.security.requirePasswordToPower

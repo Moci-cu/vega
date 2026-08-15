@@ -560,6 +560,7 @@ Singleton {
                 property JsonObject security: JsonObject {
                     property bool unlockKeyring: true
                     property bool requirePasswordToPower: false
+                    property bool fingerprintUnlock: true
                     property bool faceUnlock: true
                     property int faceUnlockDelayMs: 0
                 }

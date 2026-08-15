@@ -23,6 +23,8 @@ Scope {
     property bool passwordAuthenticated: false
     property bool showFailure: false
     property bool fingerprintsConfigured: false
+    readonly property bool fingerprintUnlockEnabled: Config.ready
+        && Config.options.lock.security.fingerprintUnlock
     readonly property int fingerprintUnavailable: 0
     readonly property int fingerprintReady: 1
     readonly property int fingerprintScanning: 2
@@ -32,7 +34,7 @@ Scope {
     property int fingerprintState: root.fingerprintUnavailable
     property int fingerprintRetryCount: 0
     readonly property int maxFingerprintRetries: 2
-    readonly property string fingerprintUsername: Quickshell.env("USER") ?? SystemInfo.username
+    readonly property string fingerprintUsername: Quickshell.env("USER") || SystemInfo.username
     readonly property string fingerprintStatusText: {
         switch (root.fingerprintState) {
         case root.fingerprintReady:
@@ -133,7 +135,8 @@ Scope {
     }
 
     function tryFingerUnlock() {
-        if (!root.fingerprintsConfigured
+        if (!root.fingerprintUnlockEnabled
+                || !root.fingerprintsConfigured
                 || !GlobalStates.screenLocked
                 || root.targetAction !== LockContext.ActionEnum.Unlock
                 || root.authenticationResolved
@@ -148,7 +151,8 @@ Scope {
     }
 
     function retryFingerUnlock() {
-        if (!root.fingerprintsConfigured
+        if (!root.fingerprintUnlockEnabled
+                || !root.fingerprintsConfigured
                 || root.targetAction !== LockContext.ActionEnum.Unlock
                 || root.authenticationResolved
                 || fingerPam.active)
@@ -159,7 +163,8 @@ Scope {
     }
 
     function scheduleFingerprintRetry() {
-        if (!root.fingerprintSessionAllowed
+        if (!root.fingerprintUnlockEnabled
+                || !root.fingerprintSessionAllowed
                 || !GlobalStates.screenLocked
                 || root.targetAction !== LockContext.ActionEnum.Unlock)
             return;
@@ -284,11 +289,20 @@ Scope {
             stopFingerPam();
             stopFacePam();
         } else if (GlobalStates.screenLocked) {
-            if (root.fingerprintsConfigured) {
+            if (root.fingerprintUnlockEnabled && root.fingerprintsConfigured) {
                 root.fingerprintRetryCount = 0;
                 fingerprintRetryTimer.restart();
             }
             scheduleFaceUnlock();
+        }
+    }
+
+    onFingerprintUnlockEnabledChanged: {
+        if (!root.fingerprintUnlockEnabled) {
+            stopFingerPam();
+        } else if (GlobalStates.screenLocked) {
+            root.fingerprintRetryCount = 0;
+            tryFingerUnlock();
         }
     }
 
@@ -356,7 +370,10 @@ Scope {
                 } else {
                     root.fingerprintState = root.fingerprintReady;
                 }
-                if (root.fingerprintsConfigured && GlobalStates.screenLocked && !fingerPam.active)
+                if (root.fingerprintUnlockEnabled
+                        && root.fingerprintsConfigured
+                        && GlobalStates.screenLocked
+                        && !fingerPam.active)
                     root.tryFingerUnlock();
             }
         }
@@ -421,7 +438,9 @@ Scope {
         config: "fprintd.conf"
 
         onCompleted: result => {
-            if (result == PamResult.Success) {
+            if (result == PamResult.Success
+                    && root.fingerprintSessionAllowed
+                    && root.fingerprintUnlockEnabled) {
                 root.completeBiometricUnlock("fingerprint");
             } else if (!root.fingerprintSessionAllowed) {
                 return;
@@ -442,7 +461,9 @@ Scope {
 
         onCompleted: result => {
             faceScanTimeoutTimer.stop();
-            if (result == PamResult.Success) {
+            if (result == PamResult.Success
+                    && root.faceSessionAllowed
+                    && root.faceUnlockEnabled) {
                 root.completeBiometricUnlock("face");
             } else if (root.faceSessionAllowed && !root.authenticationResolved) {
                 root.faceSessionAllowed = false;

@@ -111,7 +111,8 @@ MouseArea {
             && (biometricIndicator.faceActive || biometricIndicator.fingerprintActive)
         readonly property bool dualScanning: biometricIndicator.faceActive
             && biometricIndicator.fingerprintActive
-        readonly property bool fingerprintFinished: !root.context.fingerprintsConfigured
+        readonly property bool fingerprintFinished: !root.context.fingerprintUnlockEnabled
+            || !root.context.fingerprintsConfigured
             || root.context.fingerprintState === root.context.fingerprintFailed
         readonly property bool faceFinished: !root.context.faceUnlockEnabled
             || !root.context.faceAvailable
@@ -131,7 +132,7 @@ MouseArea {
         width: 88
         height: 88
         visible: root.context.targetAction === LockContext.ActionEnum.Unlock
-            && (root.context.fingerprintsConfigured
+            && ((root.context.fingerprintUnlockEnabled && root.context.fingerprintsConfigured)
                 || (root.context.faceUnlockEnabled && root.context.faceAvailable))
         opacity: root.toolbarOpacity
 
@@ -438,7 +439,7 @@ MouseArea {
                 height: 24
                 radius: width / 2
                 visible: biometricIndicator.dualScanning
-                color: Appearance.colors.colSurface
+                color: Appearance.colors.colLayer1
                 border.width: 2
                 border.color: Appearance.colors.colPrimaryContainer
 
@@ -561,7 +562,8 @@ MouseArea {
             Layout.leftMargin: 4
             Layout.rightMargin: 4
             Layout.alignment: Qt.AlignVCenter
-            active: root.context.fingerprintsConfigured
+            active: root.context.fingerprintUnlockEnabled
+                && root.context.fingerprintsConfigured
                 && root.context.targetAction === LockContext.ActionEnum.Unlock
             visible: active
 
