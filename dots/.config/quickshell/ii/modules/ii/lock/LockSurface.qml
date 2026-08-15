@@ -96,6 +96,451 @@ MouseArea {
     //     }
     // }
 
+    Item {
+        id: biometricIndicator
+
+        readonly property bool succeeded: root.context.fingerprintState === root.context.fingerprintSuccess
+            || root.context.faceState === root.context.faceSuccess
+        readonly property bool faceActive: !biometricIndicator.succeeded
+            && (root.context.faceState === root.context.faceWaiting
+                || root.context.faceState === root.context.faceScanning)
+        readonly property bool fingerprintActive: !biometricIndicator.succeeded
+            && (root.context.fingerprintState === root.context.fingerprintScanning
+                || root.context.fingerprintState === root.context.fingerprintRetryPending)
+        readonly property bool scanning: !biometricIndicator.succeeded
+            && (biometricIndicator.faceActive || biometricIndicator.fingerprintActive)
+        readonly property bool dualScanning: biometricIndicator.faceActive
+            && biometricIndicator.fingerprintActive
+        readonly property bool fingerprintFinished: !root.context.fingerprintsConfigured
+            || root.context.fingerprintState === root.context.fingerprintFailed
+        readonly property bool faceFinished: !root.context.faceUnlockEnabled
+            || !root.context.faceAvailable
+            || root.context.faceState === root.context.faceFailed
+        readonly property bool failed: !biometricIndicator.succeeded
+            && biometricIndicator.fingerprintFinished
+            && biometricIndicator.faceFinished
+        readonly property color activeColor: biometricIndicator.faceActive
+            ? Appearance.colors.colPrimary
+            : Appearance.colors.colSecondary
+
+        anchors {
+            horizontalCenter: parent.horizontalCenter
+            top: parent.top
+            topMargin: 40
+        }
+        width: 88
+        height: 88
+        visible: root.context.targetAction === LockContext.ActionEnum.Unlock
+            && (root.context.fingerprintsConfigured
+                || (root.context.faceUnlockEnabled && root.context.faceAvailable))
+        opacity: root.toolbarOpacity
+
+        Rectangle {
+            id: scanWaveOne
+
+            anchors.centerIn: parent
+            width: 64
+            height: 64
+            radius: width / 2
+            color: "transparent"
+            border.width: 1.5
+            border.color: biometricIndicator.activeColor
+            opacity: 0
+            scale: 0.72
+
+            SequentialAnimation {
+                running: biometricIndicator.scanning
+                loops: Animation.Infinite
+
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: scanWaveOne
+                        property: "scale"
+                        from: 0.72
+                        to: 1.25
+                        duration: 1250
+                        easing.type: Easing.OutCubic
+                    }
+                    SequentialAnimation {
+                        NumberAnimation {
+                            target: scanWaveOne
+                            property: "opacity"
+                            from: 0
+                            to: 0.55
+                            duration: 180
+                        }
+                        NumberAnimation {
+                            target: scanWaveOne
+                            property: "opacity"
+                            to: 0
+                            duration: 1070
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+                PauseAnimation { duration: 180 }
+            }
+        }
+
+        Rectangle {
+            id: scanWaveTwo
+
+            anchors.centerIn: parent
+            width: 64
+            height: 64
+            radius: width / 2
+            color: "transparent"
+            border.width: 1.5
+            border.color: biometricIndicator.activeColor
+            opacity: 0
+            scale: 0.72
+
+            SequentialAnimation {
+                running: biometricIndicator.scanning
+                loops: Animation.Infinite
+
+                PauseAnimation { duration: 625 }
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: scanWaveTwo
+                        property: "scale"
+                        from: 0.72
+                        to: 1.25
+                        duration: 1250
+                        easing.type: Easing.OutCubic
+                    }
+                    SequentialAnimation {
+                        NumberAnimation {
+                            target: scanWaveTwo
+                            property: "opacity"
+                            from: 0
+                            to: 0.45
+                            duration: 180
+                        }
+                        NumberAnimation {
+                            target: scanWaveTwo
+                            property: "opacity"
+                            to: 0
+                            duration: 1070
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+                PauseAnimation { duration: 180 }
+            }
+        }
+
+        MaterialSymbol {
+            id: biometricProgressRing
+
+            anchors.centerIn: parent
+            text: "progress_activity"
+            iconSize: 78
+            color: biometricIndicator.activeColor
+            opacity: biometricIndicator.scanning ? 0.82 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 180 }
+            }
+
+            RotationAnimation on rotation {
+                running: biometricIndicator.scanning
+                from: 0
+                to: 360
+                duration: 1800
+                loops: Animation.Infinite
+                easing.type: Easing.Linear
+            }
+        }
+
+        Rectangle {
+            id: biometricSuccessHalo
+
+            anchors.centerIn: parent
+            width: 64
+            height: 64
+            radius: width / 2
+            color: "transparent"
+            border.width: 2
+            border.color: Appearance.colors.colPrimary
+            opacity: 0
+            scale: 0.72
+        }
+
+        Rectangle {
+            id: biometricBadge
+
+            anchors.centerIn: parent
+            width: 60
+            height: 60
+            radius: width / 2
+            color: biometricIndicator.succeeded
+                ? Appearance.colors.colPrimary
+                : biometricIndicator.failed
+                ? Appearance.colors.colErrorContainer
+                : biometricIndicator.faceActive
+                ? Appearance.colors.colPrimaryContainer
+                : biometricIndicator.fingerprintActive
+                ? Appearance.colors.colSecondaryContainer
+                : Appearance.colors.colSurfaceContainerHigh
+            border.width: biometricIndicator.scanning ? 0 : 1
+            border.color: ColorUtils.transparentize(Appearance.colors.colOutline, 0.65)
+
+            Behavior on color {
+                ColorAnimation { duration: 220 }
+            }
+            Behavior on border.width {
+                NumberAnimation { duration: 160 }
+            }
+
+            transform: Translate {
+                id: biometricShakeTransform
+            }
+
+            Item {
+                id: faceScanViewport
+
+                anchors.centerIn: parent
+                width: 40
+                height: 40
+                clip: true
+                visible: biometricIndicator.faceActive
+
+                MaterialSymbol {
+                    id: scanningFaceIcon
+
+                    anchors.centerIn: parent
+                    text: "face"
+                    iconSize: 36
+                    fill: 1
+                    color: Appearance.colors.colOnPrimaryContainer
+                }
+
+                Rectangle {
+                    id: faceScanGlow
+
+                    x: 2
+                    width: parent.width - 4
+                    height: 10
+                    radius: height / 2
+                    color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.76)
+                    y: 3
+                }
+
+                Rectangle {
+                    id: faceScanBeam
+
+                    x: 3
+                    width: parent.width - 6
+                    height: 2
+                    radius: 1
+                    color: Appearance.colors.colPrimary
+                    y: 7
+                }
+
+                SequentialAnimation {
+                    running: biometricIndicator.faceActive
+                    loops: Animation.Infinite
+
+                    ParallelAnimation {
+                        NumberAnimation {
+                            targets: [faceScanGlow, faceScanBeam]
+                            property: "y"
+                            from: 3
+                            to: 29
+                            duration: 780
+                            easing.type: Easing.InOutCubic
+                        }
+                        SequentialAnimation {
+                            NumberAnimation {
+                                target: scanningFaceIcon
+                                property: "scale"
+                                from: 0.96
+                                to: 1.04
+                                duration: 390
+                                easing.type: Easing.OutCubic
+                            }
+                            NumberAnimation {
+                                target: scanningFaceIcon
+                                property: "scale"
+                                to: 0.96
+                                duration: 390
+                                easing.type: Easing.InCubic
+                            }
+                        }
+                    }
+                    ParallelAnimation {
+                        NumberAnimation {
+                            targets: [faceScanGlow, faceScanBeam]
+                            property: "y"
+                            from: 29
+                            to: 3
+                            duration: 780
+                            easing.type: Easing.InOutCubic
+                        }
+                        SequentialAnimation {
+                            NumberAnimation {
+                                target: scanningFaceIcon
+                                property: "scale"
+                                from: 0.96
+                                to: 1.04
+                                duration: 390
+                                easing.type: Easing.OutCubic
+                            }
+                            NumberAnimation {
+                                target: scanningFaceIcon
+                                property: "scale"
+                                to: 0.96
+                                duration: 390
+                                easing.type: Easing.InCubic
+                            }
+                        }
+                    }
+                }
+            }
+
+            MaterialSymbol {
+                id: biometricStateIcon
+
+                anchors.centerIn: parent
+                visible: !biometricIndicator.faceActive
+                text: biometricIndicator.succeeded
+                    ? "check"
+                    : biometricIndicator.fingerprintActive
+                    ? "fingerprint"
+                    : biometricIndicator.failed
+                    ? "lock"
+                    : root.context.faceUnlockEnabled && root.context.faceAvailable
+                    ? "face"
+                    : "lock"
+                iconSize: biometricIndicator.succeeded ? 34 : 32
+                fill: biometricIndicator.scanning || biometricIndicator.succeeded ? 1 : 0
+                animateChange: true
+                color: biometricIndicator.succeeded
+                    ? Appearance.colors.colOnPrimary
+                    : biometricIndicator.failed
+                    ? Appearance.colors.colOnErrorContainer
+                    : biometricIndicator.fingerprintActive
+                    ? Appearance.colors.colOnSecondaryContainer
+                    : Appearance.colors.colOnSurfaceVariant
+            }
+
+            Rectangle {
+                id: secondaryBiometricBadge
+
+                anchors {
+                    right: parent.right
+                    bottom: parent.bottom
+                    rightMargin: -4
+                    bottomMargin: -4
+                }
+                width: 24
+                height: 24
+                radius: width / 2
+                visible: biometricIndicator.dualScanning
+                color: Appearance.colors.colSurface
+                border.width: 2
+                border.color: Appearance.colors.colPrimaryContainer
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "fingerprint"
+                    iconSize: 15
+                    fill: 1
+                    color: Appearance.colors.colPrimary
+                }
+
+                SequentialAnimation on scale {
+                    running: secondaryBiometricBadge.visible
+                    loops: Animation.Infinite
+
+                    NumberAnimation {
+                        from: 0.92
+                        to: 1.08
+                        duration: 560
+                        easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        from: 1.08
+                        to: 0.92
+                        duration: 560
+                        easing.type: Easing.InOutCubic
+                    }
+                }
+            }
+        }
+
+        onSucceededChanged: {
+            if (biometricIndicator.succeeded) {
+                biometricSuccessPop.restart();
+                biometricSuccessRipple.restart();
+            }
+        }
+        onFailedChanged: {
+            if (biometricIndicator.failed)
+                biometricFailureShake.restart();
+        }
+
+        SequentialAnimation {
+            id: biometricSuccessPop
+
+            NumberAnimation {
+                target: biometricBadge
+                property: "scale"
+                from: 0.78
+                to: 1.14
+                duration: 150
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: biometricBadge
+                property: "scale"
+                to: 1
+                duration: 240
+                easing.type: Easing.OutBack
+            }
+        }
+
+        ParallelAnimation {
+            id: biometricSuccessRipple
+
+            NumberAnimation {
+                target: biometricSuccessHalo
+                property: "scale"
+                from: 0.72
+                to: 1.38
+                duration: 420
+                easing.type: Easing.OutCubic
+            }
+            SequentialAnimation {
+                NumberAnimation {
+                    target: biometricSuccessHalo
+                    property: "opacity"
+                    from: 0
+                    to: 0.8
+                    duration: 90
+                }
+                NumberAnimation {
+                    target: biometricSuccessHalo
+                    property: "opacity"
+                    to: 0
+                    duration: 330
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        SequentialAnimation {
+            id: biometricFailureShake
+
+            NumberAnimation { target: biometricShakeTransform; property: "x"; to: -6; duration: 55 }
+            NumberAnimation { target: biometricShakeTransform; property: "x"; to: 6; duration: 80 }
+            NumberAnimation { target: biometricShakeTransform; property: "x"; to: -4; duration: 70 }
+            NumberAnimation { target: biometricShakeTransform; property: "x"; to: 3; duration: 65 }
+            NumberAnimation { target: biometricShakeTransform; property: "x"; to: 0; duration: 60 }
+        }
+    }
+
     // Main toolbar: password box
     Toolbar {
         id: mainIsland
