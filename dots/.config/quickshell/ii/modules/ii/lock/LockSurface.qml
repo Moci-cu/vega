@@ -143,36 +143,65 @@ MouseArea {
         Repeater {
             model: 2
 
-            delegate: Rectangle {
+            delegate: Item {
                 id: biometricRipple
                 required property int index
 
                 anchors.centerIn: parent
-                width: 60
-                height: 60
-                radius: width / 2
-                color: "transparent"
-                border.width: 1.5
-                border.color: biometricIndicator.activeColor
+                width: 64
+                height: 64
                 opacity: 0
-                scale: 0.82
+                scale: 0.76
+
+                RadialGradient {
+                    anchors.fill: parent
+                    horizontalRadius: width / 2
+                    verticalRadius: height / 2
+
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0
+                            color: "transparent"
+                        }
+                        GradientStop {
+                            position: 0.42
+                            color: ColorUtils.transparentize(biometricIndicator.activeColor, 0.96)
+                        }
+                        GradientStop {
+                            position: 0.62
+                            color: ColorUtils.transparentize(biometricIndicator.activeColor, 0.72)
+                        }
+                        GradientStop {
+                            position: 0.76
+                            color: biometricIndicator.activeColor
+                        }
+                        GradientStop {
+                            position: 0.9
+                            color: ColorUtils.transparentize(biometricIndicator.activeColor, 0.76)
+                        }
+                        GradientStop {
+                            position: 1
+                            color: "transparent"
+                        }
+                    }
+                }
 
                 SequentialAnimation {
                     running: biometricIndicator.scanning
                     loops: Animation.Infinite
                     onStopped: {
                         biometricRipple.opacity = 0;
-                        biometricRipple.scale = 0.82;
+                        biometricRipple.scale = 0.76;
                     }
 
-                    PauseAnimation { duration: biometricRipple.index * 600 }
+                    PauseAnimation { duration: biometricRipple.index * 650 }
                     ParallelAnimation {
                         NumberAnimation {
                             target: biometricRipple
                             property: "scale"
-                            from: 0.82
-                            to: 1.4
-                            duration: 1200
+                            from: 0.76
+                            to: 1.36
+                            duration: 1300
                             easing.type: Easing.OutQuad
                         }
                         SequentialAnimation {
@@ -180,7 +209,7 @@ MouseArea {
                                 target: biometricRipple
                                 property: "opacity"
                                 from: 0
-                                to: 0.42
+                                to: 0.72
                                 duration: 180
                                 easing.type: Easing.OutCubic
                             }
@@ -188,44 +217,73 @@ MouseArea {
                                 target: biometricRipple
                                 property: "opacity"
                                 to: 0
-                                duration: 1020
+                                duration: 1120
                                 easing.type: Easing.OutQuad
                             }
                         }
                     }
                     PauseAnimation {
-                        duration: (1 - biometricRipple.index) * 600
+                        duration: (1 - biometricRipple.index) * 650
                     }
                 }
             }
         }
 
-        Rectangle {
+        component BiometricStatusGlow: Item {
+            id: statusGlow
+            required property color glowColor
+
+            width: 64
+            height: 64
+            opacity: 0
+            scale: 0.72
+
+            RadialGradient {
+                anchors.fill: parent
+                horizontalRadius: width / 2
+                verticalRadius: height / 2
+
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 0.42
+                        color: ColorUtils.transparentize(statusGlow.glowColor, 0.96)
+                    }
+                    GradientStop {
+                        position: 0.62
+                        color: ColorUtils.transparentize(statusGlow.glowColor, 0.7)
+                    }
+                    GradientStop {
+                        position: 0.76
+                        color: statusGlow.glowColor
+                    }
+                    GradientStop {
+                        position: 0.9
+                        color: ColorUtils.transparentize(statusGlow.glowColor, 0.74)
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "transparent"
+                    }
+                }
+            }
+        }
+
+        BiometricStatusGlow {
             id: biometricSuccessHalo
 
             anchors.centerIn: parent
-            width: 64
-            height: 64
-            radius: width / 2
-            color: "transparent"
-            border.width: 2
-            border.color: Appearance.colors.colPrimary
-            opacity: 0
-            scale: 0.72
+            glowColor: Appearance.colors.colPrimary
         }
 
-        Rectangle {
+        BiometricStatusGlow {
             id: biometricFailureHalo
 
             anchors.centerIn: parent
-            width: 64
-            height: 64
-            radius: width / 2
-            color: "transparent"
-            border.width: 2
-            border.color: Appearance.colors.colError
-            opacity: 0
-            scale: 0.72
+            glowColor: Appearance.colors.colError
         }
 
         Rectangle {
