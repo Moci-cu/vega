@@ -140,121 +140,63 @@ MouseArea {
                 || (root.context.faceUnlockEnabled && root.context.faceAvailable))
         opacity: root.toolbarOpacity
 
-        Rectangle {
-            id: scanWaveOne
+        Repeater {
+            model: 2
 
-            anchors.centerIn: parent
-            width: 64
-            height: 64
-            radius: width / 2
-            color: "transparent"
-            border.width: 1.5
-            border.color: biometricIndicator.activeColor
-            opacity: 0
-            scale: 0.72
+            delegate: Rectangle {
+                id: biometricRipple
+                required property int index
 
-            SequentialAnimation {
-                running: biometricIndicator.scanning
-                loops: Animation.Infinite
+                anchors.centerIn: parent
+                width: 60
+                height: 60
+                radius: width / 2
+                color: "transparent"
+                border.width: 1.5
+                border.color: biometricIndicator.activeColor
+                opacity: 0
+                scale: 0.82
 
-                ParallelAnimation {
-                    NumberAnimation {
-                        target: scanWaveOne
-                        property: "scale"
-                        from: 0.72
-                        to: 1.25
-                        duration: 1250
-                        easing.type: Easing.OutCubic
+                SequentialAnimation {
+                    running: biometricIndicator.scanning
+                    loops: Animation.Infinite
+                    onStopped: {
+                        biometricRipple.opacity = 0;
+                        biometricRipple.scale = 0.82;
                     }
-                    SequentialAnimation {
+
+                    PauseAnimation { duration: biometricRipple.index * 600 }
+                    ParallelAnimation {
                         NumberAnimation {
-                            target: scanWaveOne
-                            property: "opacity"
-                            from: 0
-                            to: 0.55
-                            duration: 180
+                            target: biometricRipple
+                            property: "scale"
+                            from: 0.82
+                            to: 1.4
+                            duration: 1200
+                            easing.type: Easing.OutQuad
                         }
-                        NumberAnimation {
-                            target: scanWaveOne
-                            property: "opacity"
-                            to: 0
-                            duration: 1070
-                            easing.type: Easing.OutCubic
+                        SequentialAnimation {
+                            NumberAnimation {
+                                target: biometricRipple
+                                property: "opacity"
+                                from: 0
+                                to: 0.42
+                                duration: 180
+                                easing.type: Easing.OutCubic
+                            }
+                            NumberAnimation {
+                                target: biometricRipple
+                                property: "opacity"
+                                to: 0
+                                duration: 1020
+                                easing.type: Easing.OutQuad
+                            }
                         }
                     }
-                }
-                PauseAnimation { duration: 180 }
-            }
-        }
-
-        Rectangle {
-            id: scanWaveTwo
-
-            anchors.centerIn: parent
-            width: 64
-            height: 64
-            radius: width / 2
-            color: "transparent"
-            border.width: 1.5
-            border.color: biometricIndicator.activeColor
-            opacity: 0
-            scale: 0.72
-
-            SequentialAnimation {
-                running: biometricIndicator.scanning
-                loops: Animation.Infinite
-
-                PauseAnimation { duration: 625 }
-                ParallelAnimation {
-                    NumberAnimation {
-                        target: scanWaveTwo
-                        property: "scale"
-                        from: 0.72
-                        to: 1.25
-                        duration: 1250
-                        easing.type: Easing.OutCubic
-                    }
-                    SequentialAnimation {
-                        NumberAnimation {
-                            target: scanWaveTwo
-                            property: "opacity"
-                            from: 0
-                            to: 0.45
-                            duration: 180
-                        }
-                        NumberAnimation {
-                            target: scanWaveTwo
-                            property: "opacity"
-                            to: 0
-                            duration: 1070
-                            easing.type: Easing.OutCubic
-                        }
+                    PauseAnimation {
+                        duration: (1 - biometricRipple.index) * 600
                     }
                 }
-                PauseAnimation { duration: 180 }
-            }
-        }
-
-        MaterialSymbol {
-            id: biometricProgressRing
-
-            anchors.centerIn: parent
-            text: "progress_activity"
-            iconSize: 78
-            color: biometricIndicator.activeColor
-            opacity: biometricIndicator.scanning ? 0.82 : 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 180 }
-            }
-
-            RotationAnimation on rotation {
-                running: biometricIndicator.scanning
-                from: 0
-                to: 360
-                duration: 1800
-                loops: Animation.Infinite
-                easing.type: Easing.Linear
             }
         }
 
@@ -312,121 +254,28 @@ MouseArea {
                 NumberAnimation { duration: 160 }
             }
 
-            transform: Translate {
-                id: biometricShakeTransform
-            }
+            transform: [
+                Scale {
+                    id: biometricBreathingTransform
 
-            Item {
-                id: faceScanViewport
-
-                anchors.centerIn: parent
-                width: 40
-                height: 40
-                clip: true
-                visible: biometricIndicator.faceActive
-
-                MaterialSymbol {
-                    id: scanningFaceIcon
-
-                    anchors.centerIn: parent
-                    text: "face"
-                    iconSize: 36
-                    fill: 1
-                    color: Appearance.colors.colOnPrimaryContainer
+                    origin.x: biometricBadge.width / 2
+                    origin.y: biometricBadge.height / 2
+                },
+                Translate {
+                    id: biometricShakeTransform
                 }
-
-                Rectangle {
-                    id: faceScanGlow
-
-                    x: 2
-                    width: parent.width - 4
-                    height: 10
-                    radius: height / 2
-                    color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.76)
-                    y: 3
-                }
-
-                Rectangle {
-                    id: faceScanBeam
-
-                    x: 3
-                    width: parent.width - 6
-                    height: 2
-                    radius: 1
-                    color: Appearance.colors.colPrimary
-                    y: 7
-                }
-
-                SequentialAnimation {
-                    running: biometricIndicator.faceActive
-                    loops: Animation.Infinite
-
-                    ParallelAnimation {
-                        NumberAnimation {
-                            targets: [faceScanGlow, faceScanBeam]
-                            property: "y"
-                            from: 3
-                            to: 29
-                            duration: 780
-                            easing.type: Easing.InOutCubic
-                        }
-                        SequentialAnimation {
-                            NumberAnimation {
-                                target: scanningFaceIcon
-                                property: "scale"
-                                from: 0.96
-                                to: 1.04
-                                duration: 390
-                                easing.type: Easing.OutCubic
-                            }
-                            NumberAnimation {
-                                target: scanningFaceIcon
-                                property: "scale"
-                                to: 0.96
-                                duration: 390
-                                easing.type: Easing.InCubic
-                            }
-                        }
-                    }
-                    ParallelAnimation {
-                        NumberAnimation {
-                            targets: [faceScanGlow, faceScanBeam]
-                            property: "y"
-                            from: 29
-                            to: 3
-                            duration: 780
-                            easing.type: Easing.InOutCubic
-                        }
-                        SequentialAnimation {
-                            NumberAnimation {
-                                target: scanningFaceIcon
-                                property: "scale"
-                                from: 0.96
-                                to: 1.04
-                                duration: 390
-                                easing.type: Easing.OutCubic
-                            }
-                            NumberAnimation {
-                                target: scanningFaceIcon
-                                property: "scale"
-                                to: 0.96
-                                duration: 390
-                                easing.type: Easing.InCubic
-                            }
-                        }
-                    }
-                }
-            }
+            ]
 
             MaterialSymbol {
                 id: biometricStateIcon
 
                 anchors.centerIn: parent
-                visible: !biometricIndicator.faceActive
                 text: biometricIndicator.succeeded
                     ? "check"
                     : biometricIndicator.faceFailureShowing
                     ? "face_retouching_off"
+                    : biometricIndicator.faceActive
+                    ? "face"
                     : biometricIndicator.fingerprintActive
                     ? "fingerprint"
                     : biometricIndicator.failed
@@ -441,6 +290,8 @@ MouseArea {
                     ? Appearance.colors.colOnPrimary
                     : biometricIndicator.faceFailureShowing || biometricIndicator.failed
                     ? Appearance.colors.colOnErrorContainer
+                    : biometricIndicator.faceActive
+                    ? Appearance.colors.colOnPrimaryContainer
                     : biometricIndicator.fingerprintActive
                     ? Appearance.colors.colOnSecondaryContainer
                     : Appearance.colors.colOnSurfaceVariant
@@ -470,23 +321,53 @@ MouseArea {
                     fill: 1
                     color: Appearance.colors.colPrimary
                 }
+            }
+        }
 
-                SequentialAnimation on scale {
-                    running: secondaryBiometricBadge.visible
-                    loops: Animation.Infinite
+        SequentialAnimation {
+            id: biometricBreathingAnimation
 
-                    NumberAnimation {
-                        from: 0.92
-                        to: 1.08
-                        duration: 560
-                        easing.type: Easing.OutCubic
-                    }
-                    NumberAnimation {
-                        from: 1.08
-                        to: 0.92
-                        duration: 560
-                        easing.type: Easing.InOutCubic
-                    }
+            running: biometricIndicator.scanning
+            loops: Animation.Infinite
+            onStopped: {
+                biometricBreathingTransform.xScale = 1;
+                biometricBreathingTransform.yScale = 1;
+            }
+
+            ParallelAnimation {
+                NumberAnimation {
+                    target: biometricBreathingTransform
+                    property: "xScale"
+                    from: 1
+                    to: 1.04
+                    duration: 750
+                    easing.type: Easing.InOutSine
+                }
+                NumberAnimation {
+                    target: biometricBreathingTransform
+                    property: "yScale"
+                    from: 1
+                    to: 1.04
+                    duration: 750
+                    easing.type: Easing.InOutSine
+                }
+            }
+            ParallelAnimation {
+                NumberAnimation {
+                    target: biometricBreathingTransform
+                    property: "xScale"
+                    from: 1.04
+                    to: 1
+                    duration: 750
+                    easing.type: Easing.InOutSine
+                }
+                NumberAnimation {
+                    target: biometricBreathingTransform
+                    property: "yScale"
+                    from: 1.04
+                    to: 1
+                    duration: 750
+                    easing.type: Easing.InOutSine
                 }
             }
         }
