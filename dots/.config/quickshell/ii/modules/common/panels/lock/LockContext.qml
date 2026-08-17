@@ -83,6 +83,8 @@ Scope {
     property bool fingerprintSessionAllowed: false
     property bool faceSessionAllowed: false
     property bool faceFallbackPending: false
+    property bool fingerprintResumePending: false
+    property bool faceResumePending: false
     readonly property int faceFallbackAnimationMs: 480
 
     function resetTargetAction() {
@@ -99,6 +101,7 @@ Scope {
 
     function reset() {
         biometricSuccessTimer.stop();
+        cancelBiometricResume();
         stopFingerPam();
         stopFacePam();
         root.resetTargetAction();
@@ -111,6 +114,31 @@ Scope {
             root.tryFingerUnlock();
             root.scheduleFaceUnlock();
         }
+    }
+
+    function resumeBiometricUnlock() {
+        if (!GlobalStates.screenLocked
+                || root.targetAction !== LockContext.ActionEnum.Unlock
+                || root.authenticationResolved)
+            return;
+
+        root.cancelBiometricResume();
+        stopFingerPam();
+        stopFacePam();
+        root.fingerprintRetryCount = 0;
+        root.refreshFingerprintAvailability();
+        root.refreshFaceAvailability();
+        root.fingerprintResumePending = root.fingerprintUnlockEnabled
+            && root.fingerprintsConfigured;
+        root.faceResumePending = root.faceUnlockEnabled && root.faceAvailable;
+        if (root.fingerprintResumePending || root.faceResumePending)
+            biometricResumeTimer.start();
+    }
+
+    function cancelBiometricResume() {
+        biometricResumeTimer.stop();
+        root.fingerprintResumePending = false;
+        root.faceResumePending = false;
     }
 
     Timer {
@@ -298,6 +326,7 @@ Scope {
         root.fingerprintSessionAllowed = false;
         root.faceSessionAllowed = false;
         fingerprintRetryTimer.stop();
+        root.cancelBiometricResume();
         faceStartTimer.stop();
         faceScanTimeoutTimer.stop();
         faceFallbackTimer.stop();
@@ -355,6 +384,41 @@ Scope {
         id: fingerprintRetryTimer
         interval: 750
         onTriggered: root.tryFingerUnlock()
+    }
+
+    Timer {
+        id: biometricResumeTimer
+        interval: 150
+        repeat: true
+        onTriggered: {
+            if (!GlobalStates.screenLocked
+                    || root.targetAction !== LockContext.ActionEnum.Unlock
+                    || root.authenticationResolved) {
+                root.cancelBiometricResume();
+                return;
+            }
+
+            if (root.fingerprintResumePending) {
+                if (!root.fingerprintUnlockEnabled || !root.fingerprintsConfigured) {
+                    root.fingerprintResumePending = false;
+                } else if (!fingerPam.active) {
+                    root.fingerprintResumePending = false;
+                    root.tryFingerUnlock();
+                }
+            }
+
+            if (root.faceResumePending) {
+                if (!root.faceUnlockEnabled || !root.faceAvailable) {
+                    root.faceResumePending = false;
+                } else if (!facePam.active) {
+                    root.faceResumePending = false;
+                    root.scheduleFaceUnlock();
+                }
+            }
+
+            if (!root.fingerprintResumePending && !root.faceResumePending)
+                biometricResumeTimer.stop();
+        }
     }
 
     Timer {
