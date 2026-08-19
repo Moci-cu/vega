@@ -26,11 +26,64 @@ Singleton {
 	readonly property MprisPlayer activePlayer: trackedPlayer;
 	signal trackChanged(reverse: bool);
 
+	property int nextPositionTickerId: 0;
+	property var positionTickerRequests: ({});
+	readonly property int positionTickerInterval: {
+		let fastestInterval = Infinity;
+		for (const request of Object.values(root.positionTickerRequests)) {
+			if (!request.running || !request.player) continue;
+			fastestInterval = Math.min(fastestInterval, request.interval);
+		}
+		return Number.isFinite(fastestInterval) ? fastestInterval : 1000;
+	}
+	readonly property bool positionTickerRunning: Object.values(root.positionTickerRequests)
+		.some(request => request.running && request.player);
+
 	property string priorityPlayer: Config.options.media.priorityPlayer;
 
 	property bool __reverse: false;
 
 	property var activeTrack;
+
+	function registerPositionTicker(player, interval, running) {
+		const requestId = root.nextPositionTickerId++;
+		root.updatePositionTicker(requestId, player, interval, running);
+		return requestId;
+	}
+
+	function updatePositionTicker(requestId, player, interval, running) {
+		if (requestId < 0) return;
+		const requests = Object.assign({}, root.positionTickerRequests);
+		requests[requestId] = {
+			player: player,
+			interval: Math.max(16, interval || 1000),
+			running: running
+		};
+		root.positionTickerRequests = requests;
+	}
+
+	function unregisterPositionTicker(requestId) {
+		if (requestId < 0 || !root.positionTickerRequests[requestId]) return;
+		const requests = Object.assign({}, root.positionTickerRequests);
+		delete requests[requestId];
+		root.positionTickerRequests = requests;
+	}
+
+	function updatePlayerPositions() {
+		const updatedPlayers = [];
+		for (const request of Object.values(root.positionTickerRequests)) {
+			if (!request.running || !request.player || updatedPlayers.includes(request.player)) continue;
+			updatedPlayers.push(request.player);
+			request.player.positionChanged();
+		}
+	}
+
+	Timer {
+		interval: root.positionTickerInterval
+		running: root.positionTickerRunning
+		repeat: true
+		onTriggered: root.updatePlayerPositions()
+	}
 
 	function applyPreferredPlayer() {
 		if (root.preferredPlayer && root.players.includes(root.preferredPlayer))

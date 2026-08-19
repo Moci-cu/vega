@@ -22,6 +22,12 @@ Singleton {
     property var monitors: []
     property var layers: ({})
 
+    property bool clientsDirty: false
+    property bool monitorsDirty: false
+    property bool layersDirty: false
+    property bool workspacesDirty: false
+    property bool activeWorkspaceDirty: false
+
     // Convenient stuff
 
     function toplevelsForWorkspace(workspace) {
@@ -47,27 +53,128 @@ Singleton {
     // Internals
 
     function updateWindowList() {
-        getClients.running = true;
+        root.requestRefresh({ clients: true });
     }
 
     function updateLayers() {
-        getLayers.running = true;
+        root.requestRefresh({ layers: true });
     }
 
     function updateMonitors() {
-        getMonitors.running = true;
+        root.requestRefresh({ monitors: true });
     }
 
     function updateWorkspaces() {
-        getWorkspaces.running = true;
-        getActiveWorkspace.running = true;
+        root.requestRefresh({ workspaces: true, activeWorkspace: true });
+    }
+
+    function updateActiveWorkspace() {
+        root.requestRefresh({ activeWorkspace: true });
     }
 
     function updateAll() {
-        updateWindowList();
-        updateMonitors();
-        updateLayers();
-        updateWorkspaces();
+        root.requestRefresh({
+            clients: true,
+            monitors: true,
+            layers: true,
+            workspaces: true,
+            activeWorkspace: true
+        });
+    }
+
+    function requestRefresh(categories) {
+        if (categories.clients) root.clientsDirty = true;
+        if (categories.monitors) root.monitorsDirty = true;
+        if (categories.layers) root.layersDirty = true;
+        if (categories.workspaces) root.workspacesDirty = true;
+        if (categories.activeWorkspace) root.activeWorkspaceDirty = true;
+        if (!refreshCoalesceTimer.running) refreshCoalesceTimer.start();
+    }
+
+    function flushRefreshes() {
+        if (root.clientsDirty && !getClients.running) {
+            root.clientsDirty = false;
+            getClients.running = true;
+        }
+        if (root.monitorsDirty && !getMonitors.running) {
+            root.monitorsDirty = false;
+            getMonitors.running = true;
+        }
+        if (root.layersDirty && !getLayers.running) {
+            root.layersDirty = false;
+            getLayers.running = true;
+        }
+        if (root.workspacesDirty && !getWorkspaces.running) {
+            root.workspacesDirty = false;
+            getWorkspaces.running = true;
+        }
+        if (root.activeWorkspaceDirty && !getActiveWorkspace.running) {
+            root.activeWorkspaceDirty = false;
+            getActiveWorkspace.running = true;
+        }
+    }
+
+    function handleHyprlandEvent(eventName) {
+        switch (eventName) {
+        case "activewindow":
+        case "activewindowv2":
+        case "windowtitle":
+        case "windowtitlev2":
+        case "fullscreen":
+        case "changefloatingmode":
+        case "urgent":
+        case "minimize":
+        case "togglegroup":
+        case "moveintogroup":
+        case "moveoutofgroup":
+        case "pin":
+            root.requestRefresh({ clients: true });
+            break;
+        case "openwindow":
+        case "closewindow":
+        case "movewindow":
+        case "movewindowv2":
+            root.requestRefresh({ clients: true, workspaces: true });
+            break;
+        case "workspace":
+        case "workspacev2":
+        case "focusedmon":
+        case "focusedmonv2":
+        case "activespecial":
+        case "activespecialv2":
+            root.requestRefresh({ monitors: true, activeWorkspace: true });
+            break;
+        case "createworkspace":
+        case "createworkspacev2":
+        case "destroyworkspace":
+        case "destroyworkspacev2":
+            root.requestRefresh({ monitors: true, workspaces: true, activeWorkspace: true });
+            break;
+        case "moveworkspace":
+        case "moveworkspacev2":
+        case "renameworkspace":
+            root.requestRefresh({ clients: true, monitors: true, workspaces: true, activeWorkspace: true });
+            break;
+        case "monitoradded":
+        case "monitoraddedv2":
+        case "monitorremoved":
+        case "monitorremovedv2":
+            root.requestRefresh({ clients: true, monitors: true, workspaces: true, activeWorkspace: true });
+            break;
+        case "openlayer":
+        case "closelayer":
+            root.requestRefresh({ layers: true });
+            break;
+        case "activelayout":
+        case "submap":
+        case "screencast":
+        case "bell":
+            break;
+        case "configreloaded":
+        default:
+            root.updateAll();
+            break;
+        }
     }
 
     function biggestWindowForWorkspace(workspaceId) {
@@ -83,19 +190,27 @@ Singleton {
         updateAll();
     }
 
+    Timer {
+        id: refreshCoalesceTimer
+        interval: 16
+        repeat: false
+        onTriggered: root.flushRefreshes()
+    }
+
     Connections {
         target: Hyprland
 
         function onRawEvent(event) {
-            // console.log("Hyprland raw event:", event.name);
-            if (["openlayer", "closelayer", "screencast"].includes(event.name)) return;
-            updateAll()
+            root.handleHyprlandEvent(event.name);
         }
     }
 
     Process {
         id: getClients
         command: ["hyprctl", "clients", "-j"]
+        onExited: {
+            if (root.clientsDirty) refreshCoalesceTimer.restart();
+        }
         stdout: StdioCollector {
             id: clientsCollector
             onStreamFinished: {
@@ -114,6 +229,9 @@ Singleton {
     Process {
         id: getMonitors
         command: ["hyprctl", "monitors", "-j"]
+        onExited: {
+            if (root.monitorsDirty) refreshCoalesceTimer.restart();
+        }
         stdout: StdioCollector {
             id: monitorsCollector
             onStreamFinished: {
@@ -125,6 +243,9 @@ Singleton {
     Process {
         id: getLayers
         command: ["hyprctl", "layers", "-j"]
+        onExited: {
+            if (root.layersDirty) refreshCoalesceTimer.restart();
+        }
         stdout: StdioCollector {
             id: layersCollector
             onStreamFinished: {
@@ -136,6 +257,9 @@ Singleton {
     Process {
         id: getWorkspaces
         command: ["hyprctl", "workspaces", "-j"]
+        onExited: {
+            if (root.workspacesDirty) refreshCoalesceTimer.restart();
+        }
         stdout: StdioCollector {
             id: workspacesCollector
             onStreamFinished: {
@@ -156,6 +280,9 @@ Singleton {
     Process {
         id: getActiveWorkspace
         command: ["hyprctl", "activeworkspace", "-j"]
+        onExited: {
+            if (root.activeWorkspaceDirty) refreshCoalesceTimer.restart();
+        }
         stdout: StdioCollector {
             id: activeWorkspaceCollector
             onStreamFinished: {

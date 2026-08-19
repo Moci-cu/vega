@@ -14,12 +14,15 @@ LazyLoader {
     property int popupRadius: Appearance.rounding.large
     property bool animate: true
     property bool stickyHover: false
+    property bool acceptsKeyboardFocus: false
+    property bool holdOpen: false
 
     property bool _popupHovered: false
     property bool _stickyActive: false
     property bool _targetHovered: hoverTarget ? hoverTarget.containsMouse : false
 
-    active: stickyHover ? _stickyActive : (hoverTarget && hoverTarget.containsMouse)
+    active: holdOpen
+        || (stickyHover ? _stickyActive : (hoverTarget && hoverTarget.containsMouse))
 
     // I have NO FUCKING IDEA why we cant use a normal timer here
     // Because if we do, we FUCKING cannot reference the timer from anywhere
@@ -45,6 +48,15 @@ LazyLoader {
     }
 
     on_TargetHoveredChanged: _evaluateStickyState()
+
+    onHoldOpenChanged: {
+        if (holdOpen && stickyHover) {
+            _stickyActive = true;
+            _timers.grace.stop();
+        } else if (!holdOpen) {
+            _evaluateStickyState();
+        }
+    }
 
     onActiveChanged: {
         if (!active) {
@@ -108,6 +120,9 @@ LazyLoader {
 
         WlrLayershell.namespace: "quickshell:popup"
         WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: root.acceptsKeyboardFocus
+            ? WlrKeyboardFocus.OnDemand
+            : WlrKeyboardFocus.None
 
         StyledRectangularShadow {
             target: popupBackground
@@ -129,7 +144,7 @@ LazyLoader {
             from: 0
             to: 1
             running: true
-            duration: Appearance.animation.elementMove.duration 
+            duration: Appearance.animation.elementMove.duration
             easing.type: Appearance.animation.elementMove.type
             easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
         }
@@ -137,7 +152,7 @@ LazyLoader {
         Rectangle {
             id: popupBackground
             readonly property real margin: 10
-            
+
             readonly property real targetWidth: (root.contentItem?.implicitWidth ?? 0) + margin * 2
             readonly property real targetHeight: (root.contentItem?.implicitHeight ?? 0) + margin * 2
 
@@ -192,7 +207,7 @@ LazyLoader {
                 verticalCenter: isVertical ? parent.verticalCenter : undefined
                 horizontalCenter: !isVertical ? parent.horizontalCenter : undefined
             }
-            
+
             width: targetWidth
             height: {
                 if (!root.animate || !root.contentItem || !heroItem || targetHeight <= heroHeight + margin * 2) return _commitHeight;
@@ -201,7 +216,7 @@ LazyLoader {
 
             color: Appearance.m3colors.m3surfaceContainer
             radius: root.popupRadius
-            
+
             Item {
                 id: contentContainer
                 anchors.fill: parent

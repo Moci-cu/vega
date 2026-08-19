@@ -23,71 +23,57 @@ Singleton {
     property string desktopEnvironment: ""
     property string windowingSystem: ""
 
-    Timer {
-        triggeredOnStart: true
-        interval: 1
-        running: true
-        repeat: false
-        onTriggered: {
-            getUsername.running = true
-            fileOsRelease.reload()
-            const textOsRelease = fileOsRelease.text()
+    function parseOsRelease(textOsRelease) {
+        const prettyNameMatch = textOsRelease.match(/^PRETTY_NAME="(.+?)"/m)
+        const nameMatch = textOsRelease.match(/^NAME="(.+?)"/m)
+        root.distroName = prettyNameMatch ? prettyNameMatch[1] : (nameMatch ? nameMatch[1].replace(/Linux/i, "").trim() : "Unknown")
 
-            // Extract the friendly name (PRETTY_NAME field, fallback to NAME)
-            const prettyNameMatch = textOsRelease.match(/^PRETTY_NAME="(.+?)"/m)
-            const nameMatch = textOsRelease.match(/^NAME="(.+?)"/m)
-            distroName = prettyNameMatch ? prettyNameMatch[1] : (nameMatch ? nameMatch[1].replace(/Linux/i, "").trim() : "Unknown")
+        const idMatch = textOsRelease.match(/^ID="?(.+?)"?$/m)
+        root.distroId = idMatch ? idMatch[1] : "unknown"
 
-            // Extract the ID
-            const idMatch = textOsRelease.match(/^ID="?(.+?)"?$/m)
-            distroId = idMatch ? idMatch[1] : "unknown"
+        const homeUrlMatch = textOsRelease.match(/^HOME_URL="(.+?)"/m)
+        root.homeUrl = homeUrlMatch ? homeUrlMatch[1] : ""
+        const documentationUrlMatch = textOsRelease.match(/^DOCUMENTATION_URL="(.+?)"/m)
+        root.documentationUrl = documentationUrlMatch ? documentationUrlMatch[1] : ""
+        const supportUrlMatch = textOsRelease.match(/^SUPPORT_URL="(.+?)"/m)
+        root.supportUrl = supportUrlMatch ? supportUrlMatch[1] : ""
+        const bugReportUrlMatch = textOsRelease.match(/^BUG_REPORT_URL="(.+?)"/m)
+        root.bugReportUrl = bugReportUrlMatch ? bugReportUrlMatch[1] : ""
+        const privacyPolicyUrlMatch = textOsRelease.match(/^PRIVACY_POLICY_URL="(.+?)"/m)
+        root.privacyPolicyUrl = privacyPolicyUrlMatch ? privacyPolicyUrlMatch[1] : ""
+        const logoFieldMatch = textOsRelease.match(/^LOGO="?(.+?)"?$/m)
+        root.logo = logoFieldMatch ? logoFieldMatch[1] : ""
 
-            // Extract additional URLs and logo
-            const homeUrlMatch = textOsRelease.match(/^HOME_URL="(.+?)"/m)
-            homeUrl = homeUrlMatch ? homeUrlMatch[1] : ""
-            const documentationUrlMatch = textOsRelease.match(/^DOCUMENTATION_URL="(.+?)"/m)
-            documentationUrl = documentationUrlMatch ? documentationUrlMatch[1] : ""
-            const supportUrlMatch = textOsRelease.match(/^SUPPORT_URL="(.+?)"/m)
-            supportUrl = supportUrlMatch ? supportUrlMatch[1] : ""
-            const bugReportUrlMatch = textOsRelease.match(/^BUG_REPORT_URL="(.+?)"/m)
-            bugReportUrl = bugReportUrlMatch ? bugReportUrlMatch[1] : ""
-            const privacyPolicyUrlMatch = textOsRelease.match(/^PRIVACY_POLICY_URL="(.+?)"/m)
-            privacyPolicyUrl = privacyPolicyUrlMatch ? privacyPolicyUrlMatch[1] : ""
-            const logoFieldMatch = textOsRelease.match(/^LOGO="?(.+?)"?$/m)
-            logo = logoFieldMatch ? logoFieldMatch[1] : ""
-
-            // Update the distroIcon property based on distroId
-            switch (distroId) {
-                case "artix":
-                case "arch": distroIcon = "arch-symbolic"; break;
-                case "endeavouros": distroIcon = "endeavouros-symbolic"; break;
-                case "cachyos": distroIcon = "cachyos-symbolic"; break;
-                case "nixos": distroIcon = "nixos-symbolic"; break;
-                case "fedora": distroIcon = "fedora-symbolic"; break;
-                case "linuxmint":
-                case "ubuntu":
-                case "zorin":
-                case "popos": distroIcon = "ubuntu-symbolic"; break;
-                case "debian":
-                case "raspbian":
-                case "kali": distroIcon = "debian-symbolic"; break;
-                case "funtoo":
-                case "gentoo": distroIcon = "gentoo-symbolic"; break;
-                default: distroIcon = "linux-symbolic"; break;
-            }
-            if (textOsRelease.toLowerCase().includes("nyarch")) {
-                distroIcon = "nyarch-symbolic"
-            }
-
-            if (logo.trim().length === 0) {
-                logo = distroIcon
-            }
-
+        switch (root.distroId) {
+        case "artix":
+        case "arch": root.distroIcon = "arch-symbolic"; break;
+        case "endeavouros": root.distroIcon = "endeavouros-symbolic"; break;
+        case "cachyos": root.distroIcon = "cachyos-symbolic"; break;
+        case "nixos": root.distroIcon = "nixos-symbolic"; break;
+        case "fedora": root.distroIcon = "fedora-symbolic"; break;
+        case "linuxmint":
+        case "ubuntu":
+        case "zorin":
+        case "popos": root.distroIcon = "ubuntu-symbolic"; break;
+        case "debian":
+        case "raspbian":
+        case "kali": root.distroIcon = "debian-symbolic"; break;
+        case "funtoo":
+        case "gentoo": root.distroIcon = "gentoo-symbolic"; break;
+        default: root.distroIcon = "linux-symbolic"; break;
         }
+        if (textOsRelease.toLowerCase().includes("nyarch"))
+            root.distroIcon = "nyarch-symbolic"
+
+        if (root.logo.trim().length === 0)
+            root.logo = root.distroIcon
     }
+
+    Component.onCompleted: fileOsRelease.reload()
 
     Process {
         id: getUsername
+        running: true
         command: ["whoami"]
         stdout: SplitParser {
             onRead: data => {
@@ -113,5 +99,6 @@ Singleton {
     FileView {
         id: fileOsRelease
         path: "/etc/os-release"
+        onLoaded: root.parseOsRelease(text())
     }
 }

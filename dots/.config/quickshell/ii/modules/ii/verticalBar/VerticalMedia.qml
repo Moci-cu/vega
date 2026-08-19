@@ -19,11 +19,10 @@ MouseArea {
     implicitHeight: mediaCircProg.implicitHeight + 10 // +10 for padding it looks so small if we dont add it
     implicitWidth: Appearance.sizes.verticalBarWidth
 
-    Timer {
+    MprisPositionTicker {
+        player: root.activePlayer
         running: activePlayer?.playbackState == MprisPlaybackState.Playing
         interval: Config.options.resources.updateInterval
-        repeat: true
-        onTriggered: activePlayer.positionChanged()
     }
 
     cursorShape: Qt.PointingHandCursor

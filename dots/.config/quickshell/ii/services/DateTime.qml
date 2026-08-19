@@ -10,6 +10,7 @@ import Quickshell.Io
  * A nice wrapper for date and time strings.
  */
 Singleton {
+    id: root
     property var clock: SystemClock {
         id: clock
         precision: {
@@ -25,36 +26,36 @@ Singleton {
     property string collapsedCalendarFormat: Qt.locale().toString(clock.date, "dddd, MMMM dd")
     property string uptime: "0h, 0m"
 
+    function parseUptime(textUptime) {
+        const uptimeSeconds = Number(textUptime.split(" ")[0] ?? 0);
+
+        const days = Math.floor(uptimeSeconds / 86400);
+        const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+        const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+
+        let formatted = "";
+        if (days > 0)
+            formatted += `${days}d`;
+        if (hours > 0)
+            formatted += `${formatted ? ", " : ""}${hours}h`;
+        if (minutes > 0 || !formatted)
+            formatted += `${formatted ? ", " : ""}${minutes}m`;
+        root.uptime = formatted;
+    }
+
+    Component.onCompleted: fileUptime.reload()
+
     Timer {
-        interval: 10
+        interval: Config.options?.resources?.updateInterval ?? 3000
         running: true
         repeat: true
-        onTriggered: {
-            fileUptime.reload();
-            const textUptime = fileUptime.text();
-            const uptimeSeconds = Number(textUptime.split(" ")[0] ?? 0);
-
-            // Convert seconds to days, hours, and minutes
-            const days = Math.floor(uptimeSeconds / 86400);
-            const hours = Math.floor((uptimeSeconds % 86400) / 3600);
-            const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-
-            // Build the formatted uptime string
-            let formatted = "";
-            if (days > 0)
-                formatted += `${days}d`;
-            if (hours > 0)
-                formatted += `${formatted ? ", " : ""}${hours}h`;
-            if (minutes > 0 || !formatted)
-                formatted += `${formatted ? ", " : ""}${minutes}m`;
-            uptime = formatted;
-            interval = Config.options?.resources?.updateInterval ?? 3000;
-        }
+        onTriggered: fileUptime.reload()
     }
 
     FileView {
         id: fileUptime
 
         path: "/proc/uptime"
+        onLoaded: root.parseUptime(text())
     }
 }

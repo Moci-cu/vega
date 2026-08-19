@@ -11,13 +11,13 @@ import Quickshell.Io
  */
 Singleton {
     id: root
-	property real memoryTotal: 1
-	property real memoryFree: 0
-	property real memoryUsed: memoryTotal - memoryFree
+    property real memoryTotal: 1
+    property real memoryFree: 0
+    property real memoryUsed: memoryTotal - memoryFree
     property real memoryUsedPercentage: memoryUsed / memoryTotal
     property real swapTotal: 1
-	property real swapFree: 0
-	property real swapUsed: swapTotal - swapFree
+    property real swapFree: 0
+    property real swapUsed: swapTotal - swapFree
     property real swapUsedPercentage: swapTotal > 0 ? (swapUsed / swapTotal) : 0
     property real diskTotal: 1
     property real diskUsed: 0
@@ -25,6 +25,10 @@ Singleton {
     property real cpuUsage: 0
     property var previousCpuStats
     property bool usagePollingActive: false
+    property bool usageSampleActive: false
+    property bool usageRefreshPending: false
+    property bool memorySampleReady: false
+    property bool cpuSampleReady: false
     property string cpuModel: "Unknown CPU"
     property string cpuFreq: "-- MHz"
     property string cpuTemp: "--°C"
@@ -70,16 +74,28 @@ Singleton {
     }
 
     function refreshUsage() {
+        if (root.usageSampleActive) {
+            root.usageRefreshPending = true
+            return
+        }
+
+        root.usageSampleActive = true
+        root.memorySampleReady = false
+        root.cpuSampleReady = false
+        usageSampleWatchdog.restart()
         fileMeminfo.reload()
         fileStat.reload()
+        fileCpuTemp.reload()
+    }
 
-        const textMeminfo = fileMeminfo.text()
+    function parseMemoryUsage(textMeminfo) {
         memoryTotal = Number(textMeminfo.match(/MemTotal: *(\d+)/)?.[1] ?? 1)
         memoryFree = Number(textMeminfo.match(/MemAvailable: *(\d+)/)?.[1] ?? 0)
         swapTotal = Number(textMeminfo.match(/SwapTotal: *(\d+)/)?.[1] ?? 1)
         swapFree = Number(textMeminfo.match(/SwapFree: *(\d+)/)?.[1] ?? 0)
+    }
 
-        const textStat = fileStat.text()
+    function parseCpuUsage(textStat) {
         const cpuLine = textStat.match(/^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/)
         if (cpuLine) {
             const stats = cpuLine.slice(1).map(Number)
@@ -94,9 +110,23 @@ Singleton {
 
             previousCpuStats = { total, idle }
         }
+    }
 
-        fileCpuTemp.reload()
+    function finishUsageSample(sample) {
+        if (!root.usageSampleActive) return
+        if (sample === "memory") root.memorySampleReady = true
+        if (sample === "cpu") root.cpuSampleReady = true
+        if (!root.memorySampleReady || !root.cpuSampleReady) return
+
+        usageSampleWatchdog.stop()
         root.updateHistories()
+        root.usageSampleActive = false
+        if (root.usageRefreshPending && root.activeInstances > 0) {
+            root.usageRefreshPending = false
+            Qt.callLater(root.refreshUsage)
+        } else {
+            root.usageRefreshPending = false
+        }
     }
 
     function cleanCpuModel(model) {
@@ -132,7 +162,6 @@ Singleton {
 
     function refreshCpuInfo() {
         fileCpuInfo.reload()
-        root.parseCpuInfo(fileCpuInfo.text())
     }
 
     function refreshDiskUsage() {
@@ -145,20 +174,59 @@ Singleton {
             root.refreshUsage()
         } else if (activeInstances === 0) {
             root.usagePollingActive = false
+            root.usageRefreshPending = false
+            root.usageSampleActive = false
+            root.memorySampleReady = false
+            root.cpuSampleReady = false
+            usageSampleWatchdog.stop()
             root.previousCpuStats = undefined
             root.cpuUsage = 0
         }
     }
 
-	Timer {
-		interval: Config.options?.resources?.updateInterval ?? 3000
+    Timer {
+        interval: Config.options?.resources?.updateInterval ?? 3000
         running: root.activeInstances > 0
         repeat: true
-		onTriggered: root.refreshUsage()
-	}
+        onTriggered: root.refreshUsage()
+    }
 
-    FileView { id: fileMeminfo; path: "/proc/meminfo" }
-    FileView { id: fileStat; path: "/proc/stat" }
+    Timer {
+        id: usageSampleWatchdog
+        interval: Math.max(5000, (Config.options?.resources?.updateInterval ?? 3000) * 2)
+        repeat: false
+        onTriggered: {
+            if (!root.usageSampleActive) return
+            console.warn("[ResourceUsage] Sample timed out")
+            root.usageSampleActive = false
+            root.usageRefreshPending = false
+            root.memorySampleReady = false
+            root.cpuSampleReady = false
+        }
+    }
+
+    FileView {
+        id: fileMeminfo
+        path: "/proc/meminfo"
+        onLoaded: {
+            if (root.usageSampleActive) {
+                root.parseMemoryUsage(text())
+                root.finishUsageSample("memory")
+            }
+        }
+        onLoadFailed: root.finishUsageSample("memory")
+    }
+    FileView {
+        id: fileStat
+        path: "/proc/stat"
+        onLoaded: {
+            if (root.usageSampleActive) {
+                root.parseCpuUsage(text())
+                root.finishUsageSample("cpu")
+            }
+        }
+        onLoadFailed: root.finishUsageSample("cpu")
+    }
     FileView {
         id: fileCpuInfo
         path: "/proc/cpuinfo"

@@ -9,6 +9,33 @@ StyledPopup {
     id: root
     popupRadius: Appearance.rounding.large
 
+    readonly property bool wifiConnected: !Network.ethernet && Network.wifiStatus === "connected"
+    readonly property bool connectionWarning: !Network.ethernet
+        && (Network.wifiStatus === "connecting" || Network.wifiStatus === "limited")
+    readonly property bool connectionOffline: !Network.ethernet
+        && (Network.wifiStatus === "disabled" || Network.wifiStatus === "disconnected")
+
+    readonly property color heroContainerColor: connectionOffline
+        ? Appearance.colors.colErrorContainer
+        : connectionWarning
+            ? Appearance.colors.colTertiaryContainer
+            : Appearance.colors.colPrimaryContainer
+    readonly property color heroAccentColor: connectionOffline
+        ? Appearance.colors.colError
+        : connectionWarning
+            ? Appearance.colors.colTertiary
+            : Appearance.colors.colPrimary
+    readonly property color heroOnContainerColor: connectionOffline
+        ? Appearance.colors.colOnErrorContainer
+        : connectionWarning
+            ? Appearance.colors.colOnTertiaryContainer
+            : Appearance.colors.colOnPrimaryContainer
+    readonly property color heroOnAccentColor: connectionOffline
+        ? Appearance.colors.colOnError
+        : connectionWarning
+            ? Appearance.colors.colOnTertiary
+            : Appearance.colors.colOnPrimary
+
     function formatSpeed(bytesPerSecond) {
         var bits = bytesPerSecond * 8;
         var suffix = "bps";
@@ -36,54 +63,103 @@ StyledPopup {
         }
     }
 
+    function connectionStatusText() {
+        if (Network.ethernet)
+            return Network.networkName || Translation.tr("Connected");
+        if (Network.wifiStatus === "connecting")
+            return Translation.tr("Connecting");
+        if (Network.wifiStatus === "limited")
+            return Network.networkName || Translation.tr("Limited connection");
+        if (Network.wifiStatus === "disabled")
+            return Translation.tr("Wi-Fi is turned off");
+        if (Network.wifiStatus === "disconnected")
+            return Translation.tr("Not connected");
+        return Network.networkName || Translation.tr("Connected");
+    }
+
+    function connectionBadgeText() {
+        if (Network.ethernet)
+            return Translation.tr("Wired");
+        if (root.wifiConnected)
+            return Translation.tr("Signal %1%").arg(Network.networkStrength);
+        if (Network.wifiStatus === "connecting")
+            return Translation.tr("Connecting");
+        if (Network.wifiStatus === "limited")
+            return Translation.tr("Limited");
+        return Translation.tr("Offline");
+    }
+
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 12
 
-        HeroCard {
+        ExpressiveMetricCard {
             id: networkHero
-            icon: Network.ethernet ? "lan" : "wifi"
-            title: Network.ethernet ? Translation.tr("Ethernet") : Translation.tr("Wi-Fi")
-            subtitle: Network.networkName || Translation.tr("Connected")
-            
-            compactMode: true
-            adaptiveWidth: true
-            
-            // Show signal strength in the pill if wifi
-            pillText: !Network.ethernet ? (Network.networkStrength + "%") : ""
-            pillIcon: !Network.ethernet ? "signal_wifi_4_bar" : ""
+
+            label: Translation.tr("Network")
+            value: Network.ethernet ? Translation.tr("Ethernet") : Translation.tr("Wi-Fi")
+            supportingText: root.connectionStatusText()
+            badgeText: root.connectionBadgeText()
+            badgeIcon: Network.ethernet ? "cable" : Network.materialSymbol
+            icon: Network.materialSymbol
+            progress: Network.networkStrength / 100
+            showProgress: root.wifiConnected
+            shapeString: Network.ethernet ? "Clover4Leaf" : "SoftBurst"
+
+            containerColor: root.heroContainerColor
+            accentColor: root.heroAccentColor
+            shapeColor: root.heroAccentColor
+            symbolColor: root.heroOnAccentColor
+            textColor: root.heroOnContainerColor
+            mutedTextColor: root.heroOnContainerColor
+            badgeColor: Appearance.colors.colSurfaceContainerHighest
+            badgeTextColor: Appearance.colors.colOnSurface
         }
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 10
 
-            InfoPill {
-                icon: "download"
-                text: Translation.tr("Download: ") + formatSpeed(NetworkUsage.networkDownloadSpeed)
-                containerColor: Appearance.colors.colPrimaryContainer
-                shapeColor: Appearance.colors.colPrimary
-                symbolColor: Appearance.colors.colOnPrimary
-                textColor: Appearance.colors.colOnPrimaryContainer
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                ExpressiveStatCard {
+                    label: Translation.tr("Download")
+                    value: root.formatSpeed(NetworkUsage.networkDownloadSpeed)
+                    supportingText: Translation.tr("Current speed")
+                    icon: "arrow_downward"
+                    shapeString: "Flower"
+                    progress: -1
+                    shapeColor: Appearance.colors.colPrimaryContainer
+                    symbolColor: Appearance.colors.colOnPrimaryContainer
+                    progressColor: Appearance.colors.colPrimary
+                }
+
+                ExpressiveStatCard {
+                    label: Translation.tr("Upload")
+                    value: root.formatSpeed(NetworkUsage.networkUploadSpeed)
+                    supportingText: Translation.tr("Current speed")
+                    icon: "arrow_upward"
+                    shapeString: "PuffyDiamond"
+                    progress: -1
+                    shapeColor: Appearance.colors.colSecondaryContainer
+                    symbolColor: Appearance.colors.colOnSecondaryContainer
+                    progressColor: Appearance.colors.colSecondary
+                }
             }
 
-            InfoPill {
-                icon: "upload"
-                text: Translation.tr("Upload: ") + formatSpeed(NetworkUsage.networkUploadSpeed)
-                containerColor: Appearance.colors.colSecondaryContainer
-                shapeColor: Appearance.colors.colSecondary
-                symbolColor: Appearance.colors.colOnSecondary
-                textColor: Appearance.colors.colOnSecondaryContainer
-            }
-
-            InfoPill {
+            ExpressiveInfoTile {
                 visible: !Config.options.bar.tooltips.compactPopups
                 icon: "data_usage"
-                text: Translation.tr("Usage: ") + formatTotal(NetworkUsage.networkDownloadTotal + NetworkUsage.networkUploadTotal)
+                label: Translation.tr("Total transferred")
+                value: root.formatTotal(NetworkUsage.networkDownloadTotal + NetworkUsage.networkUploadTotal)
+                shapeString: "Cookie9Sided"
                 containerColor: Appearance.colors.colTertiaryContainer
                 shapeColor: Appearance.colors.colTertiary
                 symbolColor: Appearance.colors.colOnTertiary
                 textColor: Appearance.colors.colOnTertiaryContainer
+                labelColor: Appearance.colors.colOnTertiaryContainer
             }
         }
     }

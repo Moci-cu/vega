@@ -17,14 +17,12 @@ Singleton {
     id: root
     property var filePath: Directories.todoPath
     property var list: []
-    
-    function addItem(item) {
-        
-          list.push(item)
-          // Reassign to trigger onListChanged
-          root.list = list.slice(0)
 
-          todoFileView.setText(JSON.stringify(root.list))
+    function addItem(item) {
+        list.unshift(item)
+        // Reassign to trigger onListChanged.
+        root.list = list.slice(0)
+        todoFileView.setText(JSON.stringify(root.list))
     }
 
     function addTask(desc) {
@@ -33,12 +31,12 @@ Singleton {
             "done": false,
         }
         addItem(item)
-      }
+    }
 
 
     function getTasksByDate(currentDate) {
         const res = [];
-        
+
         const currentDay = currentDate.getDate();
         const currentMonth = currentDate.getMonth();
         const currentYear = currentDate.getFullYear();
@@ -68,7 +66,7 @@ Singleton {
 
             todoFileView.setText(JSON.stringify(root.list))
 
-           
+
         }
     }
 
@@ -93,7 +91,7 @@ Singleton {
             root.list = list.slice(0)
 
           todoFileView.setText(JSON.stringify(root.list))
- 
+
         }
     }
 
@@ -130,4 +128,3 @@ Singleton {
         }
     }
 }
-

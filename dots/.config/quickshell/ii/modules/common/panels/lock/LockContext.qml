@@ -86,6 +86,9 @@ Scope {
     property bool fingerprintResumePending: false
     property bool faceResumePending: false
     property double biometricResumeStartedAt: 0
+    // Some readers take over 10 seconds to recover after resume. This only
+    // bounds a permanently stuck PAM session.
+    readonly property int biometricResumeTimeoutMs: 30000
     readonly property int faceFallbackAnimationMs: 480
 
     function resetTargetAction() {
@@ -137,12 +140,11 @@ Scope {
         stopFingerPam();
         stopFacePam();
         root.fingerprintRetryCount = 0;
+        root.biometricResumeStartedAt = Date.now();
+        root.fingerprintResumePending = root.fingerprintUnlockEnabled;
+        root.faceResumePending = root.faceUnlockEnabled;
         root.refreshFingerprintAvailability();
         root.refreshFaceAvailability();
-        root.biometricResumeStartedAt = Date.now();
-        root.fingerprintResumePending = root.fingerprintUnlockEnabled
-            && root.fingerprintsConfigured;
-        root.faceResumePending = root.faceUnlockEnabled && root.faceAvailable;
         root.logBiometric("Wake rearm requested");
         if (root.fingerprintResumePending || root.faceResumePending)
             biometricResumeTimer.start();
@@ -421,25 +423,38 @@ Scope {
                 return;
             }
 
+            const elapsed = Date.now() - root.biometricResumeStartedAt;
+            if (elapsed >= root.biometricResumeTimeoutMs) {
+                root.logBiometric("Wake rearm timed out after " + elapsed + " ms");
+                root.cancelBiometricResume();
+                return;
+            }
+
             if (root.fingerprintResumePending) {
-                if (!root.fingerprintUnlockEnabled || !root.fingerprintsConfigured) {
+                if (!root.fingerprintUnlockEnabled) {
+                    root.fingerprintResumePending = false;
+                } else if (fingerprintCheckProc.running) {
+                    // Wait for the asynchronous availability refresh.
+                } else if (!root.fingerprintsConfigured) {
                     root.fingerprintResumePending = false;
                 } else if (!fingerPam.active) {
                     root.fingerprintResumePending = false;
                     const started = root.tryFingerUnlock();
-                    const elapsed = Date.now() - root.biometricResumeStartedAt;
                     root.logBiometric("Fingerprint rearm requested after " + elapsed
                         + " ms (PAM start " + (started ? "accepted" : "deferred") + ")");
                 }
             }
 
             if (root.faceResumePending) {
-                if (!root.faceUnlockEnabled || !root.faceAvailable) {
+                if (!root.faceUnlockEnabled) {
+                    root.faceResumePending = false;
+                } else if (faceCheckProc.running) {
+                    // Wait for the asynchronous availability refresh.
+                } else if (!root.faceAvailable) {
                     root.faceResumePending = false;
                 } else if (!facePam.active) {
                     root.faceResumePending = false;
                     root.scheduleFaceUnlock();
-                    const elapsed = Date.now() - root.biometricResumeStartedAt;
                     root.logBiometric("Face rearm scheduled after " + elapsed + " ms");
                 }
             }
@@ -522,8 +537,13 @@ Scope {
                 if (root.fingerprintUnlockEnabled
                         && root.fingerprintsConfigured
                         && GlobalStates.screenLocked
-                        && !fingerPam.active)
-                    root.tryFingerUnlock();
+                        && !fingerPam.active) {
+                    if (root.fingerprintResumePending) {
+                        if (!biometricResumeTimer.running) biometricResumeTimer.start();
+                    } else {
+                        root.tryFingerUnlock();
+                    }
+                }
             }
         }
         onExited: (exitCode, exitStatus) => {
@@ -545,8 +565,13 @@ Scope {
                 root.stopFacePam();
             } else if (root.faceState !== root.faceSuccess) {
                 root.faceState = root.faceReady;
-                if (GlobalStates.screenLocked)
-                    root.scheduleFaceUnlock();
+                if (GlobalStates.screenLocked) {
+                    if (root.faceResumePending) {
+                        if (!biometricResumeTimer.running) biometricResumeTimer.start();
+                    } else {
+                        root.scheduleFaceUnlock();
+                    }
+                }
             }
         }
     }
