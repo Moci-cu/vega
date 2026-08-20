@@ -140,6 +140,7 @@ Scope {
             + "decides to keyboard-unfocus the lock screen"
 
         onPressed: {
+            lockContext.resumeBiometricUnlock();
             lockContext.shouldReFocus();
         }
     }

@@ -7,6 +7,7 @@ import qs.modules.common.widgets
 import qs.services
 
 Item {
+    id: root
     property int monthShift: 0
     property var viewingDate: CalendarLayout.getDateInXMonthsTime(monthShift)
     property var calendarLayout: CalendarLayout.getCalendarLayout(viewingDate, monthShift === 0, Config.options.time.firstDayOfWeek)
@@ -15,6 +16,10 @@ Item {
     anchors.topMargin: 10
     width: calendarColumn.width
     implicitHeight: calendarColumn.height + 10 * 2
+
+    Component.onCompleted: CalendarService.acquireConsumer()
+    Component.onDestruction: CalendarService.releaseConsumer()
+
     Keys.onPressed: (event) => {
         if ((event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp) && event.modifiers === Qt.NoModifier) {
             if (event.key === Qt.Key_PageDown)

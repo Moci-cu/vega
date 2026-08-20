@@ -86,12 +86,10 @@ Singleton {
         root.activePlayer.position = root.syncedLines[index].time
     }
     
-    // https://quickshell.org/docs/master/types/Quickshell.Services.Mpris/MprisPlayer/#position
-    Timer {
+    MprisPositionTicker {
+        player: root.activePlayer
         running: root.activePlayer?.playbackState == MprisPlaybackState.Playing && root.hasSyncedLines && root.isInitialized
         interval: 50
-        repeat: true
-        onTriggered: root.activePlayer.positionChanged()
     }
 
     LrclibLyrics {

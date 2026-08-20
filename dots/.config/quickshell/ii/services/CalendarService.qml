@@ -16,6 +16,10 @@ Singleton {
 
     property bool khalAvailable: false
     property var events: []
+    property int activeConsumers: 0
+    property bool refreshPending: false
+    property double lastRefreshAt: 0
+    readonly property int refreshIntervalMs: 15 * 60 * 1000
     property var weekdays: [
           Translation.tr("Sunday"), 
           Translation.tr("Monday"), 
@@ -74,10 +78,29 @@ Singleton {
         running: true
         onExited: (exitCode) => {
           root.khalAvailable = (exitCode === 0);
-          if(root.khalAvailable){
-            interval.running = true
-          }       
+          if (root.khalAvailable && root.activeConsumers > 0)
+            root.requestRefresh();
         }
+      }
+
+      function acquireConsumer() {
+        root.activeConsumers++;
+        if (root.activeConsumers === 1) root.requestRefresh();
+      }
+
+      function releaseConsumer() {
+        root.activeConsumers = Math.max(0, root.activeConsumers - 1);
+      }
+
+      function requestRefresh(force = false) {
+        if (!root.khalAvailable) return;
+        if (!force && Date.now() - root.lastRefreshAt < root.refreshIntervalMs) return;
+        if (getEventsProcess.running) {
+          root.refreshPending = true;
+          return;
+        }
+        root.lastRefreshAt = Date.now();
+        getEventsProcess.running = true;
       }
 
 
@@ -191,18 +214,19 @@ Singleton {
           }
     
         }
+        onExited: {
+          if (!root.refreshPending) return;
+          root.refreshPending = false;
+          if (root.activeConsumers > 0)
+            Qt.callLater(() => root.requestRefresh(true));
+        }
       }
 
       Timer {
-        id: interval
-        running: false
-        interval:10
+        running: root.khalAvailable && root.activeConsumers > 0
+        interval: root.refreshIntervalMs
         repeat: true
-        onTriggered: {
-          getEventsProcess.running = true
-          this.interval =    Config.options?.resources?.updateInterval ?? 3000
-                   
-        }
+        onTriggered: root.requestRefresh()
     }
 
 
@@ -211,6 +235,9 @@ Singleton {
       Process {
         id: khalAddTaskProcess
         running: false
+        onExited: exitCode => {
+          if (exitCode === 0) root.requestRefresh(true);
+        }
       }
 
 
@@ -226,6 +253,9 @@ Singleton {
     Process {
         id: khalRemoveProcess
         running: false
+        onExited: exitCode => {
+          if (exitCode === 0) root.requestRefresh(true);
+        }
       }
 
       function removeItem(item){

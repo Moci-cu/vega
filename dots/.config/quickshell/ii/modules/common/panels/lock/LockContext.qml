@@ -83,6 +83,12 @@ Scope {
     property bool fingerprintSessionAllowed: false
     property bool faceSessionAllowed: false
     property bool faceFallbackPending: false
+    property bool fingerprintResumePending: false
+    property bool faceResumePending: false
+    property double biometricResumeStartedAt: 0
+    // Some readers take over 10 seconds to recover after resume. This only
+    // bounds a permanently stuck PAM session.
+    readonly property int biometricResumeTimeoutMs: 30000
     readonly property int faceFallbackAnimationMs: 480
 
     function resetTargetAction() {
@@ -97,8 +103,19 @@ Scope {
         passwordClearTimer.restart();
     }
 
+    function biometricResultName(result) {
+        if (result === PamResult.Success) return "success";
+        if (result === PamResult.MaxTries) return "max-tries";
+        return "failed";
+    }
+
+    function logBiometric(message) {
+        console.info("[Biometric]", message);
+    }
+
     function reset() {
         biometricSuccessTimer.stop();
+        cancelBiometricResume();
         stopFingerPam();
         stopFacePam();
         root.resetTargetAction();
@@ -111,6 +128,35 @@ Scope {
             root.tryFingerUnlock();
             root.scheduleFaceUnlock();
         }
+    }
+
+    function resumeBiometricUnlock() {
+        if (!GlobalStates.screenLocked
+                || root.targetAction !== LockContext.ActionEnum.Unlock
+                || root.authenticationResolved)
+            return;
+
+        root.cancelBiometricResume();
+        stopFingerPam();
+        stopFacePam();
+        root.fingerprintRetryCount = 0;
+        root.biometricResumeStartedAt = Date.now();
+        root.fingerprintResumePending = root.fingerprintUnlockEnabled;
+        root.faceResumePending = root.faceUnlockEnabled;
+        root.refreshFingerprintAvailability();
+        root.refreshFaceAvailability();
+        root.logBiometric("Wake rearm requested");
+        if (root.fingerprintResumePending || root.faceResumePending)
+            biometricResumeTimer.start();
+        else
+            root.biometricResumeStartedAt = 0;
+    }
+
+    function cancelBiometricResume() {
+        biometricResumeTimer.stop();
+        root.fingerprintResumePending = false;
+        root.faceResumePending = false;
+        root.biometricResumeStartedAt = 0;
     }
 
     Timer {
@@ -145,13 +191,15 @@ Scope {
                 || root.targetAction !== LockContext.ActionEnum.Unlock
                 || root.authenticationResolved
                 || fingerPam.active)
-            return;
+            return false;
 
         fingerprintRetryTimer.stop();
         root.fingerprintSessionAllowed = true;
         root.fingerprintState = root.fingerprintScanning;
-        if (!fingerPam.start() && root.fingerprintState === root.fingerprintScanning)
+        const started = fingerPam.start();
+        if (!started && root.fingerprintState === root.fingerprintScanning)
             scheduleFingerprintRetry();
+        return started;
     }
 
     function retryFingerUnlock() {
@@ -214,6 +262,7 @@ Scope {
 
     function failFaceUnlock() {
         faceScanTimeoutTimer.stop();
+        root.logBiometric("Face scan failed");
         root.faceSessionAllowed = false;
         const fallbackAvailable = root.canFallbackToFingerprint();
 
@@ -238,7 +287,7 @@ Scope {
                 || root.targetAction !== LockContext.ActionEnum.Unlock
                 || root.authenticationResolved
                 || facePam.active)
-            return;
+            return false;
 
         faceStartTimer.stop();
         root.faceState = root.faceScanning;
@@ -246,7 +295,9 @@ Scope {
         faceFallbackTimer.stop();
         root.faceSessionAllowed = true;
         faceScanTimeoutTimer.restart();
-        if (!facePam.start()) root.failFaceUnlock();
+        const started = facePam.start();
+        if (!started) root.failFaceUnlock();
+        return started;
     }
 
     function retryFaceUnlock() {
@@ -298,16 +349,19 @@ Scope {
         root.fingerprintSessionAllowed = false;
         root.faceSessionAllowed = false;
         fingerprintRetryTimer.stop();
+        root.cancelBiometricResume();
         faceStartTimer.stop();
         faceScanTimeoutTimer.stop();
         faceFallbackTimer.stop();
         root.faceFallbackPending = false;
 
         if (method === "fingerprint") {
+            root.logBiometric("Fingerprint unlock accepted");
             root.fingerprintState = root.fingerprintSuccess;
             root.faceState = root.faceAvailable ? root.faceReady : root.faceUnavailable;
             if (facePam.active) facePam.abort();
         } else {
+            root.logBiometric("Face unlock accepted");
             root.faceState = root.faceSuccess;
             root.fingerprintState = root.fingerprintsConfigured
                 ? root.fingerprintReady
@@ -358,6 +412,61 @@ Scope {
     }
 
     Timer {
+        id: biometricResumeTimer
+        interval: 150
+        repeat: true
+        onTriggered: {
+            if (!GlobalStates.screenLocked
+                    || root.targetAction !== LockContext.ActionEnum.Unlock
+                    || root.authenticationResolved) {
+                root.cancelBiometricResume();
+                return;
+            }
+
+            const elapsed = Date.now() - root.biometricResumeStartedAt;
+            if (elapsed >= root.biometricResumeTimeoutMs) {
+                root.logBiometric("Wake rearm timed out after " + elapsed + " ms");
+                root.cancelBiometricResume();
+                return;
+            }
+
+            if (root.fingerprintResumePending) {
+                if (!root.fingerprintUnlockEnabled) {
+                    root.fingerprintResumePending = false;
+                } else if (fingerprintCheckProc.running) {
+                    // Wait for the asynchronous availability refresh.
+                } else if (!root.fingerprintsConfigured) {
+                    root.fingerprintResumePending = false;
+                } else if (!fingerPam.active) {
+                    root.fingerprintResumePending = false;
+                    const started = root.tryFingerUnlock();
+                    root.logBiometric("Fingerprint rearm requested after " + elapsed
+                        + " ms (PAM start " + (started ? "accepted" : "deferred") + ")");
+                }
+            }
+
+            if (root.faceResumePending) {
+                if (!root.faceUnlockEnabled) {
+                    root.faceResumePending = false;
+                } else if (faceCheckProc.running) {
+                    // Wait for the asynchronous availability refresh.
+                } else if (!root.faceAvailable) {
+                    root.faceResumePending = false;
+                } else if (!facePam.active) {
+                    root.faceResumePending = false;
+                    root.scheduleFaceUnlock();
+                    root.logBiometric("Face rearm scheduled after " + elapsed + " ms");
+                }
+            }
+
+            if (!root.fingerprintResumePending && !root.faceResumePending) {
+                biometricResumeTimer.stop();
+                root.biometricResumeStartedAt = 0;
+            }
+        }
+    }
+
+    Timer {
         id: faceStartTimer
         interval: Math.max(0, Config.options.lock.security.faceUnlockDelayMs)
         onTriggered: root.tryFaceUnlock()
@@ -368,6 +477,7 @@ Scope {
         interval: 10000
         onTriggered: {
             if (facePam.active) facePam.abort();
+            root.logBiometric("Face scan timed out");
             if (!root.authenticationResolved) root.failFaceUnlock();
         }
     }
@@ -383,7 +493,8 @@ Scope {
 
             if (!fingerPam.active) {
                 root.fingerprintRetryCount = 0;
-                root.tryFingerUnlock();
+                const started = root.tryFingerUnlock();
+                root.logBiometric("Fingerprint fallback " + (started ? "started" : "deferred"));
             }
             root.faceFallbackPending = false;
             root.faceFallbackCompleted();
@@ -426,8 +537,13 @@ Scope {
                 if (root.fingerprintUnlockEnabled
                         && root.fingerprintsConfigured
                         && GlobalStates.screenLocked
-                        && !fingerPam.active)
-                    root.tryFingerUnlock();
+                        && !fingerPam.active) {
+                    if (root.fingerprintResumePending) {
+                        if (!biometricResumeTimer.running) biometricResumeTimer.start();
+                    } else {
+                        root.tryFingerUnlock();
+                    }
+                }
             }
         }
         onExited: (exitCode, exitStatus) => {
@@ -449,8 +565,13 @@ Scope {
                 root.stopFacePam();
             } else if (root.faceState !== root.faceSuccess) {
                 root.faceState = root.faceReady;
-                if (GlobalStates.screenLocked)
-                    root.scheduleFaceUnlock();
+                if (GlobalStates.screenLocked) {
+                    if (root.faceResumePending) {
+                        if (!biometricResumeTimer.running) biometricResumeTimer.start();
+                    } else {
+                        root.scheduleFaceUnlock();
+                    }
+                }
             }
         }
     }
@@ -494,13 +615,17 @@ Scope {
             if (result == PamResult.Success
                     && root.fingerprintSessionAllowed
                     && root.fingerprintUnlockEnabled) {
+                root.logBiometric("Fingerprint PAM result: success");
                 root.completeBiometricUnlock("fingerprint");
             } else if (!root.fingerprintSessionAllowed) {
+                root.logBiometric("Ignored stale fingerprint PAM completion");
                 return;
             } else if (result == PamResult.MaxTries) {
+                root.logBiometric("Fingerprint PAM result: max-tries");
                 root.fingerprintSessionAllowed = false;
                 root.fingerprintState = root.fingerprintFailed;
             } else {
+                root.logBiometric("Fingerprint PAM result: failed");
                 root.scheduleFingerprintRetry();
             }
         }
@@ -514,11 +639,16 @@ Scope {
 
         onCompleted: result => {
             faceScanTimeoutTimer.stop();
+            if (!root.faceSessionAllowed) {
+                root.logBiometric("Ignored stale face PAM completion");
+                return;
+            }
+            root.logBiometric("Face PAM result: " + root.biometricResultName(result));
             if (result == PamResult.Success
                     && root.faceSessionAllowed
                     && root.faceUnlockEnabled) {
                 root.completeBiometricUnlock("face");
-            } else if (root.faceSessionAllowed && !root.authenticationResolved) {
+            } else if (!root.authenticationResolved) {
                 root.failFaceUnlock();
             }
         }

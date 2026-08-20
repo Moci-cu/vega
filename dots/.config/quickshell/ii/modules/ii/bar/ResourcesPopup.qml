@@ -23,84 +23,68 @@ StyledPopup {
         anchors.centerIn: parent
         spacing: 12
 
-        HeroCard {
+        ExpressiveMetricCard {
             id: resourcesHero
-            Layout.fillWidth: true
-            adaptiveWidth: true
+
+            label: Translation.tr("CPU usage")
+            value: `${Math.round(ResourceUsage.cpuUsage * 100)}%`
+            supportingText: ResourceUsage.cpuModel
+            detailText: ResourceUsage.cpuFreq
+            detailIcon: "speed"
+            badgeText: ResourceUsage.cpuTemp === "--°C"
+                ? Translation.tr("Temperature unavailable")
+                : Translation.tr("Temperature %1").arg(ResourceUsage.cpuTemp)
+            badgeIcon: "device_thermostat"
             icon: "developer_board"
-            title: `${Math.round(ResourceUsage.cpuUsage * 100)}%`
-            subtitle: ResourceUsage.cpuModel
-            pillText: ResourceUsage.cpuTemp
-            pillIcon: "device_thermostat"
+            progress: ResourceUsage.cpuUsage
+            shapeString: "Clover8Leaf"
         }
 
-        ColumnLayout {
+        GridLayout {
             Layout.fillWidth: true
-            spacing: 8
+            columns: 2
+            rowSpacing: 10
+            columnSpacing: 10
 
-            RowLayout {
+            ExpressiveStatCard {
                 Layout.fillWidth: true
-                spacing: 8
-
-                ResourceCard {
-                    title: Translation.tr("RAM")
-                    icon: "memory"
-                    shapeString: "Clover4Leaf"
-                    shapeColor: Appearance.colors.colSecondaryContainer
-                    symbolColor: Appearance.colors.colOnSecondaryContainer
-
-                    resourceName: Translation.tr("Used") 
-                    resourceValueText: `${Math.round(ResourceUsage.memoryUsedPercentage * 100)}%`
-                    resourcePercentage: ResourceUsage.memoryUsedPercentage
-                    highlightColor: Appearance.colors.colSecondary
-                }
-
-                ResourceCard {
-                    visible: Config.options.bar.tooltips.showSwap
-                    title: Translation.tr("Swap")
-                    icon: "swap_horiz"
-                    shapeString: "Ghostish"
-                    shapeColor: Appearance.colors.colPrimaryContainer
-                    symbolColor: Appearance.colors.colOnPrimaryContainer
-
-                    resourceName: Translation.tr("Used")
-                    resourceValueText: `${Math.round(ResourceUsage.swapUsedPercentage * 100)}%`
-                    resourcePercentage: ResourceUsage.swapUsedPercentage
-                    highlightColor: Appearance.colors.colPrimary
-                }
-
-                ResourceCard {
-                    visible: !Config.options.bar.tooltips.showSwap
-                    title: Translation.tr("Storage")
-                    icon: "hard_drive"
-                    shapeString: "Cookie9Sided"
-                    shapeColor: Appearance.colors.colTertiaryContainer
-                    symbolColor: Appearance.colors.colOnTertiaryContainer
-
-                    resourceName: Translation.tr("Disk")
-                    resourceValueText: `${root.formatGB(ResourceUsage.diskUsed).split(" ")[0]} / ${root.formatGB(ResourceUsage.diskTotal)}`
-                    resourcePercentage: ResourceUsage.diskUsedPercentage
-                    highlightColor: Appearance.colors.colTertiary
-                }
+                label: Translation.tr("Memory")
+                value: `${Math.round(ResourceUsage.memoryUsedPercentage * 100)}%`
+                supportingText: Translation.tr("%1 of %2").arg(root.formatGB(ResourceUsage.memoryUsed)).arg(root.formatGB(ResourceUsage.memoryTotal))
+                icon: "memory"
+                shapeString: "Flower"
+                progress: ResourceUsage.memoryUsedPercentage
+                shapeColor: Appearance.colors.colSecondaryContainer
+                symbolColor: Appearance.colors.colOnSecondaryContainer
+                progressColor: Appearance.colors.colSecondary
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
+            ExpressiveStatCard {
                 visible: Config.options.bar.tooltips.showSwap
+                Layout.fillWidth: true
+                label: Translation.tr("Swap")
+                value: `${Math.round(ResourceUsage.swapUsedPercentage * 100)}%`
+                supportingText: Translation.tr("%1 of %2").arg(root.formatGB(ResourceUsage.swapUsed)).arg(root.formatGB(ResourceUsage.swapTotal))
+                icon: "swap_horiz"
+                shapeString: "Ghostish"
+                progress: ResourceUsage.swapUsedPercentage
+                shapeColor: Appearance.colors.colPrimaryContainer
+                symbolColor: Appearance.colors.colOnPrimaryContainer
+                progressColor: Appearance.colors.colPrimary
+            }
 
-                ResourceCard {
-                    title: Translation.tr("Storage")
-                    icon: "hard_drive"
-                    shapeString: "Cookie9Sided"
-                    shapeColor: Appearance.colors.colTertiaryContainer
-                    symbolColor: Appearance.colors.colOnTertiaryContainer
-
-                    resourceName: Translation.tr("Disk")
-                    resourceValueText: `${root.formatGB(ResourceUsage.diskUsed).split(" ")[0]} / ${root.formatGB(ResourceUsage.diskTotal)}`
-                    resourcePercentage: ResourceUsage.diskUsedPercentage
-                    highlightColor: Appearance.colors.colTertiary
-                }
+            ExpressiveStatCard {
+                Layout.fillWidth: true
+                Layout.columnSpan: Config.options.bar.tooltips.showSwap ? 2 : 1
+                label: Translation.tr("Storage")
+                value: `${Math.round(ResourceUsage.diskUsedPercentage * 100)}%`
+                supportingText: Translation.tr("%1 of %2").arg(root.formatGB(ResourceUsage.diskUsed)).arg(root.formatGB(ResourceUsage.diskTotal))
+                icon: "hard_drive"
+                shapeString: "Cookie9Sided"
+                progress: ResourceUsage.diskUsedPercentage
+                shapeColor: Appearance.colors.colTertiaryContainer
+                symbolColor: Appearance.colors.colOnTertiaryContainer
+                progressColor: Appearance.colors.colTertiary
             }
         }
     }

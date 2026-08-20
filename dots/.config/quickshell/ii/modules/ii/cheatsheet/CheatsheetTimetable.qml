@@ -223,9 +223,11 @@ Item {
     }
 
     Component.onCompleted: {
+        CalendarService.acquireConsumer();
         root.updateCurrentTimeLine();
         Qt.callLater(root.maybeApplyInitialScroll);
     }
+    Component.onDestruction: CalendarService.releaseConsumer()
 
     Rectangle {
         anchors.fill: parent
@@ -520,4 +522,3 @@ Item {
         }
     }
 }
-

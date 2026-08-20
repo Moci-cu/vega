@@ -26,17 +26,13 @@ Item {
         return isFinite(position) ? Math.max(0, position) : 0
     }
 
-    Timer {
+    MprisPositionTicker {
+        player: root.player
         running: root.player?.playbackState == MprisPlaybackState.Playing
             && !root.hasSyncedLines
             && LyricsService.geniusHasLyrics
             && root.playerLength > 0
         interval: 250
-        repeat: true
-        onTriggered: {
-            if (root.player)
-                root.player.positionChanged()
-        }
     }
 
     MaterialLoadingIndicator {
