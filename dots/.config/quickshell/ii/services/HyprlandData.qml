@@ -205,89 +205,103 @@ Singleton {
         }
     }
 
-    Process {
+    component HyprlandJsonRequest: Socket {
+        id: requestSocket
+
+        required property string request
+        property bool running: false
+        signal completed(var response)
+
+        path: Hyprland.requestSocketPath
+        onRunningChanged: if (running) connected = true
+
+        onConnectionStateChanged: {
+            if (connected && running) {
+                write(`j/${request}`);
+                flush();
+            } else if (!connected && running) {
+                running = false;
+            }
+        }
+
+        onError: {
+            running = false;
+            connected = false;
+        }
+
+        parser: StdioCollector {
+            waitForEnd: false
+            onDataChanged: {
+                if (!requestSocket.running) return;
+                try {
+                    const response = JSON.parse(text);
+                    requestSocket.running = false;
+                    requestSocket.connected = false;
+                    requestSocket.completed(response);
+                } catch (error) {
+                    // A large JSON response may arrive in multiple chunks.
+                }
+            }
+        }
+    }
+
+    HyprlandJsonRequest {
         id: getClients
-        command: ["hyprctl", "clients", "-j"]
-        onExited: {
+        request: "clients"
+        onCompleted: response => {
+            root.windowList = response;
+            let tempWinByAddress = {};
+            for (var i = 0; i < root.windowList.length; ++i) {
+                var win = root.windowList[i];
+                tempWinByAddress[win.address] = win;
+            }
+            root.windowByAddress = tempWinByAddress;
+            root.addresses = root.windowList.map(win => win.address);
             if (root.clientsDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: clientsCollector
-            onStreamFinished: {
-                root.windowList = JSON.parse(clientsCollector.text)
-                let tempWinByAddress = {};
-                for (var i = 0; i < root.windowList.length; ++i) {
-                    var win = root.windowList[i];
-                    tempWinByAddress[win.address] = win;
-                }
-                root.windowByAddress = tempWinByAddress;
-                root.addresses = root.windowList.map(win => win.address);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getMonitors
-        command: ["hyprctl", "monitors", "-j"]
-        onExited: {
+        request: "monitors"
+        onCompleted: response => {
+            root.monitors = response;
             if (root.monitorsDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: monitorsCollector
-            onStreamFinished: {
-                root.monitors = JSON.parse(monitorsCollector.text);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getLayers
-        command: ["hyprctl", "layers", "-j"]
-        onExited: {
+        request: "layers"
+        onCompleted: response => {
+            root.layers = response;
             if (root.layersDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: layersCollector
-            onStreamFinished: {
-                root.layers = JSON.parse(layersCollector.text);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getWorkspaces
-        command: ["hyprctl", "workspaces", "-j"]
-        onExited: {
+        request: "workspaces"
+        onCompleted: response => {
+            // Filter out invalid workspace ids (e.g. lock-screen temp workspace 2147483647 - N)
+            root.workspaces = response.filter(ws => ws.id >= 1 && ws.id <= 100);
+            let tempWorkspaceById = {};
+            for (var i = 0; i < root.workspaces.length; ++i) {
+                var ws = root.workspaces[i];
+                tempWorkspaceById[ws.id] = ws;
+            }
+            root.workspaceById = tempWorkspaceById;
+            root.workspaceIds = root.workspaces.map(ws => ws.id);
             if (root.workspacesDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: workspacesCollector
-            onStreamFinished: {
-                var rawWorkspaces = JSON.parse(workspacesCollector.text);
-                // Filter out invalid workspace ids (e.g. lock-screen temp workspace 2147483647 - N)
-                root.workspaces = rawWorkspaces.filter(ws => ws.id >= 1 && ws.id <= 100);
-                let tempWorkspaceById = {};
-                for (var i = 0; i < root.workspaces.length; ++i) {
-                    var ws = root.workspaces[i];
-                    tempWorkspaceById[ws.id] = ws;
-                }
-                root.workspaceById = tempWorkspaceById;
-                root.workspaceIds = root.workspaces.map(ws => ws.id);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getActiveWorkspace
-        command: ["hyprctl", "activeworkspace", "-j"]
-        onExited: {
+        request: "activeworkspace"
+        onCompleted: response => {
+            root.activeWorkspace = response;
             if (root.activeWorkspaceDirty) refreshCoalesceTimer.restart();
-        }
-        stdout: StdioCollector {
-            id: activeWorkspaceCollector
-            onStreamFinished: {
-                root.activeWorkspace = JSON.parse(activeWorkspaceCollector.text);
-            }
         }
     }
 }
