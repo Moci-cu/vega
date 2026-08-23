@@ -31,13 +31,7 @@ Singleton {
 
     property var wifiNetworks: []
     readonly property WifiAccessPoint active: wifiNetworks.find(network => network?.active) ?? null
-    readonly property var friendlyWifiNetworks: wifiNetworks.filter(network => network).sort((a, b) => {
-        if (a.active && !b.active)
-            return -1;
-        if (!a.active && b.active)
-            return 1;
-        return b.strength - a.strength;
-    })
+    readonly property var friendlyWifiNetworks: wifiNetworks
 
     readonly property bool ethernet: devices.some(device => device.type === DeviceType.Wired && device.connected)
     readonly property string wifiStatus: {
@@ -195,12 +189,18 @@ Singleton {
             if (accessPoint) nextNetworks.push(accessPoint);
         }
 
+        // Keep ScriptModel rows stable while signal strength changes during scans.
+        nextNetworks.sort((a, b) => a.ssid.localeCompare(b.ssid) || a.securityType - b.securityType);
+
         for (const accessPoint of currentNetworks) {
             if (nextNetworks.includes(accessPoint)) continue;
             if (root.wifiConnectTarget === accessPoint) root.wifiConnectTarget = null;
             accessPoint.destroy();
         }
 
+        if (nextNetworks.length === currentNetworks.length
+                && nextNetworks.every((accessPoint, index) => accessPoint === currentNetworks[index]))
+            return;
         root.wifiNetworks = nextNetworks;
     }
 

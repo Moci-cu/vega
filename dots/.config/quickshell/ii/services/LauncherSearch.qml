@@ -510,7 +510,7 @@ Singleton {
             if (expr.length < 2) return
             activeExpression = expr;
             fileProc.running = false;
-            fileProc.command = ["fd", "--", expr, Config.options.search.fileSearchDirectory];
+            fileProc.command = ["fd", "--fixed-strings", "--max-results", root.resultLimit.toString(), "--", expr, Config.options.search.fileSearchDirectory];
             fileProc.running = true;
         }
         stdout: StdioCollector {
@@ -519,10 +519,7 @@ Singleton {
                     ? root.query.slice(Config.options.search.prefix.fileSearch.length).trim()
                     : "";
                 if (currentExpr !== fileProc.activeExpression) return;
-                const rawResult = this.text
-                const result = rawResult.split('\n')
-                result.pop() // deleting the last empty line
-                root.fileResults = result
+                root.fileResults = this.text.split('\n').filter(path => path.length > 0);
             }
         }
 

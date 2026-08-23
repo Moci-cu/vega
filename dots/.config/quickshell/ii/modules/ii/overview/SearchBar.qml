@@ -65,7 +65,7 @@ RowLayout {
             case SearchBar.SearchPrefixType.Math: return "calculate";
             case SearchBar.SearchPrefixType.ShellCommand: return "terminal";
             case SearchBar.SearchPrefixType.WebSearch: return "travel_explore";
-            case SearchBar.SearchPrefixType.FileSearch: return "folder_search";
+            case SearchBar.SearchPrefixType.FileSearch: return "folder";
             case SearchBar.SearchPrefixType.Window: return "select_window";
             case SearchBar.SearchPrefixType.DefaultSearch: return "search";
             default: return "search";
