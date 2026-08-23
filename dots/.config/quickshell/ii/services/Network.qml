@@ -31,7 +31,7 @@ Singleton {
 
     property var wifiNetworks: []
     readonly property WifiAccessPoint active: wifiNetworks.find(network => network?.active) ?? null
-    readonly property var friendlyWifiNetworks: wifiNetworks
+    readonly property var friendlyWifiNetworks: wifiNetworks.filter(network => (network?.ssid ?? "").length > 0)
 
     readonly property bool ethernet: devices.some(device => device.type === DeviceType.Wired && device.connected)
     readonly property string wifiStatus: {

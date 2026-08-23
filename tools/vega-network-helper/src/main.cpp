@@ -18,6 +18,7 @@
 #include <QUuid>
 
 #include <unistd.h>
+#include <poll.h>
 
 #include <cerrno>
 
@@ -136,7 +137,7 @@ QStringList jsonStringList(const QJsonValue &value)
 QString securityLabel(const QString &keyManagement)
 {
     if (keyManagement == "sae") return "sae";
-    if (keyManagement == "wpa-psk" || keyManagement == "wpa-none") return "wpa-psk";
+    if (keyManagement == "wpa-psk") return "wpa-psk";
     return keyManagement.isEmpty() ? "open" : "unsupported";
 }
 }
@@ -391,15 +392,17 @@ private:
             *error = "Password must not exceed 64 characters";
             return false;
         }
-        if (security != "open" && !base.contains("802-11-wireless-security") && password.size() < 8) {
-            *error = "A password of at least 8 characters is required";
+        if (security != "open" && password.size() < 8) {
+            *error = base.contains("802-11-wireless-security")
+                ? "Re-enter the password to save changes to a secured network"
+                : "A password of at least 8 characters is required";
             return false;
         }
 
         NmSettings next = base;
         QVariantMap connection = next.value("connection");
-        connection.insert("id", params.value("name").toString(ssid).trimmed().isEmpty()
-            ? ssid : params.value("name").toString().trimmed());
+        const QString name = params.value("name").toString().trimmed();
+        connection.insert("id", name.isEmpty() ? ssid : name);
         connection.insert("uuid", connection.value("uuid").toString().isEmpty()
             ? QUuid::createUuid().toString(QUuid::WithoutBraces) : connection.value("uuid"));
         connection.insert("type", "802-11-wireless");
@@ -491,7 +494,9 @@ public:
         const QJsonDocument document = QJsonDocument::fromJson(line, &error);
         return error.error == QJsonParseError::NoError
             && document.object().value("method").toString() == "health"
-            && kMaxRequestBytes == 262144;
+            && kMaxRequestBytes == 262144
+            && securityLabel("wpa-psk") == "wpa-psk"
+            && securityLabel("wpa-none") == "unsupported";
     }
 
 private slots:
@@ -576,7 +581,16 @@ private:
                 continue;
             }
             if (result < 0 && errno == EINTR) continue;
-            break;
+            if (result < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                pollfd descriptor{STDOUT_FILENO, POLLOUT, 0};
+                int ready;
+                do {
+                    ready = ::poll(&descriptor, 1, -1);
+                } while (ready < 0 && errno == EINTR);
+                if (ready > 0 && (descriptor.revents & POLLOUT)) continue;
+            }
+            QCoreApplication::exit(1);
+            return;
         }
     }
 

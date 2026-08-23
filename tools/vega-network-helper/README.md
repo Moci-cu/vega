@@ -12,7 +12,8 @@ cmake --build build
 cmake --install build --prefix "$HOME/.local"
 ```
 
-Required build components are Qt 6 Core, DBus, and Network. No npm packages or
+Required build components are Qt 6 Core, DBus, and Network. NetworkManager 1.20
+or newer is required for `AddConnection2` and `Update2`. No npm packages or
 background daemon are used.
 
 ## Protocol
@@ -21,7 +22,7 @@ One request and response per line:
 
 ```json
 {"id":"1","method":"health","params":{}}
-{"id":"1","ok":true,"result":{"available":true,"backend":"NetworkManager D-Bus"}}
+{"id":"1","ok":true,"result":{"available":true,"backend":"NetworkManager D-Bus","canModify":true,"version":"1.52.0"}}
 ```
 
 Supported methods are `health`, `list_profiles`, `create_profile`,
@@ -29,5 +30,6 @@ Supported methods are `health`, `list_profiles`, `create_profile`,
 `{"event":"profiles_changed"}` when NetworkManager reports profile or active
 connection changes.
 
-Passwords are accepted only in create/update request bodies. The helper never
-calls `GetSecrets`, prints request bodies, or returns a password.
+Passwords are accepted only in create/update request bodies. Updating a secured
+profile requires re-entering its password. The helper never calls `GetSecrets`,
+prints request bodies, or returns a password.

@@ -163,8 +163,7 @@ Singleton {
 
         stderr: SplitParser {
             onRead: line => {
-                if (line && line.trim().length > 0)
-                    root.lastError = Translation.tr("Wi-Fi helper failed to start")
+                if (line && line.trim().length > 0) console.warn("[NetworkProfiles]", line.trim())
             }
         }
 
@@ -225,8 +224,6 @@ Singleton {
             for (const request of expired) {
                 if (request.callback) request.callback(false, undefined, { message: root.lastError })
             }
-            root.loading = false
-            root.operationRunning = false
         }
     }
 }

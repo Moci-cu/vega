@@ -213,7 +213,14 @@ Singleton {
         signal completed(var response)
 
         path: Hyprland.requestSocketPath
-        onRunningChanged: if (running) connected = true
+        onRunningChanged: {
+            if (running) {
+                requestTimeout.restart();
+                connected = true;
+            } else {
+                requestTimeout.stop();
+            }
+        }
 
         onConnectionStateChanged: {
             if (connected && running) {
@@ -227,6 +234,14 @@ Singleton {
         onError: {
             running = false;
             connected = false;
+        }
+
+        property Timer requestTimeout: Timer {
+            interval: 3000
+            onTriggered: {
+                requestSocket.running = false;
+                requestSocket.connected = false;
+            }
         }
 
         parser: StdioCollector {

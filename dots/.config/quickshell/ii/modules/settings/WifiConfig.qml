@@ -110,6 +110,12 @@ ContentPage {
             formError = Translation.tr("SSID is required")
             return
         }
+        if (params.security !== "open" && params.password.length < 8) {
+            formError = selectedProfile
+                ? Translation.tr("Re-enter the password to save changes to a secured network")
+                : Translation.tr("A password of at least 8 characters is required")
+            return
+        }
         const done = function(ok, result, error) {
             if (!ok) {
                 page.formError = error?.message ?? NetworkProfiles.lastError
@@ -456,9 +462,7 @@ ContentPage {
                 id: passwordField
                 Layout.fillWidth: true
                 enabled: securityCombo.currentValue !== "open"
-                placeholderText: page.selectedProfile
-                    ? Translation.tr("New password (leave empty to keep current)")
-                    : Translation.tr("Password")
+                placeholderText: page.selectedProfile ? Translation.tr("Re-enter password") : Translation.tr("Password")
                 echoMode: TextInput.Password
                 inputMethodHints: Qt.ImhSensitiveData
             }
