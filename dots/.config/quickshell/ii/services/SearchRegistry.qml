@@ -31,6 +31,7 @@ Item {
         sections = []
         pageFile.start([
             Directories.generalConfigPath,
+            Directories.wifiConfigPath,
             Directories.barConfigPath,
             Directories.backgroundConfigPath,
             Directories.interfaceConfigPath,
@@ -51,13 +52,6 @@ Item {
             return
         }
         startIndexing()
-    }
-
-    Timer {
-        interval: 700
-        running: true
-        repeat: false
-        onTriggered: root.ensureIndexed()
     }
 
     Connections {

@@ -41,7 +41,18 @@ hl.window_rule({match = {class = ".*plasmawindowed.*" },                     flo
 hl.window_rule({match = {class = "kcm_.*" },                                  float = true})
 hl.window_rule({match = {class = ".*bluedevilwizard" },                      float = true})
 hl.window_rule({match = {title = ".*Welcome" },                              float = true})
-hl.window_rule({match = {title = "^(illogical-impulse Settings)$" },         float = true})
+hl.window_rule({
+    match = {
+        initial_class = "^(org\\.quickshell)$",
+        initial_title = "^(illogical-impulse Settings)$"
+    },
+    float = true,
+    center = true,
+    size = {1100, 750},
+    fullscreen_state = "0 0",
+    no_anim = true,
+    suppress_event = "fullscreen maximize"
+})
 hl.window_rule({match = {title = ".*Shell conflicts.*" },                    float = true})
 hl.window_rule({match = {class = "org.freedesktop.impl.portal.desktop.kde" }, float = true})
 hl.window_rule({match = {class = "org.freedesktop.impl.portal.desktop.kde" }, size = {"(monitor_w*0.60)", "(monitor_h*0.65)"} })

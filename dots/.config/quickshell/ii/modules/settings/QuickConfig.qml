@@ -15,6 +15,7 @@ ContentPage {
     forceWidth: true
     interactive: false
 
+    property bool allowCarouselLoad: false
     property bool allowHeavyLoad: false
     property ListModel favouritesCarouselModel: ListModel {}
     property int currentIndex: -1
@@ -44,7 +45,15 @@ ContentPage {
         }
     }
 
-    Component.onCompleted: Qt.callLater(page.refreshFavouritesCarousel)
+    Timer {
+        interval: 150
+        running: true
+        repeat: false
+        onTriggered: {
+            page.refreshFavouritesCarousel()
+            page.allowCarouselLoad = true
+        }
+    }
 
     Timer {
         interval: 700
@@ -146,46 +155,47 @@ ContentPage {
 
                 
 
-                Carousel {
-                    id: favouritesCarousel
-                    implicitWidth: parent.implicitWidth
-                    implicitHeight: parent.implicitHeight
-                    
-                    showBadges: true
-                    showOpenningAnimation: true
-                    
-                    leftPadding: 0
-                    rightPadding: 0
-                    topPadding: 0
-                    bottomPadding: 0
+                Loader {
+                    anchors.fill: parent
+                    active: page.allowCarouselLoad
+                    sourceComponent: Carousel {
+                        id: favouritesCarousel
+                        showBadges: true
+                        showOpenningAnimation: true
 
-                    model: page.favouritesCarouselModel
-                    visible: page.favouritesCarouselModel.count > 0
-                    onItemClicked: (index, modelData) => {
-                        shrinkAnimation.running = true
-                        favouritesCarousel.currentIndex = 0
-                        favouritesCarousel.snapToIndex(0)
-                        Wallpapers.select(modelData.filePath)
-                    }
+                        leftPadding: 0
+                        rightPadding: 0
+                        topPadding: 0
+                        bottomPadding: 0
 
-                    onPressedAny: () => {
-                        expandAnimation.running = true
-                    }
+                        model: page.favouritesCarouselModel
+                        visible: page.favouritesCarouselModel.count > 0
+                        onItemClicked: (index, modelData) => {
+                            shrinkAnimation.running = true
+                            favouritesCarousel.currentIndex = 0
+                            favouritesCarousel.snapToIndex(0)
+                            Wallpapers.select(modelData.filePath)
+                        }
 
-                    delegate: Item {
-                        id: carouselItem
-                        required property var modelData
-                        required property int index
+                        onPressedAny: () => {
+                            expandAnimation.running = true
+                        }
 
-                        ThumbnailImage {
-                            anchors.fill: parent
-                            sourcePath: carouselItem.modelData.filePath
-                            fillMode: Image.PreserveAspectCrop
-                            generateThumbnail: true
+                        delegate: Item {
+                            id: carouselItem
+                            required property var modelData
+                            required property int index
 
-                            // fix for resolution
-                            thumbnailSizeName: Images.thumbnailSizeNameForDimensions(512, 512)
-                            sourceSize: (512,512)
+                            ThumbnailImage {
+                                anchors.fill: parent
+                                sourcePath: carouselItem.modelData.filePath
+                                fillMode: Image.PreserveAspectCrop
+                                generateThumbnail: true
+
+                                // fix for resolution
+                                thumbnailSizeName: Images.thumbnailSizeNameForDimensions(512, 512)
+                                sourceSize: (512,512)
+                            }
                         }
                     }
                 }

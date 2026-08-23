@@ -27,6 +27,7 @@ Singleton {
     property WifiAccessPoint wifiConnectTarget
     property bool scanAfterWifiEnabled: false
     property bool initialScanRequested: false
+    property int wifiScannerConsumers: 0
 
     property var wifiNetworks: []
     readonly property WifiAccessPoint active: wifiNetworks.find(network => network?.active) ?? null
@@ -122,6 +123,23 @@ Singleton {
         root.enableWifi(true);
     }
 
+    function acquireWifiScanner(): void {
+        root.wifiScannerConsumers++;
+        scannerStopTimer.stop();
+        if (!root.wifiEnabled || !root.wifiDevice) return;
+        if (!root.wifiDevice.scannerEnabled)
+            root.wifiDevice.scannerEnabled = true;
+        if (!root.wifiScanning) {
+            root.wifiScanning = true;
+            scanIndicatorTimer.restart();
+        }
+    }
+
+    function releaseWifiScanner(): void {
+        root.wifiScannerConsumers = Math.max(0, root.wifiScannerConsumers - 1);
+        if (root.wifiScannerConsumers === 0) scannerStopTimer.restart();
+    }
+
     function connectToWifiNetwork(accessPoint: WifiAccessPoint): void {
         if (!accessPoint?.backendNetwork) return;
         accessPoint.askingPassword = false;
@@ -212,7 +230,10 @@ Singleton {
 
     Component.onCompleted: root.handleWifiAvailability()
 
-    onWifiDeviceChanged: root.handleWifiAvailability()
+    onWifiDeviceChanged: {
+        root.initialScanRequested = false;
+        root.handleWifiAvailability();
+    }
 
     Connections {
         target: Networking
@@ -272,7 +293,7 @@ Singleton {
         interval: 15000
         repeat: false
         onTriggered: {
-            if (root.wifiDevice?.scannerEnabled)
+            if (root.wifiScannerConsumers === 0 && root.wifiDevice?.scannerEnabled)
                 root.wifiDevice.scannerEnabled = false;
         }
     }

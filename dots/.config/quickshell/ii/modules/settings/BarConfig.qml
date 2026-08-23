@@ -9,7 +9,7 @@ import QtQml.Models
 ContentPage {
     id: page
     forceWidth: true
-    readonly property int index: 2 
+    readonly property int index: 3
     property bool register: parent.register ?? false
 
     property var componentMap: ({

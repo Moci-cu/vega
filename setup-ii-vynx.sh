@@ -213,6 +213,42 @@ install_cli() {
     echo -e "${GREEN}✓ Symlinked $CLI_NAME → $TARGET${NC}"
 }
 
+install_network_helper() {
+    local SOURCE="$SCRIPT_DIR/tools/vega-network-helper"
+    local BUILD_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/vega/network-helper-build"
+
+    if [ ! -d "$SOURCE" ]; then
+        log_verbose "Native network helper source not present"
+        return 0
+    fi
+
+    if ! command -v cmake >/dev/null 2>&1 || ! command -v pkg-config >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠ Skipping native Wi-Fi helper: cmake and pkg-config are required.${NC}"
+        return 0
+    fi
+
+    if ! pkg-config --exists Qt6Core Qt6DBus Qt6Network; then
+        echo -e "${YELLOW}⚠ Skipping native Wi-Fi helper: Qt6 Core, DBus, and Network development files are required.${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}• Building native NetworkManager helper...${NC}"
+    mkdir -p "$BUILD_DIR"
+    if ! cmake -S "$SOURCE" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release >/dev/null; then
+        echo -e "${YELLOW}⚠ Could not configure the native Wi-Fi helper; external network settings remain available.${NC}"
+        return 0
+    fi
+    if ! cmake --build "$BUILD_DIR" --parallel "$(nproc)" >/dev/null; then
+        echo -e "${YELLOW}⚠ Could not build the native Wi-Fi helper; external network settings remain available.${NC}"
+        return 0
+    fi
+    if ! cmake --install "$BUILD_DIR" --prefix "$HOME/.local" >/dev/null; then
+        echo -e "${YELLOW}⚠ Could not install the native Wi-Fi helper to ~/.local/lib/vega.${NC}"
+        return 0
+    fi
+    echo -e "${GREEN}✓ Native Wi-Fi helper installed${NC}"
+}
+
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}          ii-vynx setup     ${NC}"
@@ -378,6 +414,8 @@ else
         fi
     fi
 fi
+
+install_network_helper
 
 echo ""
 echo -e "${NC}• Copying...${NC}"
