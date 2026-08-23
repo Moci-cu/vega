@@ -5,7 +5,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import Quickshell
 
 Item {
     id: stopwatchTab
@@ -158,17 +157,12 @@ Item {
             spacing: 8
 
             RippleButton {
-                id: toggleButton
-
                 Layout.preferredHeight: 44
                 Layout.preferredWidth: 112
-                text: TimerService.stopwatchRunning ? Translation.tr("Pause") : TimerService.stopwatchTime === 0 ? Translation.tr("Start") : Translation.tr("Resume")
                 buttonRadius: Appearance.rounding.full
                 buttonRadiusPressed: Appearance.rounding.normal
 
-                onClicked: {
-                    TimerService.toggleStopwatch()
-                }
+                onClicked: TimerService.toggleStopwatch()
 
                 colBackground: TimerService.stopwatchRunning ? Appearance.colors.colSecondaryContainer : Appearance.colors.colPrimary 
                 colBackgroundHover: TimerService.stopwatchRunning ? Appearance.colors.colSecondaryContainerHover : Appearance.colors.colPrimaryHover 
@@ -177,18 +171,15 @@ Item {
                 contentItem: StyledText {
                     horizontalAlignment: Text.AlignHCenter
                     color: TimerService.stopwatchRunning ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnPrimary
-                    text: toggleButton.text
+                    text: TimerService.stopwatchRunning ? Translation.tr("Pause") : TimerService.stopwatchTime === 0 ? Translation.tr("Start") : Translation.tr("Resume")
                     font.pixelSize: Appearance.font.pixelSize.normal
                     font.weight: Font.Medium
                 }
             }
 
             RippleButton {
-                id: lapButton
-
                 implicitHeight: 44
                 implicitWidth: 88
-                text: TimerService.stopwatchRunning ? Translation.tr("Lap") : Translation.tr("Reset")
                 buttonRadius: Appearance.rounding.full
 
                 onClicked: {
@@ -205,7 +196,7 @@ Item {
 
                 contentItem: StyledText {
                     horizontalAlignment: Text.AlignHCenter
-                    text: lapButton.text
+                    text: TimerService.stopwatchRunning ? Translation.tr("Lap") : Translation.tr("Reset")
                     color: Appearance.colors.colOnLayer2
                     font.pixelSize: Appearance.font.pixelSize.normal
                 }

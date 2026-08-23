@@ -9,6 +9,7 @@ Item {
     id: root
 
     property bool durationError: false
+    readonly property bool resumeState: !TimerService.pomodoroRunning && TimerService.pomodoroSecondsLeft !== TimerService.pomodoroLapDuration
     readonly property color heroContainer: TimerService.pomodoroBreak
         ? Appearance.colors.colTertiaryContainer
         : Appearance.colors.colSecondaryContainer
@@ -79,7 +80,6 @@ Item {
                 value: TimerService.pomodoroSecondsLeft / TimerService.pomodoroLapDuration
                 colPrimary: root.heroForeground
                 colSecondary: Appearance.colors.colLayer3
-                enableAnimation: true
             }
 
             ColumnLayout {
@@ -138,30 +138,44 @@ Item {
 
             RippleButton {
                 implicitHeight: 46
-                implicitWidth: 156
+                implicitWidth: root.resumeState ? 46 : 156
                 buttonRadius: Appearance.rounding.full
                 buttonRadiusPressed: Appearance.rounding.normal
+                Accessible.name: root.resumeState ? Translation.tr("Resume") : TimerService.pomodoroRunning ? Translation.tr("Pause") : Translation.tr("Start")
                 onClicked: TimerService.togglePomodoro()
                 colBackground: Appearance.colors.colPrimary
                 colBackgroundHover: Appearance.colors.colPrimaryHover
                 colRipple: Appearance.colors.colPrimaryActive
 
-                contentItem: RowLayout {
-                    spacing: 6
-
+                contentItem: Item {
                     MaterialSymbol {
-                        text: TimerService.pomodoroRunning ? "pause" : "play_arrow"
+                        visible: root.resumeState
+                        anchors.fill: parent
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: "play_arrow"
                         iconSize: Appearance.font.pixelSize.larger
+                        fill: 1
                         color: Appearance.colors.colOnPrimary
+                        transform: Translate { x: 1 }
                     }
-                    StyledText {
-                        text: TimerService.pomodoroRunning
-                            ? Translation.tr("Pause")
-                            : TimerService.pomodoroSecondsLeft === TimerService.focusTime
-                                ? Translation.tr("Start")
-                                : Translation.tr("Resume")
-                        color: Appearance.colors.colOnPrimary
-                        font.weight: Font.Medium
+
+                    RowLayout {
+                        visible: !root.resumeState
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        MaterialSymbol {
+                            text: TimerService.pomodoroRunning ? "pause" : "play_arrow"
+                            iconSize: Appearance.font.pixelSize.larger
+                            fill: 1
+                            color: Appearance.colors.colOnPrimary
+                        }
+                        StyledText {
+                            text: TimerService.pomodoroRunning ? Translation.tr("Pause") : Translation.tr("Start")
+                            color: Appearance.colors.colOnPrimary
+                            font.weight: Font.Medium
+                        }
                     }
                 }
             }
@@ -195,6 +209,7 @@ Item {
             implicitHeight: 42
             radius: Appearance.rounding.full
             color: root.durationError ? Appearance.colors.colErrorContainer : Appearance.colors.colLayer2
+            enabled: TimerService.pomodoroDurationEditable
             opacity: TimerService.pomodoroDurationEditable ? 1 : 0.45
 
             RowLayout {
@@ -216,7 +231,6 @@ Item {
                     implicitWidth: 32
                     implicitHeight: 32
                     buttonRadius: Appearance.rounding.full
-                    enabled: TimerService.pomodoroDurationEditable
                     onClicked: root.adjustDuration(-5)
                     contentItem: MaterialSymbol {
                         text: "remove"
@@ -233,13 +247,11 @@ Item {
                     padding: 4
                     horizontalAlignment: TextInput.AlignHCenter
                     text: Math.floor(TimerService.focusTime / 60).toString()
-                    enabled: TimerService.pomodoroDurationEditable
                     Accessible.name: Translation.tr("Focus duration in minutes")
                     inputMethodHints: Qt.ImhDigitsOnly
                     validator: IntValidator { bottom: 1; top: 1440 }
                     colBackground: Appearance.colors.colLayer1
                     onTextEdited: root.durationError = false
-                    onAccepted: root.applyDuration()
                     onEditingFinished: {
                         if (acceptableInput) root.applyDuration();
                         else {
@@ -259,7 +271,6 @@ Item {
                     implicitWidth: 32
                     implicitHeight: 32
                     buttonRadius: Appearance.rounding.full
-                    enabled: TimerService.pomodoroDurationEditable
                     onClicked: root.adjustDuration(5)
                     contentItem: MaterialSymbol {
                         text: "add"

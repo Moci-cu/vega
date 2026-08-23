@@ -7,26 +7,21 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    property int currentTab: 0
-    property var tabButtonList: [
-        {"name": Translation.tr("Pomodoro"), "icon": "search_activity"},
-        {"name": Translation.tr("Stopwatch"), "icon": "timer"}
-    ]
 
     // These are keybinds for stopwatch and pomodoro
     Keys.onPressed: (event) => {
         if ((event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp) && event.modifiers === Qt.NoModifier) { // Switch tabs
-            root.currentTab = event.key === Qt.Key_PageDown ? 1 : 0;
+            swipeView.currentIndex = event.key === Qt.Key_PageDown ? 1 : 0;
             event.accepted = true
         } else if (event.key === Qt.Key_Space || event.key === Qt.Key_S) { // Pause/resume with Space or S
-            if (root.currentTab === 0) {
+            if (swipeView.currentIndex === 0) {
                 TimerService.togglePomodoro()
             } else {
                 TimerService.toggleStopwatch()
             }
             event.accepted = true
         } else if (event.key === Qt.Key_R) { // Reset with R
-            if (root.currentTab === 0) {
+            if (swipeView.currentIndex === 0) {
                 TimerService.resetPomodoro()
             } else {
                 TimerService.stopwatchReset()
@@ -53,19 +48,19 @@ Item {
             SelectionGroupButton {
                 Layout.fillWidth: true
                 leftmost: true
-                toggled: root.currentTab === 0
-                buttonText: root.tabButtonList[0].name
-                buttonIcon: root.tabButtonList[0].icon
-                onClicked: root.currentTab = 0
+                toggled: swipeView.currentIndex === 0
+                buttonText: Translation.tr("Pomodoro")
+                buttonIcon: "search_activity"
+                onClicked: swipeView.currentIndex = 0
             }
 
             SelectionGroupButton {
                 Layout.fillWidth: true
                 rightmost: true
-                toggled: root.currentTab === 1
-                buttonText: root.tabButtonList[1].name
-                buttonIcon: root.tabButtonList[1].icon
-                onClicked: root.currentTab = 1
+                toggled: swipeView.currentIndex === 1
+                buttonText: Translation.tr("Stopwatch")
+                buttonIcon: "timer"
+                onClicked: swipeView.currentIndex = 1
             }
         }
 
@@ -76,8 +71,6 @@ Item {
             Layout.fillHeight: true
             spacing: 10
             clip: true
-            currentIndex: root.currentTab
-            onCurrentIndexChanged: root.currentTab = currentIndex
 
             // Tabs
             PomodoroTimer {}
