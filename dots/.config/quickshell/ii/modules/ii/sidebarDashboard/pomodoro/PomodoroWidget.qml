@@ -7,6 +7,7 @@ import QtQuick.Layouts
 
 Item {
     id: root
+    property int currentTab: 0
     property var tabButtonList: [
         {"name": Translation.tr("Pomodoro"), "icon": "search_activity"},
         {"name": Translation.tr("Stopwatch"), "icon": "timer"}
@@ -15,21 +16,17 @@ Item {
     // These are keybinds for stopwatch and pomodoro
     Keys.onPressed: (event) => {
         if ((event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp) && event.modifiers === Qt.NoModifier) { // Switch tabs
-            if (event.key === Qt.Key_PageDown) {
-                tabBar.incrementCurrentIndex();
-            } else if (event.key === Qt.Key_PageUp) {
-                tabBar.decrementCurrentIndex();
-            }
+            root.currentTab = event.key === Qt.Key_PageDown ? 1 : 0;
             event.accepted = true
         } else if (event.key === Qt.Key_Space || event.key === Qt.Key_S) { // Pause/resume with Space or S
-            if (tabBar.currentIndex === 0) {
+            if (root.currentTab === 0) {
                 TimerService.togglePomodoro()
             } else {
                 TimerService.toggleStopwatch()
             }
             event.accepted = true
         } else if (event.key === Qt.Key_R) { // Reset with R
-            if (tabBar.currentIndex === 0) {
+            if (root.currentTab === 0) {
                 TimerService.resetPomodoro()
             } else {
                 TimerService.stopwatchReset()
@@ -45,27 +42,42 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        SecondaryTabBar {
-            id: tabBar
-            currentIndex: swipeView.currentIndex
+        ButtonGroup {
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+            Layout.rightMargin: 8
+            Layout.topMargin: 6
+            spacing: 4
+            uniformCellSizes: true
 
-            Repeater {
-                model: root.tabButtonList
-                delegate: SecondaryTabButton {
-                    buttonText: modelData.name
-                    buttonIcon: modelData.icon
-                }
+            SelectionGroupButton {
+                Layout.fillWidth: true
+                leftmost: true
+                toggled: root.currentTab === 0
+                buttonText: root.tabButtonList[0].name
+                buttonIcon: root.tabButtonList[0].icon
+                onClicked: root.currentTab = 0
+            }
+
+            SelectionGroupButton {
+                Layout.fillWidth: true
+                rightmost: true
+                toggled: root.currentTab === 1
+                buttonText: root.tabButtonList[1].name
+                buttonIcon: root.tabButtonList[1].icon
+                onClicked: root.currentTab = 1
             }
         }
 
         SwipeView {
             id: swipeView
-            Layout.topMargin: 10
+            Layout.topMargin: 4
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: 10
             clip: true
-            currentIndex: tabBar.currentIndex
+            currentIndex: root.currentTab
+            onCurrentIndexChanged: root.currentTab = currentIndex
 
             // Tabs
             PomodoroTimer {}

@@ -25,6 +25,7 @@ Singleton {
     property int pomodoroLapDuration: pomodoroLongBreak ? longBreakTime : pomodoroBreak ? breakTime : focusTime // This is a binding that's to be kept
     property int pomodoroSecondsLeft: pomodoroLapDuration // Reasonable init value, to be changed
     property int pomodoroCycle: Persistent.states.timer.pomodoro.cycle
+    readonly property bool pomodoroDurationEditable: !pomodoroRunning && !pomodoroBreak && pomodoroCycle === 0 && pomodoroSecondsLeft === focusTime
 
     property bool stopwatchRunning: Persistent.states.timer.stopwatch.running
     property int stopwatchTime: 0
@@ -98,6 +99,17 @@ Singleton {
         Persistent.states.timer.pomodoro.start = getCurrentTimeInSeconds();
         Persistent.states.timer.pomodoro.cycle = 0;
         refreshPomodoro();
+    }
+
+    function setFocusMinutes(value) {
+        const text = String(value).trim();
+        const minutes = Number(text);
+        if (!pomodoroDurationEditable || !/^\d+$/.test(text) || minutes < 1 || minutes > 1440)
+            return false;
+
+        Config.options.time.pomodoro.focus = minutes * 60;
+        resetPomodoro();
+        return true;
     }
 
     // Stopwatch
