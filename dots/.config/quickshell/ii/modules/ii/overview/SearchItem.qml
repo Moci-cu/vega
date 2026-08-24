@@ -16,6 +16,10 @@ RippleButton {
     property var entry
     property string query
     property bool current: false
+    readonly property string entryKey: entry?.key ?? ""
+    readonly property bool isAppResult: entryKey.startsWith("app:")
+    readonly property bool isClipboardResult: entryKey.startsWith("clipboard:")
+    readonly property bool isFileResult: entryKey.startsWith("file:")
     property bool entryShown: entry?.shown ?? true
     property string itemType: entry?.type ?? Translation.tr("App")
     property string itemName: entry?.name ?? ""
@@ -33,8 +37,8 @@ RippleButton {
     property string itemClickActionName: entry?.verb ?? "Open"
     property string bigText: entry?.iconType === LauncherSearchResult.IconType.Text ? entry?.iconName ?? "" : ""
     property string materialSymbol: entry?.iconType === LauncherSearchResult.IconType.Material ? entry?.iconName ?? "" : ""
-    property string cliphistRawString: entry?.rawValue ?? ""
-    property string filePath: Images.isValidImageByName(entry?.name) ? entry?.name : ""
+    property string cliphistRawString: isClipboardResult ? entry?.rawValue ?? "" : ""
+    property string filePath: isFileResult && Images.isValidImageByName(entry?.name) ? entry?.name : ""
     property bool blurImage: entry?.blurImage ?? false
     
     visible: root.entryShown
@@ -86,10 +90,10 @@ RippleButton {
 
         return result;
     }
-    property string displayContent: highlightContent(root.itemName, root.query)
+    property string displayContent: root.isAppResult ? root.itemName : highlightContent(root.itemName, root.query)
 
     property list<string> urls: {
-        if (!root.itemName) return [];
+        if (root.isAppResult || !root.itemName) return [];
         // Regular expression to match URLs
         const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
         const matches = root.itemName?.match(urlRegex)
@@ -222,13 +226,13 @@ RippleButton {
                 StyledText { // Item name/content
                     Layout.fillWidth: true
                     id: nameText
-                    textFormat: Text.StyledText // RichText also works, but StyledText ensures elide work
+                    textFormat: root.isAppResult ? Text.PlainText : Text.StyledText // RichText also works, but StyledText ensures elide work
                     font.pixelSize: Appearance.font.pixelSize.small
                     font.family: Appearance.font.family[root.fontType]
                     color: root.colForeground
                     horizontalAlignment: Text.AlignLeft
                     elide: Text.ElideRight
-                    text: root.selected ? root.itemName : root.displayContent
+                    text: root.selected || root.isAppResult ? root.itemName : root.displayContent
                 }
             }
             Loader { // Clipboard image preview

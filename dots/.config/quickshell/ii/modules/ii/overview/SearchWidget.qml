@@ -16,7 +16,7 @@ Item { // Wrapper
     id: root
 
     readonly property string xdgConfigHome: Directories.config
-    readonly property int typingDebounceInterval: 200
+    readonly property int typingDebounceInterval: 35
     readonly property int typingResultLimit: 15 // Should be enough to cover the whole view
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
@@ -41,14 +41,14 @@ Item { // Wrapper
     }
 
     function cancelSearch() {
+        searchBar.cancelPendingQuery();
         searchBar.searchInput.selectAll();
         LauncherSearch.query = "";
         searchBar.animateWidth = true;
     }
 
     function setSearchingText(text) {
-        searchBar.searchInput.text = text;
-        LauncherSearch.query = text;
+        searchBar.setQueryImmediately(text);
     }
 
     Keys.onPressed: event => {
@@ -137,6 +137,7 @@ Item { // Wrapper
             SearchBar {
                 id: searchBar
                 property real verticalPadding: 4
+                debounceInterval: root.typingDebounceInterval
                 Layout.fillWidth: true
                 Layout.leftMargin: 10
                 Layout.rightMargin: 4
@@ -217,8 +218,7 @@ Item { // Wrapper
                             if (LauncherSearch.results.length === 0)
                                 return;
                             const tabbedText = searchItem.modelData.name;
-                            LauncherSearch.query = tabbedText;
-                            searchBar.searchInput.text = tabbedText;
+                            searchBar.setQueryImmediately(tabbedText);
                             event.accepted = true;
                             root.focusSearchInput();
                         }

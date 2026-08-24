@@ -14,6 +14,22 @@ RowLayout {
     property bool animateWidth: false
     property alias searchInput: searchInput
     property string searchingText
+    property int debounceInterval: 35
+
+    function cancelPendingQuery() {
+        queryCommitTimer.stop();
+    }
+
+    function flushPendingQuery() {
+        queryCommitTimer.stop();
+        LauncherSearch.query = searchInput.text;
+    }
+
+    function setQueryImmediately(text) {
+        searchInput.text = text;
+        queryCommitTimer.stop();
+        LauncherSearch.query = text;
+    }
 
     function selectedEntry() {
         const selectedIndex = Math.max(0, appResults.currentIndex);
@@ -91,9 +107,13 @@ RowLayout {
             }
         }
 
-        onTextChanged: LauncherSearch.query = text
+        onTextChanged: {
+            queryCommitTimer.pendingQuery = text;
+            queryCommitTimer.restart();
+        }
 
         onAccepted: {
+            root.flushPendingQuery();
             if (appResults.count > 0) {
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
@@ -121,13 +141,20 @@ RowLayout {
                 return;
             }
             if (event.key === Qt.Key_Tab) {
+                root.flushPendingQuery();
                 if (LauncherSearch.results.length === 0) return;
                 const tabbedText = LauncherSearch.results[0].name;
-                LauncherSearch.query = tabbedText;
-                searchInput.text = tabbedText;
+                root.setQueryImmediately(tabbedText);
                 event.accepted = true;
             }
         }
+    }
+
+    Timer {
+        id: queryCommitTimer
+        property string pendingQuery: ""
+        interval: root.debounceInterval
+        onTriggered: LauncherSearch.query = pendingQuery
     }
 
     IconToolbarButton {
