@@ -159,6 +159,7 @@ Item {
             RippleButton {
                 Layout.preferredHeight: 44
                 Layout.preferredWidth: 112
+                scale: down ? 0.94 : hovered ? 1.03 : 1
                 buttonRadius: Appearance.rounding.full
                 buttonRadiusPressed: Appearance.rounding.normal
 
@@ -167,6 +168,10 @@ Item {
                 colBackground: TimerService.stopwatchRunning ? Appearance.colors.colSecondaryContainer : Appearance.colors.colPrimary 
                 colBackgroundHover: TimerService.stopwatchRunning ? Appearance.colors.colSecondaryContainerHover : Appearance.colors.colPrimaryHover 
                 colRipple: TimerService.stopwatchRunning ? Appearance.colors.colSecondaryContainerActive : Appearance.colors.colPrimaryActive 
+
+                Behavior on scale {
+                    animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+                }
 
                 contentItem: StyledText {
                     horizontalAlignment: Text.AlignHCenter
@@ -180,7 +185,9 @@ Item {
             RippleButton {
                 implicitHeight: 44
                 implicitWidth: 88
+                scale: down ? 0.92 : hovered ? 1.04 : 1
                 buttonRadius: Appearance.rounding.full
+                buttonRadiusPressed: Appearance.rounding.normal
 
                 onClicked: {
                     if (TimerService.stopwatchRunning) 
@@ -193,6 +200,10 @@ Item {
                 colBackground: Appearance.colors.colLayer2
                 colBackgroundHover: Appearance.colors.colLayer2Hover
                 colRipple: Appearance.colors.colLayer2Active
+
+                Behavior on scale {
+                    animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+                }
 
                 contentItem: StyledText {
                     horizontalAlignment: Text.AlignHCenter

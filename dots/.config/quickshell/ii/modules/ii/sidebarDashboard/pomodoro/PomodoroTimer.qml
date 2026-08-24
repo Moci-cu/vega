@@ -10,9 +10,6 @@ Item {
 
     property bool durationError: false
     readonly property bool resumeState: !TimerService.pomodoroRunning && TimerService.pomodoroSecondsLeft !== TimerService.pomodoroLapDuration
-    readonly property color heroContainer: TimerService.pomodoroBreak
-        ? Appearance.colors.colTertiaryContainer
-        : Appearance.colors.colSecondaryContainer
     readonly property color heroForeground: TimerService.pomodoroBreak
         ? Appearance.colors.colOnTertiaryContainer
         : Appearance.colors.colOnSecondaryContainer
@@ -63,23 +60,91 @@ Item {
             implicitWidth: 184
             implicitHeight: 174
 
-            MaterialShape {
-                anchors.centerIn: parent
-                width: 154
-                height: 154
-                shape: TimerService.pomodoroRunning
-                    ? MaterialShape.Shape.Cookie9Sided
-                    : MaterialShape.Shape.Cookie4Sided
-                color: root.heroContainer
-            }
+            Canvas {
+                id: progressRing
 
-            CircularProgress {
                 anchors.centerIn: parent
-                implicitSize: 174
-                lineWidth: 7
-                value: TimerService.pomodoroSecondsLeft / TimerService.pomodoroLapDuration
-                colPrimary: root.heroForeground
-                colSecondary: Appearance.colors.colLayer3
+                width: 174
+                height: 174
+
+                property real value: TimerService.pomodoroLapDuration > 0
+                    ? 1 - TimerService.pomodoroSecondsLeft / TimerService.pomodoroLapDuration
+                    : 0
+                property real animatedValue: value
+                property real wavePhase: 0
+                property real lineWidth: 7
+                property real amplitude: 4
+                property int waveCount: 12
+                property color progressColor: root.heroForeground
+                property color trackColor: Appearance.colors.colLayer3
+
+                Behavior on animatedValue {
+                    NumberAnimation {
+                        duration: 1000
+                        easing.type: Easing.Linear
+                    }
+                }
+
+                NumberAnimation on wavePhase {
+                    from: 0
+                    to: Math.PI * 2
+                    duration: 2000
+                    loops: Animation.Infinite
+                    running: TimerService.pomodoroRunning && progressRing.animatedValue > 0
+                    easing.type: Easing.Linear
+                }
+
+                onPaint: {
+                    const context = getContext("2d");
+                    const progress = Math.max(0, Math.min(1, animatedValue));
+                    const centerX = width / 2;
+                    const centerY = height / 2;
+                    const radius = Math.min(width, height) / 2 - lineWidth / 2 - amplitude - 2;
+                    const startAngle = -Math.PI / 2;
+                    const sweepAngle = Math.PI * 2 * progress;
+                    const gapAngle = Math.PI / 18;
+
+                    context.clearRect(0, 0, width, height);
+                    context.lineWidth = lineWidth;
+                    context.lineCap = "round";
+                    context.lineJoin = "round";
+
+                    context.strokeStyle = trackColor;
+                    context.beginPath();
+                    if (progress <= 0) {
+                        context.arc(centerX, centerY, radius, startAngle, startAngle + Math.PI * 2);
+                        context.closePath();
+                    } else if (Math.PI * 2 - sweepAngle > gapAngle * 2) {
+                        context.arc(centerX, centerY, radius, startAngle + sweepAngle + gapAngle, startAngle + Math.PI * 2 - gapAngle);
+                    }
+                    context.stroke();
+
+                    if (progress <= 0)
+                        return;
+
+                    const steps = Math.max(2, Math.ceil(radius * sweepAngle / 2));
+                    context.strokeStyle = progressColor;
+                    context.beginPath();
+                    for (let i = 0; i <= steps; i++) {
+                        const ratio = i / steps;
+                        const angle = startAngle + sweepAngle * ratio;
+                        const wave = Math.sin((angle - startAngle) * waveCount + wavePhase) * amplitude;
+                        const x = centerX + Math.cos(angle) * (radius + wave);
+                        const y = centerY + Math.sin(angle) * (radius + wave);
+                        if (i === 0) context.moveTo(x, y);
+                        else context.lineTo(x, y);
+                    }
+                    if (progress >= 1)
+                        context.closePath();
+                    context.stroke();
+                }
+
+                onAnimatedValueChanged: requestPaint()
+                onWavePhaseChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onProgressColorChanged: requestPaint()
+                onTrackColorChanged: requestPaint()
             }
 
             ColumnLayout {
@@ -94,18 +159,7 @@ Item {
                         return `${minutes}:${seconds}`;
                     }
                     font.pixelSize: 42
-                    font.weight: Font.Medium
-                    color: root.heroForeground
-                }
-
-                StyledText {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: TimerService.pomodoroLongBreak
-                        ? Translation.tr("Long break")
-                        : TimerService.pomodoroBreak
-                            ? Translation.tr("Break")
-                            : Translation.tr("Focus")
-                    font.pixelSize: Appearance.font.pixelSize.normal
+                    font.weight: Font.DemiBold
                     color: root.heroForeground
                 }
             }
@@ -139,6 +193,7 @@ Item {
             RippleButton {
                 implicitHeight: 46
                 implicitWidth: root.resumeState ? 46 : 156
+                scale: down ? 0.94 : hovered ? 1.03 : 1
                 buttonRadius: Appearance.rounding.full
                 buttonRadiusPressed: Appearance.rounding.normal
                 Accessible.name: root.resumeState ? Translation.tr("Resume") : TimerService.pomodoroRunning ? Translation.tr("Pause") : Translation.tr("Start")
@@ -146,6 +201,14 @@ Item {
                 colBackground: Appearance.colors.colPrimary
                 colBackgroundHover: Appearance.colors.colPrimaryHover
                 colRipple: Appearance.colors.colPrimaryActive
+
+                Behavior on implicitWidth {
+                    animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+                }
+
+                Behavior on scale {
+                    animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+                }
 
                 contentItem: Item {
                     MaterialSymbol {
@@ -183,6 +246,7 @@ Item {
             RippleButton {
                 implicitHeight: 46
                 implicitWidth: 46
+                scale: down ? 0.92 : hovered ? 1.04 : 1
                 buttonRadius: Appearance.rounding.full
                 buttonRadiusPressed: Appearance.rounding.normal
                 enabled: TimerService.pomodoroSecondsLeft < TimerService.pomodoroLapDuration
@@ -193,9 +257,17 @@ Item {
                 colBackgroundHover: Appearance.colors.colLayer2Hover
                 colRipple: Appearance.colors.colLayer2Active
 
+                Behavior on scale {
+                    animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+                }
+
                 contentItem: MaterialSymbol {
+                    anchors.fill: parent
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                     text: "restart_alt"
                     iconSize: Appearance.font.pixelSize.larger
+                    fill: 1
                     color: Appearance.colors.colOnLayer2
                 }
 
