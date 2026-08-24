@@ -75,7 +75,7 @@ PopupWindow {
             animation: Appearance.animation.elementResize.numberAnimation.createObject(tooltipRect)
         }
 
-        color: Appearance.m3colors.m3surfaceContainer
+        color: Appearance.colors.colGlassSurfaceContainer
         radius: Appearance.rounding.small
         border.width: 1
         border.color: Appearance.colors.colLayer0Border

@@ -194,7 +194,7 @@ ContentPage {
 
                                 // fix for resolution
                                 thumbnailSizeName: Images.thumbnailSizeNameForDimensions(512, 512)
-                                sourceSize: (512,512)
+                                sourceSize: Qt.size(512, 512)
                             }
                         }
                     }

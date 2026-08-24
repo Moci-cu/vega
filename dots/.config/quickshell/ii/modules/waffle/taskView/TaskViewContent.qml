@@ -237,6 +237,15 @@ Rectangle {
 
             WListView {
                 id: workspaceListView
+                readonly property var workspaceModel: {
+                    const ids = HyprlandData.workspaces
+                        .map(ws => ws.id)
+                        .filter(id => id > 0)
+                        .sort((a, b) => a - b);
+                    const uniqueIds = ids.filter((id, index) => index === 0 || id !== ids[index - 1]);
+                    const nextId = uniqueIds.length > 0 ? uniqueIds[uniqueIds.length - 1] + 1 : 1;
+                    return [...uniqueIds, nextId];
+                }
                 anchors {
                     top: parent.top
                     bottom: parent.bottom
@@ -254,7 +263,8 @@ Rectangle {
                 spacing: 4
 
                 function reposition() {
-                    positionViewAtIndex(HyprlandData.activeWorkspace.id - 1, ListView.Contain);
+                    const index = workspaceModel.indexOf(HyprlandData.activeWorkspace?.id);
+                    if (index >= 0) positionViewAtIndex(index, ListView.Contain);
                 }
 
                 Connections {
@@ -263,18 +273,13 @@ Rectangle {
                         workspaceListView.reposition();
                     }
                 }
-                model: IndexModel {
-                    id: workspaceIndexModel
-                    count: {
-                        const maxWorkspaceId = Math.max.apply(null, HyprlandData.workspaces.map(ws => ws.id));
-                        return Math.max(maxWorkspaceId, 1) + 1;
-                    }
-                }
+                model: workspaceListView.workspaceModel
                 delegate: TaskViewWorkspace {
                     id: workspaceItem
                     required property int index
-                    workspace: index + 1
-                    newWorkspace: index == workspaceIndexModel.count - 1
+                    required property int modelData
+                    workspace: modelData
+                    newWorkspace: index == workspaceListView.workspaceModel.length - 1
 
                     droppable: root.hoveredWorkspace === workspaceItem
                     DropArea {

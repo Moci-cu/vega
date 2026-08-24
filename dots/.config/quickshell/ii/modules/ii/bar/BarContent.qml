@@ -75,7 +75,7 @@ Item { // Bar content region
             fill: parent
             margins: Config.options.bar.cornerStyle === 1 ? (Appearance.sizes.hyprlandGapsOut) : 0 // idk why but +1 is needed
         }
-        color: root.showBarBackground ? Appearance.colors.colLayer0 : "transparent"
+        color: root.showBarBackground ? Appearance.colors.colGlassSurface : "transparent"
         radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
         border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
         border.color: root.showBarBackground ? Appearance.colors.colLayer0Border : "transparent"

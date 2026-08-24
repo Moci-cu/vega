@@ -1,6 +1,6 @@
 import qs.services
 import qs.modules.common
-import qs.modules.common.widgets
+import qs.modules.common.widgets as CommonWidgets
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -37,7 +37,7 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        ButtonGroup {
+        CommonWidgets.ButtonGroup {
             Layout.fillWidth: true
             Layout.leftMargin: 8
             Layout.rightMargin: 8
@@ -45,7 +45,7 @@ Item {
             spacing: 4
             uniformCellSizes: true
 
-            SelectionGroupButton {
+            CommonWidgets.SelectionGroupButton {
                 Layout.fillWidth: true
                 leftmost: true
                 toggled: swipeView.currentIndex === 0
@@ -54,7 +54,7 @@ Item {
                 onClicked: swipeView.currentIndex = 0
             }
 
-            SelectionGroupButton {
+            CommonWidgets.SelectionGroupButton {
                 Layout.fillWidth: true
                 rightmost: true
                 toggled: swipeView.currentIndex === 1

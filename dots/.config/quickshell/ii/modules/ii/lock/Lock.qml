@@ -44,6 +44,7 @@ LockScreen {
             if (GlobalStates.screenLocked) {
                 // Lock: save workspace per monitor and move all to temp workspace in one batch
                 var next = {}
+                var temporaryWorkspaceIds = []
                 var batch = "keyword animation workspaces,1,7,menu_decel,slidevert; "
                 for (var i = 0; i < Quickshell.screens.length; ++i) {
                     var mon = Quickshell.screens[i].name
@@ -53,9 +54,12 @@ LockScreen {
                     }
                     var ws = (mData?.activeWorkspace?.id ?? 1)
                     next[mon] = ws
-                    batch += `hyprctl dispatch 'hl.dsp.focus({monitor="${mon}"})'; hyprctl dispatch 'hl.dsp.focus({workspace=${2147483647 - ws}})';`
+                    var temporaryWorkspaceId = 2147483647 - ws
+                    temporaryWorkspaceIds.push(temporaryWorkspaceId)
+                    batch += `hyprctl dispatch 'hl.dsp.focus({monitor="${mon}"})'; hyprctl dispatch 'hl.dsp.focus({workspace=${temporaryWorkspaceId}})';`
                 }
                 root.savedWorkspaces = next
+                GlobalStates.lockTemporaryWorkspaceIds = temporaryWorkspaceIds
                 Quickshell.execDetached(["bash", "-c", batch])
             } else {
                 restoreTimer.start()

@@ -30,8 +30,10 @@ Item {
     }
 
     function adjustDuration(delta) {
-        const entered = Number(durationField.text);
-        const current = isNaN(entered) ? Math.floor(TimerService.focusTime / 60) : entered;
+        const raw = durationField.text.trim();
+        const entered = Number(raw);
+        const current = (raw.length === 0 || !isFinite(entered))
+            ? Math.floor(TimerService.focusTime / 60) : entered;
         durationField.text = Math.max(1, Math.min(1440, current + delta)).toString();
         applyDuration();
     }

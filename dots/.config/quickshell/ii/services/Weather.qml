@@ -15,6 +15,8 @@ Singleton {
     readonly property string city: Config.options.bar.weather.city
     readonly property bool useUSCS: Config.options.bar.weather.useUSCS
     property bool gpsActive: Config.options.bar.weather.enableGPS
+    property bool loading: false
+    property var hourlyForecast: []
 
     onUseUSCSChanged: {
         root.getData();
@@ -80,9 +82,11 @@ Singleton {
         }
         temp.lastRefresh = DateTime.time + " • " + DateTime.date;
         root.data = temp;
+        root.hourlyForecast = data?.hourly || [];
     }
 
     function getData() {
+        root.loading = true;
         let command = "curl -s wttr.in";
 
         if (root.gpsActive && root.location.valid) {
@@ -94,8 +98,7 @@ Singleton {
         // format as json
         command += "?format=j1";
         command += " | ";
-        // only take the current weather, location, asytronmy data
-        command += "jq '{current: .current_condition[0], location: .nearest_area[0], astronomy: .weather[0].astronomy[0]}'";
+        command += "jq '{current: .current_condition[0], location: .nearest_area[0], astronomy: .weather[0].astronomy[0], hourly: [(.weather[0].hourly // [])[], (.weather[1].hourly // [])[] | {time: .time, tempC: .tempC, tempF: .tempF, code: .weatherCode}]}'";
         fetcher.command[2] = command;
         fetcher.running = true;
     }
@@ -155,8 +158,10 @@ Singleton {
         command: ["bash", "-c", ""]
         stdout: StdioCollector {
             onStreamFinished: {
-                if (text.length === 0)
+                if (text.length === 0) {
+                    root.loading = false;
                     return;
+                }
                 try {
                     const parsedData = JSON.parse(text);
                     root.refineData(parsedData);
@@ -164,6 +169,7 @@ Singleton {
                 } catch (e) {
                     console.error(`[WeatherService] ${e.message}`);
                 }
+                root.loading = false;
             }
         }
     }

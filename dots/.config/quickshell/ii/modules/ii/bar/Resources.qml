@@ -7,8 +7,6 @@ MouseArea {
     id: root
     implicitWidth: rowLayout.implicitWidth + rowLayout.anchors.leftMargin + rowLayout.anchors.rightMargin
     implicitHeight: Appearance.sizes.barHeight
-    hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
     Component.onCompleted: ResourceUsage.activeInstances++
     Component.onDestruction: ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
 
@@ -52,9 +50,5 @@ MouseArea {
             warningThreshold: Config.options.bar.resources.swapWarningThreshold
         }
 
-    }
-
-    ResourcesPopup {
-        hoverTarget: root
     }
 }

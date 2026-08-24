@@ -101,17 +101,14 @@ Item { // Wrapper
         }
     }
 
-    StyledRectangularShadow {
-        target: searchWidgetContent
-    }
-
     Rectangle { // Background
         id: searchWidgetContent
         clip: true
         implicitWidth: gridLayout.implicitWidth
         implicitHeight: gridLayout.implicitHeight
         radius: Config.options.appearance.sharpMode ? 0 : searchBar.height / 2 + searchBar.verticalPadding
-        color: Appearance.colors.colBackgroundSurfaceContainer
+        color: Appearance.colors.colGlassSurfaceContainer
+        antialiasing: true
 
         Behavior on implicitHeight {
             id: searchHeightBehavior

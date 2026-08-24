@@ -33,6 +33,9 @@ Singleton {
     property real autoContentTransparency: 0.9
     property real backgroundTransparency: Config?.options.appearance.transparency.enable ? Config?.options.appearance.transparency.automatic ? autoBackgroundTransparency : Config?.options.appearance.transparency.backgroundTransparency : 0
     property real contentTransparency: Config?.options.appearance.transparency.automatic ? autoContentTransparency : Config?.options.appearance.transparency.contentTransparency
+    property real functionalSurfaceTransparency: Config?.options.appearance.transparency.enable
+        ? (Config?.options.appearance.transparency.automatic ? 0.26 : backgroundTransparency)
+        : 0
 
     m3colors: QtObject {
         property bool darkmode: true
@@ -113,6 +116,8 @@ Singleton {
         // Layer 0
         property color colLayer0Base: ColorUtils.mix(m3colors.m3background, m3colors.m3primary, Config.options.appearance.extraBackgroundTint ? 0.99 : 1)
         property color colLayer0: ColorUtils.transparentize(colLayer0Base, root.backgroundTransparency)
+        property color colGlassSurface: ColorUtils.transparentize(colLayer0Base, root.functionalSurfaceTransparency)
+        property color colGlassSurfaceContainer: ColorUtils.transparentize(m3colors.m3surfaceContainer, root.functionalSurfaceTransparency)
         property color colOnLayer0: m3colors.m3onBackground
         property color colLayer0Hover: ColorUtils.transparentize(ColorUtils.mix(colLayer0, colOnLayer0, 0.9, root.contentTransparency))
         property color colLayer0Active: ColorUtils.transparentize(ColorUtils.mix(colLayer0, colOnLayer0, 0.8, root.contentTransparency))

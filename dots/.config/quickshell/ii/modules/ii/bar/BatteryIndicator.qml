@@ -15,8 +15,6 @@ MouseArea {
     implicitWidth: batteryProgress.implicitWidth
     implicitHeight: Appearance.sizes.barHeight
 
-    hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
     ClippedProgressBar {
         id: batteryProgress
         anchors.centerIn: parent
@@ -53,10 +51,5 @@ MouseArea {
                 }
             }
         }
-    }
-
-    BatteryPopup {
-        id: batteryPopup
-        hoverTarget: root
     }
 }

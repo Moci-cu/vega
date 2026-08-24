@@ -106,7 +106,7 @@ Loader {
             id: menuContent
             property real menuMargin: 8
             anchors.centerIn: parent
-            color: Appearance.m3colors.m3surfaceContainer
+            color: Appearance.colors.colGlassSurfaceContainer
             radius: Appearance.rounding.normal
 
             implicitWidth: menuColumn.implicitWidth + (headerRow.Layout.leftMargin * 2) + (menuMargin * 2)

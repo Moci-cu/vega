@@ -16,8 +16,6 @@ MouseArea {
     implicitHeight: rowLayout.implicitHeight + 10 * 2
 
     acceptedButtons: Qt.LeftButton | Qt.RightButton
-    hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
     onPressed: {
         if (mouse.button === Qt.RightButton) {
             Weather.getData();
@@ -52,10 +50,5 @@ MouseArea {
             text: Weather.data?.temp ?? "--°"
             Layout.alignment: root.vertical ? Qt.AlignHCenter : Qt.AlignVCenter
         }
-    }
-
-    WeatherPopup {
-        compact: Config.options.bar.tooltips.compactPopups
-        hoverTarget: root
     }
 }

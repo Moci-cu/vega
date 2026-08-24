@@ -113,16 +113,13 @@ MouseArea { // Notification group area
         }
     }
 
-    StyledRectangularShadow {
-        target: background
-        visible: popup
-    }
     Rectangle { // Background of the notification
         id: background
         anchors.left: parent.left
         width: parent.width
-        color: popup ? Appearance.colors.colBackgroundSurfaceContainer : Appearance.colors.colLayer2
+        color: popup ? Appearance.colors.colGlassSurfaceContainer : Appearance.colors.colLayer2
         radius: Appearance.rounding.normal
+        antialiasing: true
         anchors.leftMargin: root.xOffset
 
         Behavior on anchors.leftMargin {

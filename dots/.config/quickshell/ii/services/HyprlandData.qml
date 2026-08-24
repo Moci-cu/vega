@@ -1,6 +1,7 @@
 pragma Singleton
 pragma ComponentBehavior: Bound
 
+import qs
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -82,13 +83,22 @@ Singleton {
         });
     }
 
-    function requestRefresh(categories) {
+    function markDirty(categories) {
         if (categories.clients) root.clientsDirty = true;
         if (categories.monitors) root.monitorsDirty = true;
         if (categories.layers) root.layersDirty = true;
         if (categories.workspaces) root.workspacesDirty = true;
         if (categories.activeWorkspace) root.activeWorkspaceDirty = true;
+    }
+
+    function requestRefresh(categories) {
+        root.markDirty(categories);
         if (!refreshCoalesceTimer.running) refreshCoalesceTimer.start();
+    }
+
+    function retryRefresh(categories) {
+        root.markDirty(categories);
+        if (!refreshRetryTimer.running) refreshRetryTimer.start();
     }
 
     function flushRefreshes() {
@@ -197,6 +207,13 @@ Singleton {
         onTriggered: root.flushRefreshes()
     }
 
+    Timer {
+        id: refreshRetryTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.flushRefreshes()
+    }
+
     Connections {
         target: Hyprland
 
@@ -211,6 +228,14 @@ Singleton {
         required property string request
         property bool running: false
         signal completed(var response)
+        signal failed()
+
+        function fail() {
+            if (!running) return;
+            running = false;
+            connected = false;
+            failed();
+        }
 
         path: Hyprland.requestSocketPath
         onRunningChanged: {
@@ -227,21 +252,15 @@ Singleton {
                 write(`j/${request}`);
                 flush();
             } else if (!connected && running) {
-                running = false;
+                fail();
             }
         }
 
-        onError: {
-            running = false;
-            connected = false;
-        }
+        onError: fail()
 
         property Timer requestTimeout: Timer {
             interval: 3000
-            onTriggered: {
-                requestSocket.running = false;
-                requestSocket.connected = false;
-            }
+            onTriggered: requestSocket.fail()
         }
 
         parser: StdioCollector {
@@ -263,6 +282,7 @@ Singleton {
     HyprlandJsonRequest {
         id: getClients
         request: "clients"
+        onFailed: root.retryRefresh({ clients: true })
         onCompleted: response => {
             root.windowList = response;
             let tempWinByAddress = {};
@@ -279,6 +299,7 @@ Singleton {
     HyprlandJsonRequest {
         id: getMonitors
         request: "monitors"
+        onFailed: root.retryRefresh({ monitors: true })
         onCompleted: response => {
             root.monitors = response;
             if (root.monitorsDirty) refreshCoalesceTimer.restart();
@@ -288,6 +309,7 @@ Singleton {
     HyprlandJsonRequest {
         id: getLayers
         request: "layers"
+        onFailed: root.retryRefresh({ layers: true })
         onCompleted: response => {
             root.layers = response;
             if (root.layersDirty) refreshCoalesceTimer.restart();
@@ -297,9 +319,9 @@ Singleton {
     HyprlandJsonRequest {
         id: getWorkspaces
         request: "workspaces"
+        onFailed: root.retryRefresh({ workspaces: true })
         onCompleted: response => {
-            // Filter out invalid workspace ids (e.g. lock-screen temp workspace 2147483647 - N)
-            root.workspaces = response.filter(ws => ws.id >= 1 && ws.id <= 100);
+            root.workspaces = response.filter(ws => !GlobalStates.lockTemporaryWorkspaceIds.includes(ws.id));
             let tempWorkspaceById = {};
             for (var i = 0; i < root.workspaces.length; ++i) {
                 var ws = root.workspaces[i];
@@ -314,6 +336,7 @@ Singleton {
     HyprlandJsonRequest {
         id: getActiveWorkspace
         request: "activeworkspace"
+        onFailed: root.retryRefresh({ activeWorkspace: true })
         onCompleted: response => {
             root.activeWorkspace = response;
             if (root.activeWorkspaceDirty) refreshCoalesceTimer.restart();

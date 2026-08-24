@@ -23,9 +23,6 @@ Item {
     implicitWidth: Appearance.sizes.osdWidth + 2 * Appearance.sizes.elevationMargin
     implicitHeight: valueIndicator.implicitHeight + 2 * Appearance.sizes.elevationMargin
 
-    StyledRectangularShadow {
-        target: valueIndicator
-    }
     Rectangle {
         id: valueIndicator
         anchors {
@@ -33,7 +30,8 @@ Item {
             margins: Appearance.sizes.elevationMargin
         }
         radius: Appearance.rounding.full
-        color: Appearance.m3colors.m3surfaceContainer
+        color: Appearance.colors.colGlassSurfaceContainer
+        antialiasing: true
 
         implicitWidth: valueRow.implicitWidth
         implicitHeight: valueRow.implicitHeight

@@ -66,6 +66,16 @@ Scope { // Scope
         else root.pin = !root.pin;
     }
 
+    function toggleSystemGlance() {
+        if (GlobalStates.sidebarLeftOpen && root.sidebarContent?.systemGlanceActive) {
+            GlobalStates.sidebarLeftOpen = false;
+            return;
+        }
+
+        root.sidebarContent?.showSystemGlance();
+        GlobalStates.sidebarLeftOpen = true;
+    }
+
     Component.onCompleted: {
         root.sidebarContent = contentComponent.createObject(null, {
             "scopeRoot": root,
@@ -134,7 +144,7 @@ Scope { // Scope
             }
 
             Component.onCompleted: {
-                if (GlobalStates.sidebarLeftOpen)
+                if (GlobalStates.sidebarLeftOpen && !root.pin)
                     GlobalFocusGrab.addDismissable(panelWindow);
             }
 
@@ -398,6 +408,13 @@ Scope { // Scope
         onPressed: {
             GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
         }
+    }
+
+    GlobalShortcut {
+        name: "sidebarSystemGlanceToggle"
+        description: "Toggles the system glance tab on press"
+
+        onPressed: root.toggleSystemGlance()
     }
 
     GlobalShortcut {

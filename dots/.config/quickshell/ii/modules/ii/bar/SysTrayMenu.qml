@@ -72,7 +72,7 @@ PopupWindow {
                 margins: root.padding
             }
 
-            color: Appearance.colors.colLayer0
+            color: Appearance.colors.colGlassSurface
             radius: Appearance.rounding.windowRounding
             border.width: 1
             border.color: Appearance.colors.colLayer0Border
