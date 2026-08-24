@@ -134,7 +134,19 @@ hl.bind("SUPER + SHIFT + ALT + Q", hl.dsp.exec_cmd("hyprctl kill"), { descriptio
 hl.bind("SUPER + Semicolon", hl.dsp.layout("splitratio -0.1"), { repeating = true })
 hl.bind("SUPER + Apostrophe", hl.dsp.layout("splitratio +0.1"), { repeating = true })
 --# Positioning mode
-hl.bind("SUPER + ALT + Space", hl.dsp.window.float({ action = "toggle" }), { description = "Window: Float/Tile" })
+hl.bind("SUPER + ALT + Space", function()
+    hl.dispatch(hl.dsp.window.float({ action = "set" }))
+    hl.dispatch(hl.dsp.window.resize({ x = 1100, y = 750, relative = false }))
+    hl.dispatch(hl.dsp.window.center())
+end, { description = "Window: Float at settings size" })
+hl.bind("SUPER + ALT + H", hl.dsp.window.resize({ x = -50, y = 0, relative = true }),
+    { repeating = true, description = "Window: Resize left" })
+hl.bind("SUPER + ALT + J", hl.dsp.window.resize({ x = 0, y = 50, relative = true }),
+    { repeating = true, description = "Window: Resize down" })
+hl.bind("SUPER + ALT + K", hl.dsp.window.resize({ x = 0, y = -50, relative = true }),
+    { repeating = true, description = "Window: Resize up" })
+hl.bind("SUPER + ALT + L", hl.dsp.window.resize({ x = 50, y = 0, relative = true }),
+    { repeating = true, description = "Window: Resize right" })
 hl.bind("SUPER + D", hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }),
     { description = "Window: Maximize" })
 hl.bind("SUPER + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }),
