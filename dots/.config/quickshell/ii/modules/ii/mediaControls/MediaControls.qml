@@ -23,6 +23,8 @@ Scope {
     readonly property real widgetHeight: Appearance.sizes.mediaControlsHeight
     property real popupRounding: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
     property list<real> visualizerPoints: []
+    property bool surfaceShown: GlobalStates.mediaControlsOpen
+    property bool contentLoaded: GlobalStates.mediaControlsOpen
 
     function filterDuplicatePlayers(players) {
         let filtered = [];
@@ -55,7 +57,7 @@ Scope {
 
     Process {
         id: cavaProc
-        running: mediaControlsLoader.active
+        running: GlobalStates.mediaControlsOpen
         onRunningChanged: {
             if (!cavaProc.running) {
                 root.visualizerPoints = [];
@@ -71,9 +73,27 @@ Scope {
         }
     }
 
+    Connections {
+        target: GlobalStates
+        function onMediaControlsOpenChanged() {
+            if (GlobalStates.mediaControlsOpen) {
+                mediaUnloadTimer.stop();
+                root.contentLoaded = true;
+                Qt.callLater(() => {
+                    if (GlobalStates.mediaControlsOpen)
+                        root.surfaceShown = true;
+                });
+                return;
+            }
+
+            root.surfaceShown = false;
+            mediaUnloadTimer.restart();
+        }
+    }
+
     Loader {
         id: mediaControlsLoader
-        active: GlobalStates.mediaControlsOpen
+        active: root.contentLoaded
         onActiveChanged: {
             if (!mediaControlsLoader.active && root.realPlayers.length === 0) {
                 GlobalStates.mediaControlsOpen = false;
@@ -139,14 +159,24 @@ Scope {
             }
 
             mask: Region {
-                item: playerColumnLayout
+                item: GlobalStates.mediaControlsOpen ? playerColumnLayout : null
             }
 
             Component.onCompleted: {
-                GlobalFocusGrab.addDismissable(panelWindow);
+                if (GlobalStates.mediaControlsOpen)
+                    GlobalFocusGrab.addDismissable(panelWindow);
             }
             Component.onDestruction: {
                 GlobalFocusGrab.removeDismissable(panelWindow);
+            }
+            Connections {
+                target: GlobalStates
+                function onMediaControlsOpenChanged() {
+                    if (GlobalStates.mediaControlsOpen)
+                        GlobalFocusGrab.addDismissable(panelWindow);
+                    else
+                        GlobalFocusGrab.removeDismissable(panelWindow);
+                }
             }
             Connections {
                 target: GlobalFocusGrab
@@ -159,6 +189,34 @@ Scope {
                 id: playerColumnLayout
                 anchors.fill: parent
                 spacing: -Appearance.sizes.elevationMargin // Shadow overlap okay
+
+                transform: Translate {
+                    x: {
+                        if (root.surfaceShown || !Config.options.bar.vertical)
+                            return 0;
+                        return Config.options.bar.bottom ? playerColumnLayout.width : -playerColumnLayout.width;
+                    }
+                    y: {
+                        if (root.surfaceShown || Config.options.bar.vertical)
+                            return 0;
+                        return Config.options.bar.bottom ? playerColumnLayout.height : -playerColumnLayout.height;
+                    }
+
+                    Behavior on x {
+                        NumberAnimation {
+                            duration: root.surfaceShown ? Appearance.animation.elementMoveEnter.duration : Appearance.animation.elementMoveExit.duration
+                            easing.type: root.surfaceShown ? Appearance.animation.elementMoveEnter.type : Appearance.animation.elementMoveExit.type
+                            easing.bezierCurve: root.surfaceShown ? Appearance.animation.elementMoveEnter.bezierCurve : Appearance.animation.elementMoveExit.bezierCurve
+                        }
+                    }
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: root.surfaceShown ? Appearance.animation.elementMoveEnter.duration : Appearance.animation.elementMoveExit.duration
+                            easing.type: root.surfaceShown ? Appearance.animation.elementMoveEnter.type : Appearance.animation.elementMoveExit.type
+                            easing.bezierCurve: root.surfaceShown ? Appearance.animation.elementMoveEnter.bezierCurve : Appearance.animation.elementMoveExit.bezierCurve
+                        }
+                    }
+                }
 
                 Repeater {
                     model: ScriptModel {
@@ -196,7 +254,7 @@ Scope {
                     Rectangle {
                         id: placeholderBackground
                         anchors.centerIn: parent
-                        color: Appearance.colors.colLayer0
+                        color: Appearance.colors.colGlassSurface
                         radius: root.popupRounding
                         property real padding: 20
                         implicitWidth: placeholderLayout.implicitWidth + padding * 2
@@ -222,21 +280,30 @@ Scope {
         }
     }
 
+    Timer {
+        id: mediaUnloadTimer
+        interval: Appearance.animation.elementMoveExit.duration
+        onTriggered: {
+            if (!GlobalStates.mediaControlsOpen)
+                root.contentLoaded = false;
+        }
+    }
+
     IpcHandler {
         target: "mediaControls"
 
         function toggle(): void {
-            mediaControlsLoader.active = !mediaControlsLoader.active;
-            if (mediaControlsLoader.active)
+            GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen;
+            if (GlobalStates.mediaControlsOpen)
                 Notifications.timeoutAll();
         }
 
         function close(): void {
-            mediaControlsLoader.active = false;
+            GlobalStates.mediaControlsOpen = false;
         }
 
         function open(): void {
-            mediaControlsLoader.active = true;
+            GlobalStates.mediaControlsOpen = true;
             Notifications.timeoutAll();
         }
     }
