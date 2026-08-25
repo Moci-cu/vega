@@ -140,8 +140,6 @@ hl.layer_rule({ match = { namespace = "osk[0-9]*" }, ignore_alpha = 0.6})
 
 -- Quickshell
 -- Quickshell: illogical-impulse
-hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur_popups = true})
-hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur = true})
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.2})
 hl.layer_rule({ match = { namespace = "quickshell:bar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:actionCenter" }, no_anim = true})
@@ -168,7 +166,6 @@ hl.layer_rule({ match = { namespace = "quickshell:mediaControls" }, ignore_alpha
 hl.layer_rule({ match = { namespace = "quickshell:reloadPopup" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:regionSelector" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:screenshot" }, no_anim = true})
-hl.layer_rule({ match = { namespace = "quickshell:session" }, blur = true})
 hl.layer_rule({ match = { namespace = "quickshell:session" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:session" }, ignore_alpha = 0})
 hl.layer_rule({ match = { namespace = "quickshell:sidebarRight" }, animation = "slide right"})

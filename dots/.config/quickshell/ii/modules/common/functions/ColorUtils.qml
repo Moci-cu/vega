@@ -150,14 +150,59 @@ Singleton {
      * @returns {string} The hex color ("#FFFFFF" or "#000000") that ensures high contrast.
      */
     function getContrastingTextColor(bgColor) {
-        let color = Qt.color(bgColor);
+        const luminance = getRelativeLuminance(bgColor);
+        return luminance < 0.179 ? "#FFFFFF" : "#000000";
+    }
+
+    function getRelativeLuminance(colorValue) {
+        const color = Qt.color(colorValue);
         // Calculate relative luminance using WCAG formula
         let r = color.r <= 0.03928 ? color.r / 12.92 : Math.pow((color.r + 0.055) / 1.055, 2.4);
         let g = color.g <= 0.03928 ? color.g / 12.92 : Math.pow((color.g + 0.055) / 1.055, 2.4);
         let b = color.b <= 0.03928 ? color.b / 12.92 : Math.pow((color.b + 0.055) / 1.055, 2.4);
-        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        // Return high contrast color
-        return luminance < 0.5 ? "#FFFFFF" : "#000000";
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    function getContrastRatio(firstColor, secondColor) {
+        const first = getRelativeLuminance(firstColor);
+        const second = getRelativeLuminance(secondColor);
+        return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    }
+
+    function getTonalPalette(bgColor, sampleColors = [bgColor], accentColor = bgColor, minContrast = 4.5) {
+        const background = Qt.color(bgColor);
+        const accent = Qt.color(accentColor);
+        const source = background.hslSaturation >= 0.08 ? background : accent;
+        const hue = isFinite(source.hslHue) && source.hslHue >= 0 ? source.hslHue : 0.76;
+        const saturation = Math.max(0.52, Math.min(0.78, source.hslSaturation));
+        const dark = Qt.hsla(hue, saturation, 0.126, 1);
+        const light = Qt.hsla(hue, saturation, 0.93, 1);
+        const samples = sampleColors?.length > 0 ? sampleColors : [background];
+        const darkContrasts = samples.map(color => getContrastRatio(dark, color));
+        const lightContrasts = samples.map(color => getContrastRatio(light, color));
+        const middle = Math.floor(samples.length / 2);
+        const darkMedian = darkContrasts.slice().sort((a, b) => a - b)[middle];
+        const lightMedian = lightContrasts.slice().sort((a, b) => a - b)[middle];
+        const darkMinimum = Math.min(...darkContrasts);
+        const lightMinimum = Math.min(...lightContrasts);
+        const useDark = darkMedian === lightMedian ? darkMinimum >= lightMinimum : darkMedian > lightMedian;
+        const foreground = useDark ? dark : light;
+        const minimumContrast = useDark ? darkMinimum : lightMinimum;
+
+        return {
+            foreground,
+            haloEnabled: minimumContrast < minContrast,
+            haloColor: Qt.rgba(1, 1, 1, 0.18),
+            minimumContrast
+        };
+    }
+
+    /**
+     * Builds a chromatic foreground from a background/accent pair.
+     * Uses dark tone on light backgrounds and pastel tone on dark backgrounds.
+     */
+    function getTonalForeground(bgColor, accentColor = bgColor) {
+        return getTonalPalette(bgColor, [bgColor], accentColor).foreground;
     }
 
     /**

@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import qs.modules.common.functions
+import qs.services
 pragma Singleton
 pragma ComponentBehavior: Bound
 
@@ -24,7 +26,148 @@ Singleton {
         depth: 0 // 2^0 = 1 color
         rescaleSize: 10
     }
+    property color wallpaperColor: wallColorQuant.colors[0] ?? m3colors.m3primary
+    property string wallpaperSamplePath: FileUtils.trimFileProtocol(wallColorQuant.source.toString())
+    readonly property int barSampleColumns: 384
+    readonly property int barSampleRows: 64
+    property int wallpaperSampleWidth: 1
+    property int wallpaperSampleHeight: 1
+    property var barBackgroundSamples: Array(barSampleColumns * barSampleRows).fill(wallpaperColor)
     property real wallpaperVibrancy: (wallColorQuant.colors[0]?.hslSaturation + wallColorQuant.colors[0]?.hslLightness) / 2
+
+    function barWorkspaceValue(workspaceId) {
+        const workspacesShown = Config.options.bar.workspaces.shown || 10;
+        const id = workspaceId ?? 1;
+        const workspaceLower = Math.floor((id - 1) / workspacesShown) * workspacesShown;
+        return (id - workspaceLower) / workspacesShown;
+    }
+
+    function barWallpaperGeometry(screen, workspaceValue, sidebarBalance) {
+        const screenWidth = screen?.width ?? 0;
+        const screenHeight = screen?.height ?? 0;
+        if (screenWidth <= 0 || screenHeight <= 0 || wallpaperSampleWidth <= 0 || wallpaperSampleHeight <= 0)
+            return null;
+
+        const imageToScreenRatio = Math.min(wallpaperSampleWidth / screenWidth, wallpaperSampleHeight / screenHeight);
+        const wallpaperScale = wallpaperSampleWidth <= screenWidth || wallpaperSampleHeight <= screenHeight
+            ? Math.max(screenWidth / wallpaperSampleWidth, screenHeight / wallpaperSampleHeight)
+            : Math.min(Config.options.background.parallax.workspaceZoom, wallpaperSampleWidth / screenWidth, wallpaperSampleHeight / screenHeight);
+        const displayWidth = wallpaperSampleWidth / imageToScreenRatio * wallpaperScale;
+        const displayHeight = wallpaperSampleHeight / imageToScreenRatio * wallpaperScale;
+        const movableXSpace = (displayWidth - screenWidth) / 2;
+        const movableYSpace = (displayHeight - screenHeight) / 2;
+        const verticalParallax = (Config.options.background.parallax.autoVertical && wallpaperSampleHeight > wallpaperSampleWidth)
+            || Config.options.background.parallax.vertical;
+        const effectiveWorkspaceValue = Config.options.background.parallax.enableWorkspace
+            ? workspaceValue ?? 0.5
+            : 0.5;
+        const sidebarOffset = Config.options.background.parallax.enableSidebar
+            ? 0.15 * sidebarBalance
+            : 0;
+        const effectiveValueX = Math.max(0, Math.min(1, verticalParallax ? 0.5 : effectiveWorkspaceValue)) + sidebarOffset;
+        const effectiveValueY = Config.options.background.parallax.enableWorkspace && verticalParallax
+            ? Math.max(0, Math.min(1, effectiveWorkspaceValue))
+            : 0.5;
+
+        return {
+            screenWidth,
+            screenHeight,
+            displayWidth,
+            displayHeight,
+            wallpaperX: -movableXSpace - (effectiveValueX - 0.5) * 2 * movableXSpace,
+            wallpaperY: -movableYSpace - (effectiveValueY - 0.5) * 2 * movableYSpace,
+            itemScale: Config.options.overview.scrollingStyle.zoomStyle === "in" ? 1.04 : 1
+        };
+    }
+
+    function barWallpaperSourceRect(x, y, width, height, screen, workspaceValue, sidebarBalance) {
+        const geometry = barWallpaperGeometry(screen, workspaceValue, sidebarBalance);
+        if (!geometry) return Qt.rect(0, 0, 1, 1);
+
+        const localX = geometry.screenWidth / 2 + (x - geometry.screenWidth / 2) / geometry.itemScale;
+        const localY = geometry.screenHeight / 2 + (y - geometry.screenHeight / 2) / geometry.itemScale;
+        return Qt.rect(
+            (localX - geometry.wallpaperX) / geometry.displayWidth,
+            (localY - geometry.wallpaperY) / geometry.displayHeight,
+            width / geometry.itemScale / geometry.displayWidth,
+            height / geometry.itemScale / geometry.displayHeight
+        );
+    }
+
+    function barPaletteAt(x, sampleWidth, screen, workspaceValue, sidebarBalance) {
+        if (LyricsService.mediaModeOpenCount > 0) {
+            return {
+                foreground: "#FFFFFF",
+                haloEnabled: false,
+                haloColor: "transparent",
+                minimumContrast: 21,
+                sampleCount: 0,
+                centerColumn: -1
+            };
+        }
+
+        const geometry = barWallpaperGeometry(screen, workspaceValue, sidebarBalance);
+        if (!geometry || barBackgroundSamples.length === 0) {
+            const fallback = ColorUtils.getTonalPalette(wallpaperColor, [wallpaperColor], m3colors.m3primary);
+            fallback.sampleCount = 1;
+            fallback.centerColumn = -1;
+            return fallback;
+        }
+
+        const localX = geometry.screenWidth / 2 + (x - geometry.screenWidth / 2) / geometry.itemScale;
+        const localY = geometry.screenHeight / 2 + (root.sizes.barHeight / 2 - geometry.screenHeight / 2) / geometry.itemScale;
+        const centerSourceX = Math.max(0, Math.min(1, (localX - geometry.wallpaperX) / geometry.displayWidth));
+        const centerColumn = Math.min(barSampleColumns - 1, Math.floor(centerSourceX * barSampleColumns));
+        const sourceY = Math.max(0, Math.min(1, (localY - geometry.wallpaperY) / geometry.displayHeight));
+        const row = Math.min(barSampleRows - 1, Math.floor(sourceY * barSampleRows));
+        const patchWidth = Math.max(16, Math.min(64, Number(sampleWidth) || 16));
+        const offsets = [-0.5, -0.25, 0, 0.25, 0.5];
+        const samples = offsets.map(offset => {
+            const sourceX = Math.max(0, Math.min(1, (localX + offset * patchWidth / geometry.itemScale - geometry.wallpaperX) / geometry.displayWidth));
+            const column = Math.min(barSampleColumns - 1, Math.floor(sourceX * barSampleColumns));
+            return barBackgroundSamples[row * barSampleColumns + column] ?? wallpaperColor;
+        });
+        const palette = ColorUtils.getTonalPalette(samples[2], samples, m3colors.m3primary);
+        palette.sampleCount = samples.length;
+        palette.centerColumn = centerColumn;
+        return palette;
+    }
+
+    function barForegroundAt(x, screen, workspaceId, sidebarBalance, sampleWidth = 16) {
+        return barPaletteAt(x, sampleWidth, screen, barWorkspaceValue(workspaceId), sidebarBalance).foreground;
+    }
+
+    onWallpaperSamplePathChanged: barColorSampleTimer.restart()
+    Component.onCompleted: barColorSampleTimer.restart()
+
+    Timer {
+        id: barColorSampleTimer
+        interval: 50
+        onTriggered: {
+            barColorSampler.running = false;
+            if (root.wallpaperSamplePath !== "") barColorSampler.running = true;
+        }
+    }
+
+    Process {
+        id: barColorSampler
+        command: [
+            "magick", root.wallpaperSamplePath,
+            "-print", "%w %h\n",
+            "-resize", `${root.barSampleColumns}x${root.barSampleRows}!`, "-depth", "8", "txt:-"
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!text) return;
+                const dimensions = text.match(/^(\d+)\s+(\d+)/);
+                const samples = text.match(/#[0-9A-Fa-f]{6}/g);
+                if (!dimensions || !samples || samples.length !== root.barSampleColumns * root.barSampleRows) return;
+                root.wallpaperSampleWidth = Number(dimensions[1]);
+                root.wallpaperSampleHeight = Number(dimensions[2]);
+                root.barBackgroundSamples = samples;
+            }
+        }
+    }
     property real autoBackgroundTransparency: { // y = 0.5768x^2 - 0.759x + 0.2896
         let x = wallpaperVibrancy
         let y = 0.5768 * (x * x) - 0.759 * (x) + 0.2896
@@ -186,6 +329,7 @@ Singleton {
         property color colSurfaceContainerHighestActive: ColorUtils.mix(m3colors.m3surfaceContainerHighest, m3colors.m3onSurface, 0.85)
         property color colOnSurface: m3colors.m3onSurface
         property color colOnSurfaceVariant: m3colors.m3onSurfaceVariant
+        property bool transparentBar: Config.options.bar.barGroupStyle === 2 && Config.options.bar.barBackgroundStyle === 0
         // Misc
         property color colTooltip: m3colors.m3inverseSurface
         property color colOnTooltip: m3colors.m3inverseOnSurface

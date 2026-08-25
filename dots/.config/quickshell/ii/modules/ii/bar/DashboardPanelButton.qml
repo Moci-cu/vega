@@ -7,6 +7,9 @@ import qs.modules.common.widgets
 
 RippleButton { // Right sidebar button
     id: rightSidebarButton
+    property color foregroundColor: Appearance.colors.colOnLayer0
+    property bool haloEnabled: false
+    property color haloColor: "transparent"
 
     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
     Layout.rightMargin: Appearance.rounding.screenRounding
@@ -22,7 +25,8 @@ RippleButton { // Right sidebar button
     colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
     colRippleToggled: Appearance.colors.colSecondaryContainerActive
     toggled: GlobalStates.sidebarRightOpen
-    property color colText: toggled ? Appearance.m3colors.m3onSecondaryContainer : Appearance.colors.colOnLayer0
+    property color colText: toggled ? Appearance.m3colors.m3onSecondaryContainer : foregroundColor
+    readonly property bool adaptiveHaloEnabled: haloEnabled && !toggled
 
     Behavior on colText {
         animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
@@ -49,6 +53,8 @@ RippleButton { // Right sidebar button
                 text: "coffee"
                 iconSize: Appearance.font.pixelSize.larger
                 color: rightSidebarButton.colText
+                haloEnabled: rightSidebarButton.adaptiveHaloEnabled
+                haloColor: rightSidebarButton.haloColor
             }
         }
         Revealer {
@@ -62,6 +68,8 @@ RippleButton { // Right sidebar button
                 text: "volume_off"
                 iconSize: Appearance.font.pixelSize.larger
                 color: rightSidebarButton.colText
+                haloEnabled: rightSidebarButton.adaptiveHaloEnabled
+                haloColor: rightSidebarButton.haloColor
             }
         }
         Revealer {
@@ -75,6 +83,8 @@ RippleButton { // Right sidebar button
                 text: "mic_off"
                 iconSize: Appearance.font.pixelSize.larger
                 color: rightSidebarButton.colText
+                haloEnabled: rightSidebarButton.adaptiveHaloEnabled
+                haloColor: rightSidebarButton.haloColor
             }
         }
         HyprlandXkbIndicator {
@@ -99,6 +109,8 @@ RippleButton { // Right sidebar button
             text: Network.materialSymbol
             iconSize: Appearance.font.pixelSize.larger
             color: rightSidebarButton.colText
+            haloEnabled: rightSidebarButton.adaptiveHaloEnabled
+            haloColor: rightSidebarButton.haloColor
         }
         MaterialSymbol {
             Layout.leftMargin: indicatorsRowLayout.realSpacing
@@ -106,6 +118,8 @@ RippleButton { // Right sidebar button
             text: BluetoothStatus.connected ? "bluetooth_connected" : BluetoothStatus.enabled ? "bluetooth" : "bluetooth_disabled"
             iconSize: Appearance.font.pixelSize.larger
             color: rightSidebarButton.colText
+            haloEnabled: rightSidebarButton.adaptiveHaloEnabled
+            haloColor: rightSidebarButton.haloColor
         }
     }
 }

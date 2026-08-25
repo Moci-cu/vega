@@ -7,6 +7,9 @@ Revealer { // Scroll hint
     property string icon
     property string side: "left"
     property string tooltipText: ""
+    property color foregroundColor: Appearance.colors.colSubtext
+    property bool haloEnabled: false
+    property color haloColor: "transparent"
     
     MouseArea {
         id: mouseArea
@@ -34,6 +37,12 @@ Revealer { // Scroll hint
             text: tooltipText
         }
 
+        LiquidGlassSurface {
+            anchors.fill: parent
+            radius: Appearance.rounding.full
+            shown: Appearance.colors.transparentBar
+        }
+
         Column {
             id: contentColumn
             anchors {
@@ -43,17 +52,23 @@ Revealer { // Scroll hint
             MaterialSymbol {
                 text: "keyboard_arrow_up"
                 iconSize: 14
-                color: Appearance.colors.colSubtext
+                color: root.foregroundColor
+                haloEnabled: root.haloEnabled
+                haloColor: root.haloColor
             }
             MaterialSymbol {
                 text: root.icon
                 iconSize: 14
-                color: Appearance.colors.colSubtext
+                color: root.foregroundColor
+                haloEnabled: root.haloEnabled
+                haloColor: root.haloColor
             }
             MaterialSymbol {
                 text: "keyboard_arrow_down"
                 iconSize: 14
-                color: Appearance.colors.colSubtext
+                color: root.foregroundColor
+                haloEnabled: root.haloEnabled
+                haloColor: root.haloColor
             }
         }
     }

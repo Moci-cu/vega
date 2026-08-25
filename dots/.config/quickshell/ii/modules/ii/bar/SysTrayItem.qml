@@ -12,6 +12,7 @@ import qs.modules.common.functions
 MouseArea {
     id: root
     required property SystemTrayItem item
+    property color foregroundColor: Appearance.colors.colOnLayer0
     property bool targetMenuOpen: false
 
     signal menuOpened(qsWindow: var)
@@ -124,7 +125,7 @@ MouseArea {
             ColorOverlay {
                 anchors.fill: desaturatedIcon
                 source: desaturatedIcon
-                color: ColorUtils.transparentize(Appearance.colors.colOnLayer0, 0.9)
+                color: ColorUtils.transparentize(root.foregroundColor, 0.9)
             }
         }
     }

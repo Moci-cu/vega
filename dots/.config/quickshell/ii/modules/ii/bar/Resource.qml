@@ -5,6 +5,27 @@ import QtQuick.Layouts
 
 Item {
     id: root
+    property color fallbackForegroundColor: Appearance.colors.colOnLayer1
+    property var screen
+    property real parallaxWorkspaceValue: 0.5
+    property real parallaxSidebarBalance: 0
+    readonly property real screenCenterX: {
+        width;
+        x;
+        let ancestor = parent;
+        while (ancestor) {
+            ancestor.x;
+            ancestor.width;
+            ancestor = ancestor.parent;
+        }
+        return mapToItem(null, width / 2, 0).x;
+    }
+    readonly property var adaptivePalette: Appearance.colors.transparentBar
+        ? Appearance.barPaletteAt(screenCenterX, width, screen, parallaxWorkspaceValue, parallaxSidebarBalance)
+        : ({ foreground: fallbackForegroundColor, haloEnabled: false, haloColor: "transparent" })
+    property color foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : fallbackForegroundColor
+    readonly property bool haloEnabled: Appearance.colors.transparentBar && adaptivePalette.haloEnabled
+    readonly property color haloColor: adaptivePalette.haloColor
     required property string iconName
     required property double percentage
     property string valueText: `${Math.round(percentage * 100).toString()}`
@@ -30,7 +51,7 @@ Item {
             lineWidth: Appearance.rounding.unsharpen
             value: percentage
             implicitSize: 20
-            colPrimary: root.warning ? Appearance.colors.colError : Appearance.colors.colOnSecondaryContainer
+            colPrimary: root.warning ? Appearance.colors.colError : root.foregroundColor
             accountForLightBleeding: !root.warning
             enableAnimation: false
 
@@ -45,7 +66,9 @@ Item {
                     fill: 1
                     text: iconName
                     iconSize: Appearance.font.pixelSize.normal
-                    color: Appearance.m3colors.m3onSecondaryContainer
+                    color: root.foregroundColor
+                    haloEnabled: root.haloEnabled
+                    haloColor: root.haloColor
                 }
             }
         }
@@ -64,7 +87,9 @@ Item {
             StyledText {
                 id: percentageText
                 anchors.centerIn: parent
-                color: Appearance.colors.colOnLayer1
+                color: root.foregroundColor
+                haloEnabled: root.haloEnabled
+                haloColor: root.haloColor
                 font.pixelSize: Appearance.font.pixelSize.small
                 text: root.valueText
             }

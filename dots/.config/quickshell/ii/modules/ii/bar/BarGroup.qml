@@ -1,4 +1,5 @@
 import qs.modules.common
+import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
 
@@ -13,8 +14,15 @@ Item {
     property var endRadius // right - bottom
 
     property color colBackground: Appearance.m3colors.m3surfaceContainerLow
+    property bool liquidGlass: false
+    property bool liquidGlassBackdrop: true
+    property color glassColor: Qt.rgba(1, 1, 1, 0.18)
+    property var wallpaperSource
+    property var screen
+    property real parallaxWorkspaceValue: 0.5
+    property real parallaxSidebarBalance: 0
 
-    Rectangle {
+    Item {
         id: background
         anchors {
             fill: parent
@@ -23,14 +31,29 @@ Item {
             leftMargin: root.vertical ? 4 : 0
             rightMargin: root.vertical ? 4 : 0
         }
-        color: root.colBackground
-        topLeftRadius: startRadius
-        bottomLeftRadius: root.vertical ? endRadius: startRadius
-        topRightRadius: root.vertical ? startRadius: endRadius
-        bottomRightRadius: endRadius
+        Rectangle {
+            anchors.fill: parent
+            color: root.liquidGlass ? "transparent" : root.colBackground
+            topLeftRadius: root.startRadius
+            bottomLeftRadius: root.vertical ? root.endRadius : root.startRadius
+            topRightRadius: root.vertical ? root.startRadius : root.endRadius
+            bottomRightRadius: root.endRadius
 
-        Behavior on color {
-            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            Behavior on color {
+                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            }
+        }
+
+        LiquidGlassSurface {
+            anchors.fill: parent
+            shown: root.liquidGlass
+            backdropEnabled: root.liquidGlassBackdrop
+            wallpaperSource: root.wallpaperSource
+            screen: root.screen
+            parallaxWorkspaceValue: root.parallaxWorkspaceValue
+            parallaxSidebarBalance: root.parallaxSidebarBalance
+            tintColor: root.glassColor
+            radius: height / 2
         }
     }
 

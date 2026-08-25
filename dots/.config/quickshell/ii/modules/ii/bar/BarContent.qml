@@ -16,9 +16,22 @@ Item { // Bar content region
 
     property var screen: root.QsWindow.window?.screen
     property int monitorIndex
+    readonly property int activeWorkspaceId: HyprlandData.monitors.find(monitor => monitor.name === screen?.name)?.activeWorkspace?.id ?? 1
+    readonly property real targetParallaxWorkspaceValue: Appearance.barWorkspaceValue(activeWorkspaceId)
+    readonly property real targetParallaxSidebarBalance: GlobalStates.effectiveRightOpen - GlobalStates.effectiveLeftOpen
+    property real parallaxWorkspaceValue: targetParallaxWorkspaceValue
+    property real parallaxSidebarBalance: targetParallaxSidebarBalance
     property var brightnessMonitor: Brightness.getMonitorForScreen(screen)
     property real useShortenedForm: (Appearance.sizes.barHellaShortenScreenWidthThreshold >= screen?.width) ? 2 : (Appearance.sizes.barShortenScreenWidthThreshold >= screen?.width) ? 1 : 0
     readonly property int centerSideModuleWidth: (useShortenedForm == 2) ? Appearance.sizes.barCenterSideModuleWidthHellaShortened : (useShortenedForm == 1) ? Appearance.sizes.barCenterSideModuleWidthShortened : Appearance.sizes.barCenterSideModuleWidth
+
+    component ParallaxAnimation: NumberAnimation {
+        duration: 600
+        easing.type: Easing.OutCubic
+    }
+
+    Behavior on parallaxWorkspaceValue { ParallaxAnimation {} }
+    Behavior on parallaxSidebarBalance { ParallaxAnimation {} }
 
     property bool hasActiveWindows: false
     property bool showBarBackground: root.hasActiveWindows && Config.options.bar.barBackgroundStyle === 2 || Config.options.bar.barBackgroundStyle === 1
@@ -34,6 +47,22 @@ Item { // Bar content region
 
             root.hasActiveWindows = hasWindow
         }
+    }
+
+    // ponytail: uses the wallpaper/thumbnail texture, not live screencopy; switch only if video-perfect refraction justifies continuous capture.
+    Image {
+        id: liquidGlassWallpaper
+        visible: false
+        width: Math.max(1, root.screen?.width ?? 1)
+        height: Math.max(1, root.screen?.height ?? 1)
+        source: Appearance.wallpaperSamplePath ? Qt.resolvedUrl(Appearance.wallpaperSamplePath) : ""
+        sourceSize: Qt.size(
+            Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
+            Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
+        )
+        asynchronous: true
+        cache: true
+        smooth: true
     }
 
     ////// Definning places of center modules //////
@@ -108,6 +137,10 @@ Item { // Bar content region
             reveal: barLeftSideMouseArea.hovered
             icon: Hyprsunset.gamma === 100 ? "light_mode" : "wb_twilight"
             tooltipText: Translation.tr("Scroll to change brightness")
+            readonly property var adaptivePalette: Appearance.barPaletteAt(0, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
+            foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : Appearance.colors.colSubtext
+            haloEnabled: Appearance.colors.transparentBar && adaptivePalette.haloEnabled
+            haloColor: adaptivePalette.haloColor
             side: "left"
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -141,6 +174,10 @@ Item { // Bar content region
             delegate: BarComponent {
                 list: Config.options.bar.layouts.left
                 barSection: 0
+                screen: root.screen
+                wallpaperSource: liquidGlassWallpaper
+                parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                parallaxSidebarBalance: root.parallaxSidebarBalance
             }
         }
     }
@@ -166,7 +203,11 @@ Item { // Bar content region
                 delegate: BarComponent {
                     list: Config.options.bar.layouts.center
                     barSection: 1
+                    screen: root.screen
+                    wallpaperSource: liquidGlassWallpaper
                     originalIndex: Config.options.bar.layouts.center.findIndex(e => e.id === modelData.id) // we have to recalculate the index because repeater.model has changed
+                    parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                    parallaxSidebarBalance: root.parallaxSidebarBalance
                 }
             }
         }
@@ -183,7 +224,11 @@ Item { // Bar content region
                 delegate: BarComponent {
                     list: Config.options.bar.layouts.center
                     barSection: 1
+                    screen: root.screen
+                    wallpaperSource: liquidGlassWallpaper
                     originalIndex: Config.options.bar.layouts.center.findIndex(e => e.id === modelData.id)
+                    parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                    parallaxSidebarBalance: root.parallaxSidebarBalance
                 }
             }
         }
@@ -201,7 +246,11 @@ Item { // Bar content region
                 delegate: BarComponent {
                     list: Config.options.bar.layouts.center
                     barSection: 1
+                    screen: root.screen
+                    wallpaperSource: liquidGlassWallpaper
                     originalIndex: Config.options.bar.layouts.center.findIndex(e => e.id === modelData.id)
+                    parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                    parallaxSidebarBalance: root.parallaxSidebarBalance
                 }
             }
         }
@@ -224,6 +273,10 @@ Item { // Bar content region
             delegate: BarComponent {
                 list: rightRepeater.model
                 barSection: 2
+                screen: root.screen
+                wallpaperSource: liquidGlassWallpaper
+                parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                parallaxSidebarBalance: root.parallaxSidebarBalance
             }
         }
     }
@@ -266,6 +319,10 @@ Item { // Bar content region
             reveal: barRightSideMouseArea.hovered
             icon: "volume_up"
             tooltipText: Translation.tr("Scroll to change volume")
+            readonly property var adaptivePalette: Appearance.barPaletteAt(root.screen?.width ?? 1, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
+            foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : Appearance.colors.colSubtext
+            haloEnabled: Appearance.colors.transparentBar && adaptivePalette.haloEnabled
+            haloColor: adaptivePalette.haloColor
             side: "right"
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter

@@ -12,6 +12,9 @@ MouseArea {
     id: root
     property bool vertical: false
     property bool hovered: false
+    property color foregroundColor: Appearance.colors.colOnLayer1
+    property bool haloEnabled: false
+    property color haloColor: "transparent"
     implicitWidth: rowLayout.implicitWidth + 10 * 2.5
     implicitHeight: rowLayout.implicitHeight + 10 * 2
 
@@ -39,14 +42,18 @@ MouseArea {
             fill: 0
             text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
             iconSize: Appearance.font.pixelSize.large
-            color: Appearance.colors.colOnLayer1
+            color: root.foregroundColor
+            haloEnabled: root.haloEnabled
+            haloColor: root.haloColor
             Layout.alignment: root.vertical ? Qt.AlignHCenter : Qt.AlignVCenter
         }
 
         StyledText {
             visible: true
             font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.colors.colOnLayer1
+            color: root.foregroundColor
+            haloEnabled: root.haloEnabled
+            haloColor: root.haloColor
             text: Weather.data?.temp ?? "--°"
             Layout.alignment: root.vertical ? Qt.AlignHCenter : Qt.AlignVCenter
         }

@@ -6,6 +6,9 @@ import qs.modules.common.widgets
 
 RippleButton {
     id: leftSidebarButton
+    property color foregroundColor: Appearance.colors.colOnLayer0
+    property bool haloEnabled: false
+    property color haloColor: "transparent"
 
     property bool showPing: false
 
@@ -54,7 +57,7 @@ RippleButton {
         height: 19.5
         source: Config.options.bar.topLeftIcon == 'distro' ? SystemInfo.distroIcon : `${Config.options.bar.topLeftIcon}-symbolic`
         colorize: true
-        color: Appearance.colors.colOnLayer0
+        color: leftSidebarButton.foregroundColor
 
         Rectangle {
             opacity: leftSidebarButton.showPing ? 1 : 0
