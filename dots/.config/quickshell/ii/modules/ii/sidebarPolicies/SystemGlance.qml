@@ -88,7 +88,9 @@ Item {
         onLoaded: {
             const content = text()
             if (!content || !glanceRoot) return
-            glanceRoot.gpuUsage = Math.max(0, Math.min(100, Number(content.trim())))
+            const parsed = Number(content.trim())
+            if (!Number.isFinite(parsed)) return
+            glanceRoot.gpuUsage = Math.max(0, Math.min(100, parsed))
         }
     }
 

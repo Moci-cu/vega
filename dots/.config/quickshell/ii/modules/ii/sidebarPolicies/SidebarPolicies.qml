@@ -144,6 +144,8 @@ Scope { // Scope
             }
 
             Component.onCompleted: {
+                root.surfaceVisible = GlobalStates.sidebarLeftOpen;
+                root.sidebarShown = GlobalStates.sidebarLeftOpen;
                 if (GlobalStates.sidebarLeftOpen && !root.pin)
                     GlobalFocusGrab.addDismissable(panelWindow);
             }

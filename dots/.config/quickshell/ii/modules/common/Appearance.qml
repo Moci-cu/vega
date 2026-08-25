@@ -115,7 +115,10 @@ Singleton {
         }
 
         const localX = geometry.screenWidth / 2 + (x - geometry.screenWidth / 2) / geometry.itemScale;
-        const localY = geometry.screenHeight / 2 + (root.sizes.barHeight / 2 - geometry.screenHeight / 2) / geometry.itemScale;
+        const barCenterY = Config.options.bar.bottom
+            ? geometry.screenHeight - root.sizes.barHeight / 2
+            : root.sizes.barHeight / 2;
+        const localY = geometry.screenHeight / 2 + (barCenterY - geometry.screenHeight / 2) / geometry.itemScale;
         const centerSourceX = Math.max(0, Math.min(1, (localX - geometry.wallpaperX) / geometry.displayWidth));
         const centerColumn = Math.min(barSampleColumns - 1, Math.floor(centerSourceX * barSampleColumns));
         const sourceY = Math.max(0, Math.min(1, (localY - geometry.wallpaperY) / geometry.displayHeight));

@@ -28,7 +28,7 @@ float roundedBoxDistance(vec2 point, vec2 halfSize, vec4 radii) {
 void main() {
     vec2 size = max(itemSize, vec2(1.0));
     vec2 point = qt_TexCoord0 * size - size * 0.5;
-    float distance = roundedBoxDistance(point, size * 0.5, vec4(min(size.x, size.y) * 0.5));
+    float distance = roundedBoxDistance(point, size * 0.5, cornerRadii);
     float antialias = max(fwidth(distance), 0.75);
     float coverage = 1.0 - smoothstep(-antialias, antialias, distance);
 

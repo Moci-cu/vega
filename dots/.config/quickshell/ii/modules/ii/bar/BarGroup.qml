@@ -53,7 +53,7 @@ Item {
             parallaxWorkspaceValue: root.parallaxWorkspaceValue
             parallaxSidebarBalance: root.parallaxSidebarBalance
             tintColor: root.glassColor
-            radius: height / 2
+            radius: height / 2 // Liquid glass groups intentionally remain separate pills.
         }
     }
 
