@@ -223,7 +223,7 @@ Scope {
                 Item {
                     id: contentItem
                     anchors.fill: parent
-                    opacity: root.contentShown ? 1 : 0
+                    opacity: root.contentShown && searchWidget.backdropReady ? 1 : 0
 
                     MouseArea { // We could have used PanelWindow.mask to detect this, but this is more stable
                         anchors.fill: parent

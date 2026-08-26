@@ -7,7 +7,12 @@ Item {
 
     property bool shown: false
     property bool backdropEnabled: true
+    property bool accountForBarPosition: false
+    property bool sourceFillsItem: false
+    property bool enhancedOptics: false
+    property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
+    property bool sourceReady: wallpaperSource?.status === Image.Ready
     property var screen
     property real parallaxWorkspaceValue: 0.5
     property real parallaxSidebarBalance: 0
@@ -32,21 +37,23 @@ Item {
         }
         return root.mapToItem(null, 0, 0);
     }
-    readonly property real screenY: scenePosition.y + (Config.options.bar.bottom
+    readonly property real screenY: scenePosition.y + (root.accountForBarPosition && Config.options.bar.bottom
         ? Math.max(0, (screen?.height ?? 0) - (root.QsWindow.window?.height ?? 0))
         : 0)
-    readonly property rect wallpaperRect: Appearance.barWallpaperSourceRect(
-        scenePosition.x,
-        screenY,
-        width,
-        height,
-        screen,
-        parallaxWorkspaceValue,
-        parallaxSidebarBalance
-    )
+    readonly property rect sampleRect: sourceFillsItem
+        ? itemSourceRect
+        : Appearance.barWallpaperSourceRect(
+            scenePosition.x,
+            screenY,
+            width,
+            height,
+            screen,
+            parallaxWorkspaceValue,
+            parallaxSidebarBalance
+        )
     readonly property bool shaderReady: backdropEnabled
         && !!wallpaperSource
-        && wallpaperSource.status === Image.Ready
+        && sourceReady
         && width > 0
         && height > 0
 
@@ -94,10 +101,10 @@ Item {
         property var source: root.wallpaperSource
         property vector2d itemSize: Qt.vector2d(width, height)
         property vector4d sourceRect: Qt.vector4d(
-            root.wallpaperRect.x,
-            root.wallpaperRect.y,
-            root.wallpaperRect.width,
-            root.wallpaperRect.height
+            root.sampleRect.x,
+            root.sampleRect.y,
+            root.sampleRect.width,
+            root.sampleRect.height
         )
         property vector4d cornerRadii: Qt.vector4d(
             root.topLeftRadius,
@@ -112,6 +119,7 @@ Item {
             + 0.08 * root.parallaxSidebarBalance
         property vector2d lightDirection: Qt.vector2d(Math.cos(lightAngle), Math.sin(lightAngle))
         property real refraction: 5
+        property real enhancedOptics: root.enhancedOptics ? 1 : 0
 
         fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb")
 

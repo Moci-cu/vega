@@ -48,6 +48,7 @@ Item {
             anchors.fill: parent
             shown: root.liquidGlass
             backdropEnabled: root.liquidGlassBackdrop
+            accountForBarPosition: true
             wallpaperSource: root.wallpaperSource
             screen: root.screen
             parallaxWorkspaceValue: root.parallaxWorkspaceValue

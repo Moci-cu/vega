@@ -5,6 +5,7 @@ import Qt5Compat.GraphicalEffects
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 
 import qs
 import qs.services
@@ -18,10 +19,13 @@ Item { // Wrapper
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 35
     readonly property int typingResultLimit: 15 // Should be enough to cover the whole view
+    readonly property var screen: root.QsWindow.window?.screen
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
+    readonly property bool backdropReady: liquidGlassCapture.hasContent || backdropCaptureTimedOut
     property string searchingText: LauncherSearch.query
     property bool showResults: searchingText != ""
+    property bool backdropCaptureTimedOut: false
     implicitWidth: searchWidgetContent.implicitWidth + Appearance.sizes.elevationMargin * 2
     implicitHeight: searchWidgetContent.implicitHeight + searchBar.verticalPadding * 2 + Appearance.sizes.elevationMargin * 2
 
@@ -101,19 +105,79 @@ Item { // Wrapper
         }
     }
 
-    Rectangle { // Background
+    ScreencopyView {
+        id: liquidGlassCapture
+        width: Math.max(1, root.screen?.width ?? 1)
+        height: Math.max(1, root.screen?.height ?? 1)
+        captureSource: GlobalStates.overviewOpen && !root.backdropCaptureTimedOut ? root.screen : null
+        live: false
+        paintCursor: false
+
+        onHasContentChanged: {
+            if (hasContent)
+                liquidGlassBackdrop.scheduleUpdate();
+        }
+    }
+
+    ShaderEffectSource {
+        id: liquidGlassBackdrop
+        visible: false
+        width: liquidGlassCapture.width
+        height: liquidGlassCapture.height
+        sourceItem: liquidGlassCapture
+        sourceRect: Qt.rect(0, 0, width, height)
+        textureSize: Qt.size(
+            Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
+            Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
+        )
+        hideSource: true
+        live: false
+    }
+
+    Connections {
+        target: GlobalStates
+
+        function onOverviewOpenChanged() {
+            root.backdropCaptureTimedOut = false;
+        }
+    }
+
+    Timer {
+        interval: 200
+        running: GlobalStates.overviewOpen && !liquidGlassCapture.hasContent
+        onTriggered: root.backdropCaptureTimedOut = true
+    }
+
+    Item { // Background
         id: searchWidgetContent
         clip: true
         implicitWidth: gridLayout.implicitWidth
         implicitHeight: gridLayout.implicitHeight
-        radius: Config.options.appearance.sharpMode ? 0 : searchBar.height / 2 + searchBar.verticalPadding
-        color: Appearance.colors.colGlassSurfaceContainer
-        antialiasing: true
+        property real radius: Config.options.appearance.sharpMode ? 0 : searchBar.height / 2 + searchBar.verticalPadding
 
         Behavior on implicitHeight {
             id: searchHeightBehavior
             enabled: GlobalStates.overviewOpen && root.showResults
             animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+        }
+
+        LiquidGlassSurface {
+            id: liquidGlassSurface
+            anchors.fill: parent
+            shown: GlobalStates.overviewOpen
+            wallpaperSource: liquidGlassBackdrop
+            sourceReady: liquidGlassCapture.hasContent
+            sourceFillsItem: true
+            enhancedOptics: true
+            itemSourceRect: Qt.rect(
+                ((root.screen?.width ?? root.width) - root.width) / 2 / liquidGlassBackdrop.width,
+                (screenY - (!Config.options.bar.vertical && !Config.options.bar.bottom ? Appearance.sizes.barHeight : 0)) / liquidGlassBackdrop.height,
+                width / liquidGlassBackdrop.width,
+                height / liquidGlassBackdrop.height
+            )
+            screen: root.screen
+            tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
+            radius: searchWidgetContent.radius
         }
 
         GridLayout {
