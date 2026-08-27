@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import Qt.labs.synchronizer
 import Qt5Compat.GraphicalEffects
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
@@ -18,16 +19,26 @@ Item { // Wrapper
 
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 35
-    readonly property int typingResultLimit: 15 // Should be enough to cover the whole view
+    readonly property int typingResultLimit: 7
     readonly property var screen: root.QsWindow.window?.screen
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
     readonly property bool backdropReady: liquidGlassCapture.hasContent || backdropCaptureTimedOut
+    readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
     property string searchingText: LauncherSearch.query
     property bool showResults: searchingText != ""
     property bool backdropCaptureTimedOut: false
+    property real retainedBackdropWidth: 1
+    property real retainedBackdropHeight: 1
     implicitWidth: searchWidgetContent.implicitWidth + Appearance.sizes.elevationMargin * 2
     implicitHeight: searchWidgetContent.implicitHeight + searchBar.verticalPadding * 2 + Appearance.sizes.elevationMargin * 2
+
+    function retainBackdropSize(targetWidth, targetHeight) {
+        if (!GlobalStates.overviewOpen)
+            return;
+        root.retainedBackdropWidth = Math.max(root.retainedBackdropWidth, targetWidth + 4);
+        root.retainedBackdropHeight = Math.max(root.retainedBackdropHeight, targetHeight + 4);
+    }
 
     function focusFirstItem() {
         if (appResults.count <= 0)
@@ -53,6 +64,70 @@ Item { // Wrapper
 
     function setSearchingText(text) {
         searchBar.setQueryImmediately(text);
+    }
+
+    function resultAt(index) {
+        return root.nativeAppSearchActive ? NativeAppSearch.get(index) : LauncherSearch.results[index];
+    }
+
+    function nativeFallbackRows(values) {
+        return (values ?? []).map(entry => ({
+            nativeFallback: true,
+            key: entry.key,
+            type: entry.type,
+            fontType: entry.fontType,
+            name: entry.name,
+            rawValue: entry.rawValue,
+            iconName: entry.iconName,
+            iconType: entry.iconType,
+            verb: entry.verb,
+            shown: entry.shown,
+            blurImage: entry.blurImage
+        }));
+    }
+
+    function refreshResults() {
+        const values = LauncherSearch.results;
+        if (root.nativeAppSearchActive) {
+            NativeAppSearch.search(
+                LauncherSearch.nativeAppQuery(root.searchingText),
+                root.typingResultLimit,
+                root.nativeFallbackRows(values)
+            );
+            return;
+        }
+        NativeAppSearch.clear();
+        appResults.setResultValues(values);
+    }
+
+    function scheduleResultsRefresh() {
+        resultsRefreshTimer.restart();
+    }
+
+    onNativeAppSearchActiveChanged: root.scheduleResultsRefresh()
+    Component.onCompleted: root.scheduleResultsRefresh()
+
+    Timer {
+        id: resultsRefreshTimer
+        interval: 0
+        onTriggered: root.refreshResults()
+    }
+
+    Connections {
+        target: NativeAppSearch
+
+        function onAvailableChanged() {
+            root.scheduleResultsRefresh();
+        }
+    }
+
+    Connections {
+        target: NativeAppSearch.model
+        ignoreUnknownSignals: true
+
+        function onSearchFinished() {
+            Qt.callLater(root.focusFirstItem);
+        }
     }
 
     Keys.onPressed: event => {
@@ -112,26 +187,60 @@ Item { // Wrapper
         captureSource: GlobalStates.overviewOpen && !root.backdropCaptureTimedOut ? root.screen : null
         live: false
         paintCursor: false
+    }
 
-        onHasContentChanged: {
-            if (hasContent)
-                liquidGlassBackdrop.scheduleUpdate();
-        }
+    ShaderEffectSource {
+        id: liquidGlassCrop
+        readonly property real padding: 48
+        readonly property real screenWidth: Math.max(1, root.screen?.width ?? root.width)
+        readonly property real screenHeight: Math.max(1, root.screen?.height ?? root.height)
+        readonly property real panelX: (screenWidth - root.width) / 2
+        readonly property real panelY: liquidGlassSurface.screenY
+            - (!Config.options.bar.vertical && !Config.options.bar.bottom ? Appearance.sizes.barHeight : 0)
+        readonly property real cropX: Math.max(0, panelX - padding)
+        readonly property real cropY: Math.max(0, panelY - padding)
+        readonly property real cropRight: Math.min(screenWidth,
+            panelX + Math.max(liquidGlassSurface.width, root.retainedBackdropWidth) + padding)
+        readonly property real cropBottom: Math.min(screenHeight,
+            panelY + Math.max(liquidGlassSurface.height, root.retainedBackdropHeight) + padding)
+
+        visible: false
+        width: Math.max(1, cropRight - cropX)
+        height: Math.max(1, cropBottom - cropY)
+        sourceItem: liquidGlassCapture
+        sourceRect: Qt.rect(cropX, cropY, width, height)
+        textureSize: Qt.size(
+            Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
+            Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
+        )
+        hideSource: true
+        live: GlobalStates.overviewOpen && liquidGlassCapture.hasContent
+    }
+
+    MultiEffect {
+        id: liquidGlassBlur
+        width: liquidGlassCrop.width
+        height: liquidGlassCrop.height
+        source: liquidGlassCrop
+        autoPaddingEnabled: false
+        blurEnabled: true
+        blurMax: 40
+        blur: 1
     }
 
     ShaderEffectSource {
         id: liquidGlassBackdrop
         visible: false
-        width: liquidGlassCapture.width
-        height: liquidGlassCapture.height
-        sourceItem: liquidGlassCapture
+        width: liquidGlassBlur.width
+        height: liquidGlassBlur.height
+        sourceItem: liquidGlassBlur
         sourceRect: Qt.rect(0, 0, width, height)
         textureSize: Qt.size(
             Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
             Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
         )
         hideSource: true
-        live: false
+        live: GlobalStates.overviewOpen && liquidGlassCapture.hasContent
     }
 
     Connections {
@@ -139,6 +248,12 @@ Item { // Wrapper
 
         function onOverviewOpenChanged() {
             root.backdropCaptureTimedOut = false;
+            if (GlobalStates.overviewOpen) {
+                root.retainBackdropSize(gridLayout.implicitWidth, gridLayout.implicitHeight);
+            } else {
+                root.retainedBackdropWidth = 1;
+                root.retainedBackdropHeight = 1;
+            }
         }
     }
 
@@ -154,11 +269,48 @@ Item { // Wrapper
         implicitWidth: gridLayout.implicitWidth
         implicitHeight: gridLayout.implicitHeight
         property real radius: Config.options.appearance.sharpMode ? 0 : searchBar.height / 2 + searchBar.verticalPadding
+        property real opticalEnergy: glassHover.hovered ? 0.48 : 0
+        property real opticalX: glassHover.hovered
+            ? Math.max(0, Math.min(1, glassHover.point.position.x / Math.max(1, width))) : 0.5
+        property real opticalY: glassHover.hovered
+            ? Math.max(0, Math.min(1, glassHover.point.position.y / Math.max(1, height))) : 0.5
+
+        Behavior on opticalEnergy {
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on opticalX {
+            NumberAnimation {
+                duration: 90
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on opticalY {
+            NumberAnimation {
+                duration: 90
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Behavior on implicitHeight {
             id: searchHeightBehavior
-            enabled: GlobalStates.overviewOpen && root.showResults
-            animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+            enabled: GlobalStates.overviewOpen
+            SpringAnimation {
+                spring: 5
+                damping: 0.30
+                mass: 0.5
+                epsilon: 2
+            }
+        }
+
+        HoverHandler {
+            id: glassHover
+            enabled: GlobalStates.overviewOpen
+            blocking: false
         }
 
         LiquidGlassSurface {
@@ -169,9 +321,13 @@ Item { // Wrapper
             sourceReady: liquidGlassCapture.hasContent
             sourceFillsItem: true
             enhancedOptics: true
+            interactiveOptics: true
+            interaction: searchWidgetContent.opticalEnergy
+            interactionPoint: Qt.point(searchWidgetContent.opticalX, searchWidgetContent.opticalY)
+            thicknessOverride: 0.15
             itemSourceRect: Qt.rect(
-                ((root.screen?.width ?? root.width) - root.width) / 2 / liquidGlassBackdrop.width,
-                (screenY - (!Config.options.bar.vertical && !Config.options.bar.bottom ? Appearance.sizes.barHeight : 0)) / liquidGlassBackdrop.height,
+                (liquidGlassCrop.panelX - liquidGlassCrop.cropX) / liquidGlassBackdrop.width,
+                (liquidGlassCrop.panelY - liquidGlassCrop.cropY) / liquidGlassBackdrop.height,
                 width / liquidGlassBackdrop.width,
                 height / liquidGlassBackdrop.height
             )
@@ -184,6 +340,9 @@ Item { // Wrapper
             id: gridLayout
             anchors.horizontalCenter: parent.horizontalCenter
             columns: 1
+
+            onImplicitWidthChanged: root.retainBackdropSize(implicitWidth, implicitHeight)
+            onImplicitHeightChanged: root.retainBackdropSize(implicitWidth, implicitHeight)
 
             // clip: true
             layer.enabled: true
@@ -199,6 +358,8 @@ Item { // Wrapper
                 id: searchBar
                 property real verticalPadding: 4
                 debounceInterval: root.typingDebounceInterval
+                resultAt: root.resultAt
+                executeResult: entry => LauncherSearch.executeResult(entry)
                 Layout.fillWidth: true
                 Layout.leftMargin: 10
                 Layout.rightMargin: 4
@@ -246,11 +407,13 @@ Item { // Wrapper
                 Connections {
                     target: LauncherSearch
                     function onResultsChanged() {
-                        appResults.setResultValues(LauncherSearch.results);
+                        root.scheduleResultsRefresh();
                     }
                 }
 
-                model: ScriptModel {
+                model: root.nativeAppSearchActive ? NativeAppSearch.model : resultModel
+
+                ScriptModel {
                     id: resultModel
                     objectProp: "key"
                 }
@@ -268,6 +431,7 @@ Item { // Wrapper
                         return prefix ? StringUtils.cleanPrefix(root.searchingText, prefix) : root.searchingText
                     }
                     current: appResults.currentIndex === index
+                    containerRadius: searchWidgetContent.radius
 
                     onHoveredChanged: {
                         if (hovered && appResults.currentIndex !== index)
@@ -276,9 +440,9 @@ Item { // Wrapper
 
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_Tab) {
-                            if (LauncherSearch.results.length === 0)
+                            if (appResults.count === 0)
                                 return;
-                            const tabbedText = searchItem.modelData.name;
+                            const tabbedText = root.resultAt(0)?.name ?? "";
                             searchBar.setQueryImmediately(tabbedText);
                             event.accepted = true;
                             root.focusSearchInput();

@@ -1,6 +1,7 @@
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 
 Item {
@@ -21,6 +22,44 @@ Item {
     property var screen
     property real parallaxWorkspaceValue: 0.5
     property real parallaxSidebarBalance: 0
+    property real opticalEnergy: glassTap.pressed ? 1 : glassHover.hovered ? 0.42 : 0
+    readonly property point opticalPoint: {
+        const point = glassTap.pressed ? glassTap.point.position : glassHover.point.position;
+        return Qt.point(
+            Math.max(0, Math.min(1, point.x / Math.max(1, width))),
+            Math.max(0, Math.min(1, point.y / Math.max(1, height)))
+        );
+    }
+
+    scale: glassTap.pressed ? 0.985 : glassHover.hovered ? 1.006 : 1
+
+    Behavior on scale {
+        SpringAnimation {
+            spring: 5
+            damping: 0.55
+            epsilon: 0.0005
+        }
+    }
+
+    Behavior on opticalEnergy {
+        NumberAnimation {
+            duration: 140
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    HoverHandler {
+        id: glassHover
+        enabled: root.liquidGlass
+        blocking: false
+    }
+
+    TapHandler {
+        id: glassTap
+        enabled: root.liquidGlass
+        acceptedButtons: Qt.LeftButton
+        gesturePolicy: TapHandler.DragThreshold
+    }
 
     Item {
         id: background
@@ -44,7 +83,38 @@ Item {
             }
         }
 
+        RectangularShadow {
+            anchors.fill: glassSurface
+            radius: glassSurface.radius
+            blur: 14
+            offset: Qt.vector2d(0, 2)
+            spread: -2
+            color: Qt.rgba(0, 0, 0, 0.22)
+            cached: true
+            opacity: root.liquidGlass ? 0.54 + root.opticalEnergy * 0.10 : 0
+
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+        }
+
+        RectangularShadow {
+            anchors.fill: glassSurface
+            radius: glassSurface.radius
+            blur: 5
+            offset: Qt.vector2d(0, 1)
+            spread: -1
+            color: Qt.rgba(0, 0, 0, 0.30)
+            cached: true
+            opacity: root.liquidGlass ? 0.40 + root.opticalEnergy * 0.10 : 0
+
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+        }
+
         LiquidGlassSurface {
+            id: glassSurface
             anchors.fill: parent
             shown: root.liquidGlass
             backdropEnabled: root.liquidGlassBackdrop
@@ -54,6 +124,9 @@ Item {
             parallaxWorkspaceValue: root.parallaxWorkspaceValue
             parallaxSidebarBalance: root.parallaxSidebarBalance
             tintColor: root.glassColor
+            responsiveOptics: true
+            interaction: root.opticalEnergy
+            interactionPoint: root.opticalPoint
             radius: height / 2 // Liquid glass groups intentionally remain separate pills.
         }
     }

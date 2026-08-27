@@ -45,6 +45,20 @@ Singleton {
         return root.matchedPrefixEntry(queryText)?.prefix ?? "";
     }
 
+    function shouldUseNativeAppSearch(queryText = root.query) {
+        if (!NativeAppSearch.available || AppSearch.sloppySearch || Config.options.panelFamily !== "ii")
+            return false;
+        const queryString = String(queryText ?? "");
+        if (queryString.length === 0 || /^\d/.test(queryString))
+            return false;
+        const prefixName = root.matchedPrefixName(queryString);
+        return prefixName === "app" || prefixName === "";
+    }
+
+    function nativeAppQuery(queryText = root.query) {
+        return StringUtils.cleanPrefix(String(queryText ?? ""), Config.options.search.prefix.app);
+    }
+
     function ensurePrefix(prefix) {
         const currentPrefix = root.matchedPrefix();
         if (currentPrefix.length > 0) {
@@ -233,7 +247,25 @@ Singleton {
         return StringUtils.stringListContainsSubstring(entry.toLowerCase(), unsafeKeywords);
     }
 
+    function resolvedResult(entry) {
+        if (!entry) return null;
+        if (entry.nativeApp) {
+            const app = AppSearch.entryById(entry.id);
+            return app ? root.appResult(app) : null;
+        }
+        if (entry.nativeFallback)
+            return root.results.find(result => result.key === entry.key) ?? null;
+        return entry;
+    }
+
+    function executeResult(entry) {
+        const resolved = root.resolvedResult(entry);
+        if (resolved?.execute)
+            resolved.execute();
+    }
+
     function resultActions(entry, limit) {
+        entry = root.resolvedResult(entry);
         if (!entry) return [];
         const actions = entry.actions;
         if (typeof actions === "function") return actions(limit);
@@ -571,7 +603,7 @@ Singleton {
 
         //////////////// Apps //////////////////
         const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !startsWithNumber;
-        if (shouldSearchApps || startsWithAppPrefix) {
+        if ((shouldSearchApps || startsWithAppPrefix) && !root.shouldUseNativeAppSearch(root.query)) {
             result = result.concat(AppSearch.fuzzyQuery(StringUtils.cleanPrefix(root.query, Config.options.search.prefix.app), root.resultLimit).map(entry => root.appResult(entry)));
         }
 

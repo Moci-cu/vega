@@ -159,6 +159,17 @@ Scope {
             // Keep the surface mapped so blur keeps sampling the active window while closing.
             visible: true
 
+            LiquidGlassCapture {
+                id: osdGlassCapture
+                screen: osdRoot.screen
+                target: osdIndicatorLoader
+                active: GlobalStates.osdVolumeOpen
+                windowOriginX: Math.max(0, ((screen?.width ?? osdRoot.width) - osdRoot.width) / 2)
+                windowOriginY: Config.options.bar.bottom
+                    ? Math.max(0, (screen?.height ?? osdRoot.height) - osdRoot.height - Appearance.sizes.barHeight)
+                    : Appearance.sizes.barHeight
+            }
+
             ColumnLayout {
                 id: columnLayout
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -197,6 +208,7 @@ Scope {
                         Loader {
                             id: osdIndicatorLoader
                             source: root.indicators.find(i => i.id === root.currentIndicator)?.sourceUrl
+                            onLoaded: item.glassCapture = osdGlassCapture
                         }
 
                         Item {

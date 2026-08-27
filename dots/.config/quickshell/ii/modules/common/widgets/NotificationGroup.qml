@@ -18,6 +18,7 @@ MouseArea { // Notification group area
     property bool multipleNotifications: notificationCount > 1
     property bool expanded: false
     property bool popup: false
+    property var glassCapture
     property real padding: 10
     implicitHeight: background.implicitHeight
 
@@ -117,7 +118,7 @@ MouseArea { // Notification group area
         id: background
         anchors.left: parent.left
         width: parent.width
-        color: popup ? Appearance.colors.colGlassSurfaceContainer : Appearance.colors.colLayer2
+        color: popup ? "transparent" : Appearance.colors.colLayer2
         radius: Appearance.rounding.normal
         antialiasing: true
         anchors.leftMargin: root.xOffset
@@ -135,6 +136,34 @@ MouseArea { // Notification group area
         implicitHeight: root.expanded ? 
             row.implicitHeight + padding * 2 :
             Math.min(80, row.implicitHeight + padding * 2)
+
+        LiquidGlassSurface {
+            anchors.fill: parent
+            readonly property point targetPosition: {
+                background.x;
+                background.y;
+                root.x;
+                root.y;
+                return root.glassCapture?.target
+                    ? background.mapToItem(root.glassCapture.target, 0, 0)
+                    : Qt.point(0, 0);
+            }
+
+            shown: root.popup
+            wallpaperSource: root.glassCapture?.source ?? null
+            sourceReady: root.glassCapture?.ready ?? false
+            sourceFillsItem: true
+            enhancedOptics: true
+            thicknessOverride: 0.15
+            itemSourceRect: Qt.rect(
+                ((root.glassCapture?.targetOffsetX ?? 0) + targetPosition.x) / Math.max(1, root.glassCapture?.sourceWidth ?? 1),
+                ((root.glassCapture?.targetOffsetY ?? 0) + targetPosition.y) / Math.max(1, root.glassCapture?.sourceHeight ?? 1),
+                width / Math.max(1, root.glassCapture?.sourceWidth ?? 1),
+                height / Math.max(1, root.glassCapture?.sourceHeight ?? 1)
+            )
+            tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
+            radius: background.radius
+        }
 
         Behavior on implicitHeight {
             id: implicitHeightAnim

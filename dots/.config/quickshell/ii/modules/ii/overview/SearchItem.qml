@@ -17,15 +17,14 @@ RippleButton {
     property string query
     property bool current: false
     readonly property string entryKey: entry?.key ?? ""
-    readonly property bool isAppResult: entryKey.startsWith("app:")
+    readonly property bool isAppResult: entry?.nativeApp ?? entryKey.startsWith("app:")
     readonly property bool isClipboardResult: entryKey.startsWith("clipboard:")
     readonly property bool isFileResult: entryKey.startsWith("file:")
     property bool entryShown: entry?.shown ?? true
-    property string itemType: entry?.type ?? Translation.tr("App")
+    property string itemType: entry?.nativeApp ? Translation.tr("App") : entry?.type ?? Translation.tr("App")
     property string itemName: entry?.name ?? ""
-    property var iconType: entry?.iconType
+    property var iconType: entry?.nativeApp ? LauncherSearchResult.IconType.System : entry?.iconType
     property string iconName: entry?.iconName ?? ""
-    property var itemExecute: entry?.execute
     property var fontType: switch(entry?.fontType) {
         case LauncherSearchResult.FontType.Monospace:
             return "monospace"
@@ -34,7 +33,7 @@ RippleButton {
         default:
             return "main"
     }
-    property string itemClickActionName: entry?.verb ?? "Open"
+    property string itemClickActionName: entry?.nativeApp ? Translation.tr("Open") : entry?.verb ?? "Open"
     property string bigText: entry?.iconType === LauncherSearchResult.IconType.Text ? entry?.iconName ?? "" : ""
     property string materialSymbol: entry?.iconType === LauncherSearchResult.IconType.Material ? entry?.iconName ?? "" : ""
     property string cliphistRawString: isClipboardResult ? entry?.rawValue ?? "" : ""
@@ -45,12 +44,13 @@ RippleButton {
     property int horizontalMargin: 10
     property int buttonHorizontalPadding: 10
     property int buttonVerticalPadding: 6
+    property real containerRadius: Appearance.rounding.normal + horizontalMargin
     property bool keyboardDown: false
     readonly property bool selected: root.current
 
     implicitHeight: rowLayout.implicitHeight + root.buttonVerticalPadding * 2
     implicitWidth: rowLayout.implicitWidth + root.buttonHorizontalPadding * 2
-    buttonRadius: Appearance.rounding.normal
+    buttonRadius: Math.max(0, root.containerRadius - root.horizontalMargin)
     colBackground: (root.down || root.keyboardDown) ? Appearance.colors.colPrimaryContainerActive : 
         (selected ? Appearance.colors.colPrimaryContainer : 
         ColorUtils.transparentize(Appearance.colors.colPrimaryContainer, 1))
@@ -111,7 +111,7 @@ RippleButton {
 
     onClicked: {
         GlobalStates.overviewOpen = false
-        root.itemExecute()
+        LauncherSearch.executeResult(root.entry)
     }
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Delete && event.modifiers === Qt.ShiftModifier) {
@@ -193,7 +193,7 @@ RippleButton {
             spacing: 0
             StyledText {
                 font.pixelSize: Appearance.font.pixelSize.smaller
-                color: root.selected ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
+                color: root.selected ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurfaceVariant
                 visible: root.itemType && root.itemType != Translation.tr("App")
                 text: root.itemType
             }

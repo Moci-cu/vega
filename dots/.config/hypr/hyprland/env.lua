@@ -5,6 +5,7 @@ hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
 
 -- Applications
 hl.env("XDG_DATA_DIRS", home_dir .. "/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:/usr/local/share:/usr/share:$XDG_DATA_DIRS")
+hl.env("QML_IMPORT_PATH", home_dir .. "/.local/lib/vega/qml:$QML_IMPORT_PATH")
 
 -- Themes
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")

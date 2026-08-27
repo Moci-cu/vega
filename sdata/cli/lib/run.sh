@@ -8,5 +8,5 @@ hyprctl reload
 
 sleep 1.0
 
-nohup qs -c ii > /dev/null 2>&1 &
+QML_IMPORT_PATH="$HOME/.local/lib/vega/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}" nohup qs -c ii > /dev/null 2>&1 &
 echo -e "${GREEN}✓ Quickshell started${NC}"

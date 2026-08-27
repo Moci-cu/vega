@@ -10,6 +10,11 @@ Item {
     property bool accountForBarPosition: false
     property bool sourceFillsItem: false
     property bool enhancedOptics: false
+    property bool interactiveOptics: false
+    property bool responsiveOptics: false
+    property real interaction: 0
+    property point interactionPoint: Qt.point(0.5, 0.5)
+    property real thicknessOverride: -1
     property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
     property bool sourceReady: wallpaperSource?.status === Image.Ready
@@ -117,9 +122,15 @@ Item {
             + 0.28 * ((root.scenePosition.x + root.width / 2) / Math.max(1, root.screen?.width ?? 1) - 0.5)
             + 0.22 * (root.parallaxWorkspaceValue - 0.5)
             + 0.08 * root.parallaxSidebarBalance
+            + 0.45 * root.interaction * (root.interactionPoint.x - 0.5)
         property vector2d lightDirection: Qt.vector2d(Math.cos(lightAngle), Math.sin(lightAngle))
         property real refraction: 5
         property real enhancedOptics: root.enhancedOptics ? 1 : 0
+        property real interactiveOptics: root.interactiveOptics ? 1 : 0
+        property real responsiveOptics: root.responsiveOptics ? 1 : 0
+        property real interaction: root.interaction
+        property vector2d interactionPoint: Qt.vector2d(root.interactionPoint.x, root.interactionPoint.y)
+        property real thicknessOverride: root.thicknessOverride
 
         fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb")
 

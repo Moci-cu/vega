@@ -49,22 +49,16 @@ Singleton {
     ]
 
     // Deduped list to fix double icons
-    readonly property list<DesktopEntry> list: Array.from(DesktopEntries.applications.values)
-        .filter((app, index, self) => 
-            index === self.findIndex((t) => (
-                t.id === app.id
-            ))
-    )
-    
-    readonly property var preppedNames: list.map(a => ({
-        name: Fuzzy.prepare(`${a.name} `),
-        entry: a
-    }))
-
-    readonly property var preppedIcons: list.map(a => ({
-        name: Fuzzy.prepare(`${a.icon} `),
-        entry: a
-    }))
+    readonly property list<DesktopEntry> list: {
+        const seen = new Set();
+        return Array.from(DesktopEntries.applications.values).filter(app => {
+            if (seen.has(app.id)) return false;
+            seen.add(app.id);
+            return true;
+        });
+    }
+    property var preppedNamesCache: null
+    property var preppedIconsCache: null
 
     onSloppySearchChanged: queryCache = ({})
     onResultLimitChanged: queryCache = ({})
@@ -90,6 +84,34 @@ Singleton {
         iconExistsCache = ({});
         guessIconCache = ({});
         iconPathCache = ({});
+        preppedNamesCache = null;
+        preppedIconsCache = null;
+    }
+
+    function preparedNames() {
+        if (root.preppedNamesCache === null) {
+            root.preppedNamesCache = root.list.map(app => ({
+                name: Fuzzy.prepare(`${app.name} `),
+                entry: app
+            }));
+        }
+        return root.preppedNamesCache;
+    }
+
+    function preparedIcons() {
+        if (root.preppedIconsCache === null) {
+            root.preppedIconsCache = root.list.map(app => ({
+                name: Fuzzy.prepare(`${app.icon} `),
+                entry: app
+            }));
+        }
+        return root.preppedIconsCache;
+    }
+
+    function entryById(id) {
+        const directEntry = DesktopEntries.byId(id);
+        if (directEntry) return directEntry;
+        return root.list.find(entry => (entry.id || entry.name) === id);
     }
 
     Connections {
@@ -115,7 +137,7 @@ Singleton {
             return root.rememberCacheValue(root.queryCache, cacheKey, results, root.queryCacheLimit);
         }
 
-        const results = Fuzzy.go(search, preppedNames, {
+        const results = Fuzzy.go(search, root.preparedNames(), {
             all: true,
             key: "name",
             limit: effectiveLimit
@@ -196,7 +218,7 @@ Singleton {
         if (iconExists(undescoreToKebabGuess)) return root.rememberIconGuess(iconName, undescoreToKebabGuess);
 
         // Search in desktop entries
-        const iconSearchResults = Fuzzy.go(iconName, preppedIcons, {
+        const iconSearchResults = Fuzzy.go(iconName, root.preparedIcons(), {
             all: true,
             key: "name"
         }).map(r => {

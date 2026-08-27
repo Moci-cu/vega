@@ -249,6 +249,39 @@ install_network_helper() {
     echo -e "${GREEN}✓ Native Wi-Fi helper installed${NC}"
 }
 
+install_launcher_backend() {
+    local SOURCE="$SCRIPT_DIR/tools/vega-launcher-backend"
+    local BUILD_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/vega/launcher-backend-build"
+    local MODULE_DIR="$HOME/.local/lib/vega/qml/Vega/Launcher"
+
+    if [ ! -d "$SOURCE" ]; then
+        return 0
+    fi
+
+    if ! command -v cmake >/dev/null 2>&1 || ! command -v pkg-config >/dev/null 2>&1 || ! pkg-config --exists Qt6Core Qt6Qml; then
+        echo -e "${YELLOW}⚠ Skipping native launcher search: CMake and Qt6 QML development files are required; JavaScript fallback remains available.${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}• Building native launcher search...${NC}"
+    mkdir -p "$BUILD_DIR"
+    if ! cmake -S "$SOURCE" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release >/dev/null \
+        || ! cmake --build "$BUILD_DIR" --parallel "$(nproc)" >/dev/null \
+        || ! ctest --test-dir "$BUILD_DIR" --output-on-failure; then
+        echo -e "${YELLOW}⚠ Native launcher search could not be installed; JavaScript fallback remains available.${NC}"
+        return 0
+    fi
+    mkdir -p "$MODULE_DIR"
+    if ! install -m755 "$BUILD_DIR/libvega_launcherplugin.so" "$MODULE_DIR/.libvega_launcherplugin.so.new" \
+        || ! mv -f "$MODULE_DIR/.libvega_launcherplugin.so.new" "$MODULE_DIR/libvega_launcherplugin.so" \
+        || ! install -m644 "$SOURCE/qml/qmldir" "$MODULE_DIR/.qmldir.new" \
+        || ! mv -f "$MODULE_DIR/.qmldir.new" "$MODULE_DIR/qmldir"; then
+        echo -e "${YELLOW}⚠ Native launcher search could not be installed; JavaScript fallback remains available.${NC}"
+        return 0
+    fi
+    echo -e "${GREEN}✓ Native launcher search installed${NC}"
+}
+
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}          ii-vynx setup     ${NC}"
@@ -416,6 +449,7 @@ else
 fi
 
 install_network_helper
+install_launcher_backend
 
 echo ""
 echo -e "${NC}• Copying...${NC}"
@@ -444,7 +478,7 @@ hyprctl reload
 sleep 1.0
 
 log_verbose "Starting Quickshell with config: ii"
-nohup qs -c ii > /dev/null 2>&1 &
+QML_IMPORT_PATH="$HOME/.local/lib/vega/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}" nohup qs -c ii > /dev/null 2>&1 &
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Quickshell started${NC}"

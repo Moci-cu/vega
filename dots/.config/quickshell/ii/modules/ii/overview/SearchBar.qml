@@ -15,6 +15,8 @@ RowLayout {
     property alias searchInput: searchInput
     property string searchingText
     property int debounceInterval: 35
+    property var resultAt: index => LauncherSearch.results[index]
+    property var executeResult: entry => LauncherSearch.executeResult(entry)
 
     function cancelPendingQuery() {
         queryCommitTimer.stop();
@@ -33,7 +35,7 @@ RowLayout {
 
     function selectedEntry() {
         const selectedIndex = Math.max(0, appResults.currentIndex);
-        return LauncherSearch.results[selectedIndex];
+        return root.resultAt(selectedIndex);
     }
 
     function forceFocus() {
@@ -94,6 +96,8 @@ RowLayout {
         implicitHeight: 40
         focus: GlobalStates.overviewOpen
         font.pixelSize: Appearance.font.pixelSize.small
+        color: Appearance.colors.colOnSurface
+        placeholderTextColor: Appearance.colors.colOnSurfaceVariant
         placeholderText: Translation.tr("Search, calculate or run")
         implicitWidth: root.searchingText == "" ? Appearance.sizes.searchWidthCollapsed : Appearance.sizes.searchWidth
 
@@ -118,7 +122,7 @@ RowLayout {
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
                 GlobalStates.overviewOpen = false;
-                selectedEntry.execute();
+                root.executeResult(selectedEntry);
             }
         }
 
@@ -142,8 +146,8 @@ RowLayout {
             }
             if (event.key === Qt.Key_Tab) {
                 root.flushPendingQuery();
-                if (LauncherSearch.results.length === 0) return;
-                const tabbedText = LauncherSearch.results[0].name;
+                if (appResults.count === 0) return;
+                const tabbedText = root.resultAt(0)?.name ?? "";
                 root.setQueryImmediately(tabbedText);
                 event.accepted = true;
             }

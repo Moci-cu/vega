@@ -36,8 +36,29 @@ Scope {
         color: "transparent"
         implicitWidth: Appearance.sizes.notificationPopupWidth
 
+        Item {
+            id: notificationGlassTarget
+            anchors {
+                top: parent.top
+                right: parent.right
+                rightMargin: 4
+                topMargin: 4
+            }
+            width: listview.width
+            height: Math.max(1, Math.min(listview.contentHeight, root.height - anchors.topMargin))
+        }
+
+        LiquidGlassCapture {
+            id: notificationGlassCapture
+            screen: root.screen
+            target: notificationGlassTarget
+            active: root.visible
+            windowOriginX: Math.max(0, (screen?.width ?? root.width) - root.width)
+        }
+
         NotificationListView {
             id: listview
+            glassCapture: notificationGlassCapture
             anchors {
                 top: parent.top
                 bottom: parent.bottom
