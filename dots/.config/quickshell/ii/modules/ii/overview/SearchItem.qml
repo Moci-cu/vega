@@ -162,6 +162,7 @@ RippleButton {
             id: iconImageComponent
             IconImage {
                 source: AppSearch.iconPath(root.iconName, "image-missing")
+                asynchronous: true
                 width: 35
                 height: 35
             }
@@ -304,6 +305,7 @@ RippleButton {
                             active: actionButton.iconType === LauncherSearchResult.IconType.System && actionButton.iconName !== ""
                             sourceComponent: IconImage {
                                 source: AppSearch.iconPath(actionButton.iconName)
+                                asynchronous: true
                                 implicitSize: 20
                             }
                         }

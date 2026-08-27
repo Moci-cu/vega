@@ -57,9 +57,9 @@ int main(int argc, char **argv)
     QObject::connect(&model, &QAbstractItemModel::rowsMoved, [&moves] { ++moves; });
     const QPersistentModelIndex firstResultSlot = model.index(0);
     model.search("fi", 3, {QVariantMap{{"key", "web-search"}, {"name", "fi"}}});
-    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 3; }))
-        return fail("native search did not merge fallback rows");
-    if (model.get(2).value("key").toString() != "web-search")
+    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 2; }))
+        return fail("confident application search kept a generic fallback");
+    if (model.get(1).value("id").toString() != "firefox.desktop")
         return fail("native search did not deduplicate application IDs");
     if (firstResultSlot.row() != 0
         || model.data(firstResultSlot, NativeAppSearchModel::ModelDataRole).toMap().value("id") != "files.desktop")
@@ -68,6 +68,32 @@ int main(int argc, char **argv)
         return fail("native search did not batch structural model updates");
     if (resets != 0)
         return fail("stable result model unexpectedly reset");
+
+    model.rebuildIndex({
+        QVariantMap{{"id", "heroic.desktop"}, {"name", "Heroic Games Launcher"}, {"iconName", "heroic"}},
+        QVariantMap{{"id", "avahi.desktop"}, {"name", "Avahi Zeroconf Browser"}, {"iconName", "network-workgroup"}},
+        QVariantMap{{"id", "bssh.desktop"}, {"name", "Avahi SSH Server Browser"}, {"iconName", "network-workgroup"}},
+        QVariantMap{{"id", "bvnc.desktop"}, {"name", "Avahi VNC Server Browser"}, {"iconName", "network-workgroup"}},
+    });
+    const QVariantList genericActions = {
+        QVariantMap{{"key", "command"}, {"name", "her"}},
+        QVariantMap{{"key", "web-search"}, {"name", "her"}},
+    };
+    model.search("her", 7, genericActions);
+    if (!waitUntil([&model] { return model.indexReady() && !model.busy() && model.rowCount() == 1; }))
+        return fail("confident prefix search kept weak applications or generic actions");
+    if (model.get(0).value("id") != "heroic.desktop")
+        return fail("short prefix did not predict Heroic Games Launcher");
+
+    model.search("games lau", 7, genericActions);
+    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 1; })
+        || model.get(0).value("id") != "heroic.desktop")
+        return fail("multi-word prefixes did not resolve Heroic Games Launcher");
+
+    model.search("hgl", 7, genericActions);
+    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 1; })
+        || model.get(0).value("id") != "heroic.desktop")
+        return fail("application initials did not resolve Heroic Games Launcher");
 
     model.search("no-native-match", 4, {
         QVariantMap{{"key", "a"}, {"name", "A"}},

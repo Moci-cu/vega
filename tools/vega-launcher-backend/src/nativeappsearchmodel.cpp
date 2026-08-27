@@ -2,7 +2,9 @@
 
 #include <QMetaObject>
 #include <QObject>
+#include <QRegularExpression>
 #include <QSet>
+#include <QStringList>
 
 #include <algorithm>
 #include <limits>
@@ -14,6 +16,8 @@ struct IndexedApp {
     QString id;
     QString name;
     QString foldedName;
+    QStringList foldedWords;
+    QString initials;
     QString iconName;
 };
 
@@ -22,18 +26,60 @@ struct ScoredApp {
     int score;
 };
 
-std::optional<int> fuzzyScore(const QString &text, const QString &query)
+constexpr int confidentMatchScore = 800'000;
+
+QStringList splitWords(const QString &text)
 {
+    static const QRegularExpression separator(QStringLiteral("[^\\p{L}\\p{N}]+"));
+    return text.split(separator, Qt::SkipEmptyParts);
+}
+
+QString wordInitials(const QStringList &words)
+{
+    QString initials;
+    initials.reserve(words.size());
+    for (const QString &word : words)
+        initials.append(word.front());
+    return initials;
+}
+
+std::optional<int> fuzzyScore(const IndexedApp &app, const QString &query,
+                              const QStringList &queryWords, const QString &compactQuery)
+{
+    const QString &text = app.foldedName;
     if (query.isEmpty())
         return 0;
     if (text == query)
         return 1'000'000;
     if (text.startsWith(query))
-        return 900'000 - text.size();
+        return 950'000 - text.size();
+
+    int nextWord = 0;
+    int skippedWords = 0;
+    int unmatchedCharacters = 0;
+    bool allWordsMatch = !queryWords.isEmpty();
+    for (const QString &queryWord : queryWords) {
+        int matchedWord = nextWord;
+        while (matchedWord < app.foldedWords.size()
+               && !app.foldedWords.at(matchedWord).startsWith(queryWord))
+            ++matchedWord;
+        if (matchedWord == app.foldedWords.size()) {
+            allWordsMatch = false;
+            break;
+        }
+        skippedWords += matchedWord - nextWord;
+        unmatchedCharacters += app.foldedWords.at(matchedWord).size() - queryWord.size();
+        nextWord = matchedWord + 1;
+    }
+    if (allWordsMatch)
+        return 900'000 - skippedWords * 1'000 - unmatchedCharacters;
+
+    if (compactQuery.size() > 1 && app.initials.startsWith(compactQuery))
+        return 850'000 - app.initials.size();
 
     const qsizetype containedAt = text.indexOf(query);
     if (containedAt >= 0)
-        return 800'000 - static_cast<int>(containedAt * 32 + text.size());
+        return 700'000 - static_cast<int>(containedAt * 32 + text.size());
 
     int score = 0;
     qsizetype previous = -1;
@@ -100,10 +146,14 @@ public slots:
             if (seenIds.contains(id))
                 continue;
             seenIds.insert(id);
+            const QString foldedName = name.toCaseFolded();
+            const QStringList foldedWords = splitWords(foldedName);
             index.push_back({
                 .id = std::move(id),
                 .name = name,
-                .foldedName = name.toCaseFolded(),
+                .foldedName = foldedName,
+                .foldedWords = foldedWords,
+                .initials = wordInitials(foldedWords),
                 .iconName = entry.value(QStringLiteral("iconName")).toString(),
             });
         }
@@ -117,14 +167,19 @@ public slots:
             return;
 
         const QString foldedQuery = query.trimmed().toCaseFolded();
+        const QStringList queryWords = splitWords(foldedQuery);
+        const QString compactQuery = queryWords.join(QString());
         QVector<ScoredApp> matches;
         matches.reserve(index_.size());
+        bool hasConfidentMatch = false;
         for (int i = 0; i < index_.size(); ++i) {
             if (generation != latestGeneration_->load(std::memory_order_relaxed))
                 return;
-            const std::optional<int> score = fuzzyScore(index_.at(i).foldedName, foldedQuery);
-            if (score)
+            const std::optional<int> score = fuzzyScore(index_.at(i), foldedQuery, queryWords, compactQuery);
+            if (score) {
                 matches.push_back({i, *score});
+                hasConfidentMatch |= *score >= confidentMatchScore;
+            }
         }
 
         std::sort(matches.begin(), matches.end(), [this](const ScoredApp &left, const ScoredApp &right) {
@@ -138,12 +193,16 @@ public slots:
         for (const ScoredApp &match : matches) {
             if (rows.size() >= limit)
                 break;
+            if (hasConfidentMatch && match.score < confidentMatchScore)
+                continue;
             rows.push_back(appRow(index_.at(match.index)));
         }
-        for (const QVariant &fallback : fallbackRows) {
-            if (rows.size() >= limit)
-                break;
-            rows.push_back(fallback);
+        if (!hasConfidentMatch) {
+            for (const QVariant &fallback : fallbackRows) {
+                if (rows.size() >= limit)
+                    break;
+                rows.push_back(fallback);
+            }
         }
 
         if (generation == latestGeneration_->load(std::memory_order_acquire))

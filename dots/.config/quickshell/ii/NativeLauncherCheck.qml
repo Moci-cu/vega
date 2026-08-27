@@ -24,8 +24,8 @@ ShellRoot {
             if (!root.searchStarted)
                 return;
             const first = NativeAppSearch.get(0);
-            if (!first?.nativeApp || first.id !== root.expectedId)
-                return root.fail("native model returned the wrong application");
+            if (!first?.nativeApp || first.id !== root.expectedId || NativeAppSearch.model.count !== 1)
+                return root.fail("'her' did not resolve only Heroic Games Launcher");
             console.log(`[NativeLauncherCheck] first=${first.name} count=${NativeAppSearch.model.count}`);
             Qt.exit(0);
         }
@@ -53,12 +53,13 @@ ShellRoot {
             if (root.searchStarted)
                 return;
 
-            const entry = Array.from(DesktopEntries.applications.values)[0];
+            const entry = Array.from(DesktopEntries.applications.values)
+                .find(app => String(app.name).toLowerCase().startsWith("heroic"));
             if (!entry)
-                return root.fail("desktop application index is empty");
+                return root.fail("Heroic Games Launcher is not installed");
             root.expectedId = entry.id || entry.name;
             root.searchStarted = true;
-            LauncherSearch.query = entry.name;
+            LauncherSearch.query = "her";
         }
     }
 }
