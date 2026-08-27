@@ -12,11 +12,16 @@ RowLayout {
     id: root
     spacing: 6
     property bool animateWidth: false
+    property bool forceExpanded: false
     property alias searchInput: searchInput
     property string searchingText
     property int debounceInterval: 35
+    property int resultCount: 0
+    property int currentIndex: -1
+    property int navigationColumns: 1
     property var resultAt: index => LauncherSearch.results[index]
     property var executeResult: entry => LauncherSearch.executeResult(entry)
+    property var moveSelection: (delta, linear) => {}
 
     function cancelPendingQuery() {
         queryCommitTimer.stop();
@@ -34,7 +39,7 @@ RowLayout {
     }
 
     function selectedEntry() {
-        const selectedIndex = Math.max(0, appResults.currentIndex);
+        const selectedIndex = Math.max(0, root.currentIndex);
         return root.resultAt(selectedIndex);
     }
 
@@ -99,7 +104,8 @@ RowLayout {
         color: Appearance.colors.colOnSurface
         placeholderTextColor: Appearance.colors.colOnSurfaceVariant
         placeholderText: Translation.tr("Search, calculate or run")
-        implicitWidth: root.searchingText == "" ? Appearance.sizes.searchWidthCollapsed : Appearance.sizes.searchWidth
+        implicitWidth: root.forceExpanded || root.searchingText != ""
+            ? Appearance.sizes.searchWidth : Appearance.sizes.searchWidthCollapsed
 
         Behavior on implicitWidth {
             id: searchWidthBehavior
@@ -118,7 +124,7 @@ RowLayout {
 
         onAccepted: {
             root.flushPendingQuery();
-            if (appResults.count > 0) {
+            if (root.resultCount > 0) {
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
                 GlobalStates.overviewOpen = false;
@@ -129,24 +135,32 @@ RowLayout {
         Keys.onPressed: event => {
             const ctrlPressed = event.modifiers & Qt.ControlModifier;
             if (ctrlPressed && event.key === Qt.Key_N) {
-                if (appResults.count > 0) {
-                    appResults.currentIndex = Math.min(appResults.count - 1, appResults.currentIndex + 1);
-                    appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
-                }
+                root.moveSelection(1, true);
                 event.accepted = true;
                 return;
             }
             if (ctrlPressed && event.key === Qt.Key_P) {
-                if (appResults.count > 0) {
-                    appResults.currentIndex = Math.max(0, appResults.currentIndex - 1);
-                    appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
-                }
+                root.moveSelection(-1, true);
+                event.accepted = true;
+                return;
+            }
+            let selectionDelta = 0;
+            if (root.navigationColumns > 1 && event.key === Qt.Key_Left)
+                selectionDelta = -1;
+            else if (root.navigationColumns > 1 && event.key === Qt.Key_Right)
+                selectionDelta = 1;
+            else if (event.key === Qt.Key_Up)
+                selectionDelta = -root.navigationColumns;
+            else if (event.key === Qt.Key_Down)
+                selectionDelta = root.navigationColumns;
+            if (selectionDelta !== 0 && root.resultCount > 0) {
+                root.moveSelection(selectionDelta);
                 event.accepted = true;
                 return;
             }
             if (event.key === Qt.Key_Tab) {
                 root.flushPendingQuery();
-                if (appResults.count === 0) return;
+                if (root.resultCount === 0) return;
                 const tabbedText = root.resultAt(0)?.name ?? "";
                 root.setQueryImmediately(tabbedText);
                 event.accepted = true;

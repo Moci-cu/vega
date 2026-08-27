@@ -80,10 +80,17 @@ int main(int argc, char **argv)
         QVariantMap{{"key", "web-search"}, {"name", "her"}},
     };
     model.search("her", 7, genericActions);
-    if (!waitUntil([&model] { return model.indexReady() && !model.busy() && model.rowCount() == 1; }))
-        return fail("confident prefix search kept weak applications or generic actions");
+    if (!waitUntil([&model] {
+            return model.indexReady() && !model.busy() && model.rowCount() > 0
+                && model.get(0).value("id") == "heroic.desktop";
+        }))
+        return fail("confident prefix search did not rank Heroic Games Launcher first");
     if (model.get(0).value("id") != "heroic.desktop")
         return fail("short prefix did not predict Heroic Games Launcher");
+    for (int row = 0; row < model.rowCount(); ++row) {
+        if (!model.get(row).value("nativeApp").toBool())
+            return fail("confident application search kept a generic action");
+    }
 
     model.search("games lau", 7, genericActions);
     if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 1; })
@@ -117,6 +124,16 @@ int main(int argc, char **argv)
         return fail("stable result slot was recreated during mixed result changes");
     if (resets != 0)
         return fail("stable result model reset during mixed structural changes");
+
+    model.search("", 20);
+    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 4; }))
+        return fail("empty query did not return the full application index");
+    for (int row = 1; row < model.rowCount(); ++row) {
+        const QString previous = model.get(row - 1).value("name").toString();
+        const QString current = model.get(row).value("name").toString();
+        if (QString::localeAwareCompare(previous, current) > 0)
+            return fail("empty-query applications are not alphabetically ordered");
+    }
 
     return 0;
 }

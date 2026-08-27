@@ -193,8 +193,6 @@ public slots:
         for (const ScoredApp &match : matches) {
             if (rows.size() >= limit)
                 break;
-            if (hasConfidentMatch && match.score < confidentMatchScore)
-                continue;
             rows.push_back(appRow(index_.at(match.index)));
         }
         if (!hasConfidentMatch) {
@@ -292,7 +290,7 @@ void NativeAppSearchModel::search(const QString &query, int limit, const QVarian
     lastFallbackRows_ = fallbackRows;
 
     const quint64 generation = latestSearchGeneration_.fetch_add(1, std::memory_order_acq_rel) + 1;
-    if (query.trimmed().isEmpty() || lastLimit_ == 0) {
+    if (lastLimit_ == 0) {
         setBusy(false);
         applyRows({});
         emit searchFinished();

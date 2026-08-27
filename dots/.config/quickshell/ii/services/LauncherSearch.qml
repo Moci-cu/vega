@@ -45,14 +45,18 @@ Singleton {
         return root.matchedPrefixEntry(queryText)?.prefix ?? "";
     }
 
-    function shouldUseNativeAppSearch(queryText = root.query) {
-        if (!NativeAppSearch.available || AppSearch.sloppySearch || Config.options.panelFamily !== "ii")
-            return false;
+    function isApplicationQuery(queryText = root.query) {
         const queryString = String(queryText ?? "");
-        if (queryString.length === 0 || /^\d/.test(queryString))
+        if (/^\d/.test(queryString))
             return false;
         const prefixName = root.matchedPrefixName(queryString);
         return prefixName === "app" || prefixName === "";
+    }
+
+    function shouldUseNativeAppSearch(queryText = root.query) {
+        if (!NativeAppSearch.available || AppSearch.sloppySearch || Config.options.panelFamily !== "ii")
+            return false;
+        return root.isApplicationQuery(queryText);
     }
 
     function nativeAppQuery(queryText = root.query) {

@@ -3,9 +3,11 @@ pragma ComponentBehavior: Bound
 import Qt.labs.synchronizer
 import Qt5Compat.GraphicalEffects
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Widgets
 import Quickshell.Wayland
 
 import qs
@@ -20,13 +22,23 @@ Item { // Wrapper
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 35
     readonly property int typingResultLimit: 7
-    readonly property var screen: root.QsWindow.window?.screen
+    readonly property int appGridColumns: 5
+    readonly property int appGridRows: 4
+    readonly property int appGridCapacity: appGridColumns * appGridRows
+    readonly property real appGridCellWidth: 100
+    readonly property real appGridCellHeight: 104
+    readonly property real resultsViewportWidth: appGridColumns * appGridCellWidth
+    readonly property real resultsViewportHeight: appGridRows * appGridCellHeight
+    readonly property var screen: root.QsWindow.window?.screen ?? null
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
     readonly property bool backdropReady: liquidGlassCapture.hasContent || backdropCaptureTimedOut
+    readonly property bool appMode: LauncherSearch.isApplicationQuery(root.searchingText)
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
+    readonly property int activeResultCount: appMode ? appGrid.count : listResults.count
+    readonly property int activeCurrentIndex: appMode ? appGrid.currentIndex : listResults.currentIndex
     property string searchingText: LauncherSearch.query
-    property bool showResults: searchingText != ""
+    readonly property bool showResults: GlobalStates.overviewOpen
     property bool backdropCaptureTimedOut: false
     property real retainedBackdropWidth: 1
     property real retainedBackdropHeight: 1
@@ -41,10 +53,29 @@ Item { // Wrapper
     }
 
     function focusFirstItem() {
-        if (appResults.count <= 0)
+        const view = root.appMode ? appGrid : listResults;
+        if (view.count <= 0)
             return;
-        if (appResults.currentIndex !== 0)
-            appResults.currentIndex = 0;
+        if (view.currentIndex !== 0)
+            view.currentIndex = 0;
+        view.positionViewAtIndex(0, root.appMode ? GridView.Contain : ListView.Contain);
+    }
+
+    function moveSelection(delta, linear = false) {
+        const view = root.appMode ? appGrid : listResults;
+        if (view.count <= 0)
+            return;
+        const current = Math.max(0, view.currentIndex);
+        if (root.appMode && !linear) {
+            const column = current % root.appGridColumns;
+            if ((delta === -1 && column === 0) || (delta === 1 && column === root.appGridColumns - 1))
+                return;
+            if (Math.abs(delta) === root.appGridColumns
+                    && (current + delta < 0 || current + delta >= view.count))
+                return;
+        }
+        view.currentIndex = Math.max(0, Math.min(view.count - 1, current + delta));
+        view.positionViewAtIndex(view.currentIndex, root.appMode ? GridView.Contain : ListView.Contain);
     }
 
     function focusSearchInput() {
@@ -67,43 +98,39 @@ Item { // Wrapper
     }
 
     function resultAt(index) {
-        return root.nativeAppSearchActive ? NativeAppSearch.get(index) : LauncherSearch.results[index];
-    }
-
-    function nativeFallbackRows(values) {
-        return (values ?? []).map(entry => ({
-            nativeFallback: true,
-            key: entry.key,
-            type: entry.type,
-            fontType: entry.fontType,
-            name: entry.name,
-            rawValue: entry.rawValue,
-            iconName: entry.iconName,
-            iconType: entry.iconType,
-            verb: entry.verb,
-            shown: entry.shown,
-            blurImage: entry.blurImage
-        }));
+        return root.nativeAppSearchActive ? NativeAppSearch.get(index) : resultModel.values[index];
     }
 
     function refreshResults() {
         const values = LauncherSearch.results;
-        if (root.nativeAppSearchActive) {
-            NativeAppSearch.search(
-                LauncherSearch.nativeAppQuery(root.searchingText),
-                root.typingResultLimit,
-                root.nativeFallbackRows(values)
-            );
+        if (root.appMode) {
+            const query = LauncherSearch.nativeAppQuery(root.searchingText);
+            const blankQuery = query.trim().length === 0;
+            const limit = blankQuery ? Math.max(root.appGridCapacity, AppSearch.list.length) : root.appGridCapacity;
+            if (root.nativeAppSearchActive) {
+                NativeAppSearch.search(query, limit);
+                return;
+            }
+            NativeAppSearch.clear();
+            resultModel.values = blankQuery
+                ? Array.from(AppSearch.list)
+                    .sort((left, right) => String(left.name).localeCompare(String(right.name)))
+                    .map(entry => LauncherSearch.appResult(entry))
+                : (values ?? []).filter(entry => String(entry?.key ?? "").startsWith("app:")).slice(0, limit);
+            Qt.callLater(root.focusFirstItem);
             return;
         }
         NativeAppSearch.clear();
-        appResults.setResultValues(values);
+        resultModel.values = (values ?? []).slice(0, root.typingResultLimit);
+        Qt.callLater(root.focusFirstItem);
     }
 
     function scheduleResultsRefresh() {
         resultsRefreshTimer.restart();
     }
 
+    onSearchingTextChanged: root.scheduleResultsRefresh()
+    onAppModeChanged: root.scheduleResultsRefresh()
     onNativeAppSearchActiveChanged: root.scheduleResultsRefresh()
     Component.onCompleted: root.scheduleResultsRefresh()
 
@@ -127,6 +154,14 @@ Item { // Wrapper
 
         function onSearchFinished() {
             Qt.callLater(root.focusFirstItem);
+        }
+    }
+
+    Connections {
+        target: LauncherSearch
+
+        function onResultsChanged() {
+            root.scheduleResultsRefresh();
         }
     }
 
@@ -176,6 +211,64 @@ Item { // Wrapper
                 searchBar.searchInput.cursorPosition += 1;
                 event.accepted = true;
                 root.focusFirstItem();
+            }
+        }
+    }
+
+    component AppGridItem: RippleButton {
+        id: gridItem
+
+        required property int index
+        required property var modelData
+
+        width: root.appGridCellWidth
+        height: root.appGridCellHeight
+        toggled: appGrid.currentIndex === index
+        buttonRadius: Appearance.rounding.normal
+        colBackground: ColorUtils.transparentize(Appearance.colors.colSurfaceContainerHigh, 1)
+        colBackgroundHover: Appearance.colors.colSurfaceContainerHigh
+        colBackgroundToggled: Appearance.colors.colPrimaryContainer
+        colBackgroundToggledHover: Appearance.colors.colPrimaryContainerHover
+        colRipple: Appearance.colors.colSurfaceContainerHighest
+        colRippleToggled: Appearance.colors.colPrimaryContainerActive
+
+        background {
+            anchors.margins: 4
+        }
+
+        onHoveredChanged: {
+            if (hovered && appGrid.currentIndex !== index)
+                appGrid.currentIndex = index;
+        }
+        onClicked: {
+            GlobalStates.overviewOpen = false;
+            LauncherSearch.executeResult(gridItem.modelData);
+        }
+
+        contentItem: Item {
+            ColumnLayout {
+                anchors.centerIn: parent
+                width: Math.max(1, parent.width - 12)
+                spacing: 6
+
+                IconImage {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 56
+                    Layout.preferredHeight: 56
+                    source: AppSearch.iconPath(gridItem.modelData?.iconName ?? "", "image-missing")
+                    asynchronous: true
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    color: gridItem.toggled
+                        ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurface
+                    font.pixelSize: Appearance.font.pixelSize.small
+                    horizontalAlignment: Text.AlignHCenter
+                    maximumLineCount: 1
+                    elide: Text.ElideRight
+                    text: gridItem.modelData?.name ?? ""
+                }
             }
         }
     }
@@ -249,6 +342,7 @@ Item { // Wrapper
         function onOverviewOpenChanged() {
             root.backdropCaptureTimedOut = false;
             if (GlobalStates.overviewOpen) {
+                root.scheduleResultsRefresh();
                 root.retainBackdropSize(gridLayout.implicitWidth, gridLayout.implicitHeight);
             } else {
                 root.retainedBackdropWidth = 1;
@@ -293,17 +387,6 @@ Item { // Wrapper
             NumberAnimation {
                 duration: 90
                 easing.type: Easing.OutCubic
-            }
-        }
-
-        Behavior on implicitHeight {
-            id: searchHeightBehavior
-            enabled: GlobalStates.overviewOpen
-            SpringAnimation {
-                spring: 5
-                damping: 0.30
-                mass: 0.5
-                epsilon: 2
             }
         }
 
@@ -358,8 +441,13 @@ Item { // Wrapper
                 id: searchBar
                 property real verticalPadding: 4
                 debounceInterval: root.typingDebounceInterval
+                forceExpanded: root.showResults
+                resultCount: root.activeResultCount
+                currentIndex: root.activeCurrentIndex
+                navigationColumns: root.appMode ? root.appGridColumns : 1
                 resultAt: root.resultAt
                 executeResult: entry => LauncherSearch.executeResult(entry)
+                moveSelection: (delta, linear) => root.moveSelection(delta, linear)
                 Layout.fillWidth: true
                 Layout.leftMargin: 10
                 Layout.rightMargin: 4
@@ -379,73 +467,102 @@ Item { // Wrapper
                 Layout.row: 1
             }
 
-            ListView { // App results
-                id: appResults
+            Item {
+                id: resultsViewport
                 visible: root.showResults
-                Layout.fillWidth: true
-                implicitHeight: Math.min(600, appResults.contentHeight + topMargin + bottomMargin)
+                Layout.preferredWidth: root.resultsViewportWidth
+                Layout.minimumWidth: root.resultsViewportWidth
+                Layout.maximumWidth: root.resultsViewportWidth
+                Layout.preferredHeight: root.resultsViewportHeight
+                Layout.minimumHeight: root.resultsViewportHeight
+                Layout.maximumHeight: root.resultsViewportHeight
+                Layout.leftMargin: 10
+                Layout.rightMargin: 10
                 clip: true
-                topMargin: 10
-                bottomMargin: 10
-                spacing: 2
-                KeyNavigation.up: searchBar
-                highlightMoveDuration: 100
-
-                function setResultValues(values) {
-                    const limitedValues = (values ?? []).slice(0, root.typingResultLimit);
-                    resultModel.values = limitedValues;
-                    if (limitedValues.length > 0 && appResults.currentIndex !== 0) {
-                        Qt.callLater(root.focusFirstItem);
-                    }
-                }
-
-                onFocusChanged: {
-                    if (focus)
-                        root.focusFirstItem();
-                }
-
-                Connections {
-                    target: LauncherSearch
-                    function onResultsChanged() {
-                        root.scheduleResultsRefresh();
-                    }
-                }
-
-                model: root.nativeAppSearchActive ? NativeAppSearch.model : resultModel
 
                 ScriptModel {
                     id: resultModel
                     objectProp: "key"
                 }
 
-                delegate: SearchItem {
-                    id: searchItem
-                    // The selectable item for each search result
-                    required property int index
-                    required property var modelData
-                    anchors.left: parent?.left
-                    anchors.right: parent?.right
-                    entry: modelData
-                    query: {
-                        const prefix = LauncherSearch.matchedPrefix(root.searchingText)
-                        return prefix ? StringUtils.cleanPrefix(root.searchingText, prefix) : root.searchingText
-                    }
-                    current: appResults.currentIndex === index
-                    containerRadius: searchWidgetContent.radius
+                GridView {
+                    id: appGrid
+                    visible: root.appMode
+                    anchors.fill: parent
+                    clip: true
+                    cellWidth: root.appGridCellWidth
+                    cellHeight: root.appGridCellHeight
+                    model: root.nativeAppSearchActive ? NativeAppSearch.model : resultModel
+                    delegate: AppGridItem {}
+                    boundsBehavior: Flickable.StopAtBounds
+                    reuseItems: true
+                    keyNavigationWraps: false
+                    highlightMoveDuration: 100
+                    ScrollBar.vertical: StyledScrollBar {}
 
-                    onHoveredChanged: {
-                        if (hovered && appResults.currentIndex !== index)
-                            appResults.currentIndex = index;
+                    onCountChanged: {
+                        if (count <= 0)
+                            currentIndex = -1;
+                        else if (currentIndex < 0 || currentIndex >= count)
+                            currentIndex = 0;
+                    }
+                }
+
+                ListView {
+                    id: listResults
+                    visible: !root.appMode
+                    anchors.fill: parent
+                    clip: true
+                    topMargin: 10
+                    bottomMargin: 10
+                    spacing: 2
+                    model: resultModel
+                    boundsBehavior: Flickable.StopAtBounds
+                    reuseItems: true
+                    KeyNavigation.up: searchBar
+                    highlightMoveDuration: 100
+                    ScrollBar.vertical: StyledScrollBar {}
+
+                    onCountChanged: {
+                        if (count <= 0)
+                            currentIndex = -1;
+                        else if (currentIndex < 0 || currentIndex >= count)
+                            currentIndex = 0;
+                    }
+                    onFocusChanged: {
+                        if (focus)
+                            root.focusFirstItem();
                     }
 
-                    Keys.onPressed: event => {
-                        if (event.key === Qt.Key_Tab) {
-                            if (appResults.count === 0)
-                                return;
-                            const tabbedText = root.resultAt(0)?.name ?? "";
-                            searchBar.setQueryImmediately(tabbedText);
-                            event.accepted = true;
-                            root.focusSearchInput();
+                    delegate: SearchItem {
+                        id: searchItem
+
+                        required property int index
+                        required property var modelData
+                        anchors.left: parent?.left
+                        anchors.right: parent?.right
+                        entry: modelData
+                        query: {
+                            const prefix = LauncherSearch.matchedPrefix(root.searchingText)
+                            return prefix ? StringUtils.cleanPrefix(root.searchingText, prefix) : root.searchingText
+                        }
+                        current: listResults.currentIndex === index
+                        containerRadius: searchWidgetContent.radius
+
+                        onHoveredChanged: {
+                            if (hovered && listResults.currentIndex !== index)
+                                listResults.currentIndex = index;
+                        }
+
+                        Keys.onPressed: event => {
+                            if (event.key === Qt.Key_Tab) {
+                                if (listResults.count === 0)
+                                    return;
+                                const tabbedText = root.resultAt(0)?.name ?? "";
+                                searchBar.setQueryImmediately(tabbedText);
+                                event.accepted = true;
+                                root.focusSearchInput();
+                            }
                         }
                     }
                 }

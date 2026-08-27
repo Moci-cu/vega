@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.services
+import qs.modules.common
 import qs.modules.ii.overview
 
 ShellRoot {
@@ -24,8 +25,8 @@ ShellRoot {
             if (!root.searchStarted)
                 return;
             const first = NativeAppSearch.get(0);
-            if (!first?.nativeApp || first.id !== root.expectedId || NativeAppSearch.model.count !== 1)
-                return root.fail("'her' did not resolve only Heroic Games Launcher");
+            if (!first?.nativeApp || first.id !== root.expectedId || NativeAppSearch.model.count < 1)
+                return root.fail("'her' did not rank Heroic Games Launcher first");
             console.log(`[NativeLauncherCheck] first=${first.name} count=${NativeAppSearch.model.count}`);
             Qt.exit(0);
         }
@@ -52,6 +53,11 @@ ShellRoot {
             }
             if (root.searchStarted)
                 return;
+            if (!widgetLoader.item.appMode
+                    || widgetLoader.item.appGridColumns !== 5
+                    || widgetLoader.item.appGridRows !== 4
+                    || !LauncherSearch.shouldUseNativeAppSearch(""))
+                return root.fail("blank query did not enter the 5x4 native application grid");
 
             const entry = Array.from(DesktopEntries.applications.values)
                 .find(app => String(app.name).toLowerCase().startsWith("heroic"));
@@ -59,6 +65,7 @@ ShellRoot {
                 return root.fail("Heroic Games Launcher is not installed");
             root.expectedId = entry.id || entry.name;
             root.searchStarted = true;
+            GlobalStates.overviewOpen = true;
             LauncherSearch.query = "her";
         }
     }

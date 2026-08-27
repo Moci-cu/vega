@@ -107,6 +107,8 @@ Scope {
                 property real scaleAnimated: showOpeningAnimation ? GlobalStates.overviewOpen ? zoomedRatio : defaultRatio : 1
 
                 property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1 
+                property real launcherScale: showOpeningAnimation
+                    ? (GlobalStates.overviewOpen ? 1 : 0.86) : 1
                 property bool workspaceContentReady: false
                 readonly property bool contentShown: {
                     if (!showOpeningAnimation) return GlobalStates.overviewOpen;
@@ -126,6 +128,14 @@ Scope {
 
                 Behavior on scaleAnimated {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
+                }
+
+                Behavior on launcherScale {
+                    enabled: root.showOpeningAnimation
+                    NumberAnimation {
+                        duration: GlobalStates.overviewOpen ? 240 : 150
+                        easing.type: GlobalStates.overviewOpen ? Easing.OutBack : Easing.InCubic
+                    }
                 }
 
                 anchors {
@@ -249,7 +259,8 @@ Scope {
                         }
                         SearchWidget {
                             id: searchWidget
-                            scale: root.effectiveScale
+                            scale: root.launcherScale
+                            transformOrigin: Item.Center
                             anchors.horizontalCenter: parent.horizontalCenter
                             Synchronizer on searchingText {
                                 property alias source: root.searchingText
