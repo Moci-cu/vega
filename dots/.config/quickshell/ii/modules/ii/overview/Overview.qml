@@ -106,9 +106,9 @@ Scope {
                 property bool isResettingZoom: false 
                 property real scaleAnimated: showOpeningAnimation ? GlobalStates.overviewOpen ? zoomedRatio : defaultRatio : 1
 
+                readonly property bool launcherReady: GlobalStates.overviewOpen && searchWidget.backdropReady
                 property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1 
-                property real launcherScale: showOpeningAnimation
-                    ? (GlobalStates.overviewOpen ? 1 : 0.86) : 1
+                property real launcherScale: 1
                 property bool workspaceContentReady: false
                 readonly property bool contentShown: {
                     if (!showOpeningAnimation) return GlobalStates.overviewOpen;
@@ -122,6 +122,15 @@ Scope {
                         isResettingZoom = false
                     }
                 }
+                onLauncherReadyChanged: {
+                    launcherPopAnimation.stop();
+                    launcherCloseAnimation.stop();
+                    if (launcherReady) {
+                        launcherPopAnimation.restart();
+                    } else if (!GlobalStates.overviewOpen) {
+                        launcherCloseAnimation.restart();
+                    }
+                }
 
                 // Keep the input-transparent surface alive so opening only has to reveal its content.
                 visible: true
@@ -130,12 +139,44 @@ Scope {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
                 }
 
-                Behavior on launcherScale {
-                    enabled: root.showOpeningAnimation
-                    NumberAnimation {
-                        duration: GlobalStates.overviewOpen ? 240 : 150
-                        easing.type: GlobalStates.overviewOpen ? Easing.OutBack : Easing.InCubic
+                SequentialAnimation {
+                    id: launcherPopAnimation
+
+                    PropertyAction {
+                        target: root
+                        property: "launcherScale"
+                        value: 1.01
                     }
+                    PauseAnimation {
+                        duration: 30
+                    }
+                    NumberAnimation {
+                        target: root
+                        property: "launcherScale"
+                        from: 1.01
+                        to: 0.99
+                        duration: 180
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+                    }
+                    NumberAnimation {
+                        target: root
+                        property: "launcherScale"
+                        from: 0.99
+                        to: 1
+                        duration: 180
+                        easing.type: Easing.OutBack
+                        easing.overshoot: 0.1
+                    }
+                }
+
+                NumberAnimation {
+                    id: launcherCloseAnimation
+                    target: root
+                    property: "launcherScale"
+                    to: 0.9
+                    duration: 140
+                    easing.type: Easing.InCubic
                 }
 
                 anchors {
@@ -242,8 +283,8 @@ Scope {
 
                     Item { // Wrapper for animation 
                         id: searchWidgetWrapper
-                        implicitHeight: searchWidget.implicitHeight
-                        implicitWidth: searchWidget.implicitWidth
+                        width: searchWidget.implicitWidth
+                        height: searchWidget.implicitHeight
                         z: 999
 
                         Keys.onPressed: event => {
@@ -252,16 +293,12 @@ Scope {
                             }
                         }
 
-                        anchors {
-                            horizontalCenter: parent.horizontalCenter
-                            top: parent.top
-                            topMargin: root.margin * 2 + Appearance.sizes.elevationMargin
-                        }
+                        anchors.centerIn: parent
                         SearchWidget {
                             id: searchWidget
                             scale: root.launcherScale
                             transformOrigin: Item.Center
-                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.centerIn: parent
                             Synchronizer on searchingText {
                                 property alias source: root.searchingText
                             }
