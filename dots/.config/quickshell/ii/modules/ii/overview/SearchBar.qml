@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Widgets
 import qs
 import qs.services
 import qs.modules.common
@@ -19,9 +21,40 @@ RowLayout {
     property int resultCount: 0
     property int currentIndex: -1
     property int navigationColumns: 1
+    property var selectedResult
     property var resultAt: index => LauncherSearch.results[index]
     property var executeResult: entry => LauncherSearch.executeResult(entry)
     property var moveSelection: (delta, linear) => {}
+    property var autocompleteWallpaperSource
+    property bool autocompleteSourceReady: false
+    property var autocompleteSourceRectFor: item => Qt.rect(0, 0, 1, 1)
+    property var autocompleteScreen
+    property bool caretBlinkOn: true
+    readonly property var autocompleteEntry: {
+        const query = root.searchingText.trim();
+        const count = root.resultCount;
+        const index = root.currentIndex;
+        return query.length > 0 && count > 0
+            ? (root.selectedResult ?? root.resultAt(Math.max(0, index))) : null;
+    }
+    readonly property bool autocompleteIsApp: root.autocompleteEntry?.nativeApp
+        || String(root.autocompleteEntry?.key ?? "").startsWith("app:")
+    readonly property string autocompleteAction: {
+        const entry = root.autocompleteEntry;
+        if (!entry)
+            return "";
+        if (root.autocompleteIsApp)
+            return Translation.tr("Open");
+        return String(entry.verb ?? "");
+    }
+    readonly property string autocompleteInputQuery: LauncherSearch.nativeAppQuery(searchInput.text).trim()
+    readonly property string autocompleteName: String(root.autocompleteEntry?.name ?? "")
+    readonly property bool autocompleteMatchesInput: root.autocompleteInputQuery.length > 0
+        && root.autocompleteName.toLowerCase().startsWith(root.autocompleteInputQuery.toLowerCase())
+    readonly property string autocompleteCompletion: {
+        return root.autocompleteMatchesInput
+            ? root.autocompleteName.slice(root.autocompleteInputQuery.length) : "";
+    }
 
     function cancelPendingQuery() {
         queryCommitTimer.stop();
@@ -40,7 +73,7 @@ RowLayout {
 
     function selectedEntry() {
         const selectedIndex = Math.max(0, root.currentIndex);
-        return root.resultAt(selectedIndex);
+        return root.selectedResult ?? root.resultAt(selectedIndex);
     }
 
     function forceFocus() {
@@ -99,47 +132,124 @@ RowLayout {
 
         cursorDelegate: Item {
             width: 3
-            height: searchInput.font.pixelSize + 8
+            height: searchInput.font.pixelSize + 4
+            opacity: searchInput.activeFocus && !autocompleteChip.visible && root.caretBlinkOn ? 1 : 0
 
-            Rectangle {
-                anchors.centerIn: parent
-                width: 7
-                height: parent.height
-                radius: 3.5
-                color: Qt.rgba(0.48, 0.78, 1, 0.2)
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 180
+                    easing.type: Easing.InOutSine
+                }
+            }
+
+            RectangularShadow {
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 2
+                height: parent.height / 2 + 2
+                radius: 1
+                blur: 8
+                spread: 1
+                color: Qt.rgba(0.42, 0.8, 1, 0.72)
+                cached: true
+            }
+
+            RectangularShadow {
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 2
+                height: parent.height / 2 + 2
+                radius: 1
+                blur: 8
+                spread: 1
+                color: Qt.rgba(1, 0.68, 0.3, 0.68)
+                cached: true
             }
 
             Rectangle {
                 anchors.centerIn: parent
-                width: 2.2
+                width: 2
                 height: parent.height
-                radius: 1.1
+                radius: 1
                 gradient: Gradient {
                     GradientStop {
                         position: 0
-                        color: Qt.rgba(0.78, 0.9, 1, 0.72)
+                        color: Qt.rgba(0.82, 0.94, 1, 1)
                     }
                     GradientStop {
-                        position: 0.5
+                        position: 0.42
+                        color: Qt.rgba(1, 1, 1, 1)
+                    }
+                    GradientStop {
+                        position: 0.58
                         color: Qt.rgba(1, 1, 1, 1)
                     }
                     GradientStop {
                         position: 1
-                        color: Qt.rgba(0.68, 0.86, 1, 0.72)
+                        color: Qt.rgba(1, 0.9, 0.72, 1)
                     }
                 }
             }
+        }
 
-            Rectangle {
-                anchors.centerIn: parent
-                width: 0.7
-                height: parent.height - 2
-                radius: 0.35
-                color: Qt.rgba(1, 1, 1, 0.94)
+        Item {
+            id: autocompleteChip
+
+            readonly property real desiredX: Math.max(0, searchInput.cursorRectangle.x)
+
+            x: desiredX
+            anchors.verticalCenter: parent.verticalCenter
+            width: autocompleteContent.implicitWidth + 4
+            height: searchInput.font.pixelSize + 6
+            z: 5
+            visible: root.autocompleteAction.length > 0
+                && root.autocompleteMatchesInput
+                && searchInput.text.length > 0
+                && searchInput.cursorPosition === searchInput.text.length
+                && desiredX + width <= searchInput.width - 4
+
+            LiquidGlassSurface {
+                id: autocompleteGlass
+
+                anchors.fill: parent
+                shown: autocompleteChip.visible
+                wallpaperSource: root.autocompleteWallpaperSource
+                sourceReady: root.autocompleteSourceReady
+                sourceFillsItem: true
+                enhancedOptics: true
+                thicknessOverride: 0.06
+                edgeLighting: 0.34
+                refraction: 0
+                itemSourceRect: root.autocompleteSourceRectFor(autocompleteGlass)
+                screen: root.autocompleteScreen
+                tintColor: Qt.rgba(0.86, 0.9, 0.94, 0.12)
+                radius: 4
+            }
+
+            RowLayout {
+                id: autocompleteContent
+
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+
+                StyledText {
+                    visible: root.autocompleteCompletion.length > 0
+                    text: root.autocompleteCompletion
+                    color: Qt.rgba(1, 1, 1, 0.86)
+                    font: searchInput.font
+                }
+
+                StyledText {
+                    text: `— ${root.autocompleteAction}`
+                    color: Qt.rgba(1, 1, 1, 0.72)
+                    font: searchInput.font
+                }
             }
         }
 
         onTextChanged: {
+            root.caretBlinkOn = true;
             queryCommitTimer.pendingQuery = text;
             queryCommitTimer.restart();
         }
@@ -183,11 +293,21 @@ RowLayout {
             if (event.key === Qt.Key_Tab) {
                 root.flushPendingQuery();
                 if (root.resultCount === 0) return;
-                const tabbedText = root.resultAt(0)?.name ?? "";
+                const tabbedText = root.selectedEntry()?.name ?? "";
                 root.setQueryImmediately(tabbedText);
                 event.accepted = true;
             }
         }
+    }
+
+    IconImage {
+        Layout.alignment: Qt.AlignVCenter
+        Layout.preferredWidth: 34
+        Layout.preferredHeight: 34
+        visible: root.autocompleteIsApp && root.autocompleteAction.length > 0
+            && root.autocompleteMatchesInput
+        source: AppSearch.iconPath(root.autocompleteEntry?.iconName ?? "", "image-missing")
+        asynchronous: true
     }
 
     Timer {
@@ -195,6 +315,14 @@ RowLayout {
         property string pendingQuery: ""
         interval: root.debounceInterval
         onTriggered: LauncherSearch.query = pendingQuery
+    }
+
+    Timer {
+        interval: 650
+        repeat: true
+        running: searchInput.activeFocus && !autocompleteChip.visible
+        onRunningChanged: root.caretBlinkOn = true
+        onTriggered: root.caretBlinkOn = !root.caretBlinkOn
     }
 
     IconToolbarButton {

@@ -60,6 +60,7 @@ ShellRoot {
             if (!widgetLoader.item.appMode
                     || widgetLoader.item.appGridColumns !== 7
                     || widgetLoader.item.appGridRows !== 4
+                    || widgetLoader.item.appGridCellHeight !== 90
                     || widgetLoader.item.searchPillWidth >= widgetLoader.item.resultsPanelWidth
                     || !LauncherSearch.shouldUseNativeAppSearch(""))
                 return root.fail("launcher did not enter the detached 7x4 application layout");

@@ -25,7 +25,7 @@ Item { // Wrapper
     readonly property int appGridRows: 4
     readonly property int appGridCapacity: appGridColumns * appGridRows
     readonly property real appGridCellWidth: 88
-    readonly property real appGridCellHeight: 82
+    readonly property real appGridCellHeight: 90
     readonly property real resultsViewportWidth: appGridColumns * appGridCellWidth
     readonly property real resultsViewportHeight: appGridRows * appGridCellHeight
     readonly property real resultsPanelWidth: resultsViewportWidth + 24
@@ -247,17 +247,16 @@ Item { // Wrapper
         width: root.appGridCellWidth
         height: root.appGridCellHeight
         toggled: appGrid.currentIndex === index
+        rippleEnabled: false
         buttonRadius: root.sharpMode ? 0 : 15
         buttonRadiusPressed: root.sharpMode ? 0 : 12
         colBackground: "transparent"
-        colBackgroundHover: Qt.rgba(1, 1, 1, 0.09)
-        colBackgroundToggled: Qt.rgba(1, 1, 1, 0.13)
-        colBackgroundToggledHover: Qt.rgba(1, 1, 1, 0.17)
-        colRipple: Qt.rgba(1, 1, 1, 0.12)
-        colRippleToggled: Qt.rgba(1, 1, 1, 0.18)
+        colBackgroundHover: "transparent"
+        colBackgroundToggled: "transparent"
+        colBackgroundToggledHover: "transparent"
 
         background {
-            anchors.margins: 3
+            visible: false
         }
 
         onHoveredChanged: {
@@ -275,12 +274,32 @@ Item { // Wrapper
                 width: Math.max(1, parent.width - 8)
                 spacing: 4
 
-                IconImage {
+                Item {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    source: AppSearch.iconPath(gridItem.entry?.iconName ?? "", "image-missing")
-                    asynchronous: true
+                    Layout.preferredWidth: 68
+                    Layout.preferredHeight: 60
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 64
+                        height: 60
+                        radius: root.sharpMode ? 0 : 16
+                        color: gridItem.toggled ? Qt.rgba(1, 1, 1, 0.14) : "transparent"
+                        border.width: gridItem.toggled ? 0.6 : 0
+                        border.color: Qt.rgba(1, 1, 1, 0.16)
+
+                        Behavior on color {
+                            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                        }
+                    }
+
+                    IconImage {
+                        anchors.centerIn: parent
+                        width: 48
+                        height: 48
+                        source: AppSearch.iconPath(gridItem.entry?.iconName ?? "", "image-missing")
+                        asynchronous: true
+                    }
                 }
 
                 StyledText {
@@ -522,9 +541,16 @@ Item { // Wrapper
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
                 navigationColumns: root.appMode ? root.appGridColumns : 1
+                selectedResult: root.appMode
+                    ? (appGrid.currentItem?.entry ?? null)
+                    : (listResults.currentItem?.entry ?? null)
                 resultAt: root.resultAt
                 executeResult: entry => LauncherSearch.executeResult(entry)
                 moveSelection: (delta, linear) => root.moveSelection(delta, linear)
+                autocompleteWallpaperSource: liquidGlassPipeline.item?.source ?? null
+                autocompleteSourceReady: liquidGlassPipeline.item?.ready ?? false
+                autocompleteSourceRectFor: item => root.backdropRectFor(item)
+                autocompleteScreen: root.screen
 
                 Synchronizer on searchingText {
                     property alias source: root.searchingText
