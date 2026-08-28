@@ -216,6 +216,8 @@ Scope {
                             searchWidget.disableExpandAnimation();
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
+                            launcherCloseAnimation.stop();
+                            root.launcherScale = 1;
                             if (!overviewScope.dontAutoCancelSearch) {
                                 searchWidget.cancelSearch();
                             }

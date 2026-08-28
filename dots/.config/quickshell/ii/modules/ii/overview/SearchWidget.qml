@@ -32,7 +32,7 @@ Item { // Wrapper
     readonly property var screen: root.QsWindow.window?.screen ?? null
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
-    readonly property bool backdropReady: liquidGlassCapture.hasContent || backdropCaptureTimedOut
+    readonly property bool backdropReady: (liquidGlassPipeline.item?.ready ?? false) || backdropCaptureTimedOut
     readonly property bool appMode: LauncherSearch.isApplicationQuery(root.searchingText)
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
     readonly property int activeResultCount: appMode ? appGrid.count : listResults.count
@@ -273,67 +273,85 @@ Item { // Wrapper
         }
     }
 
-    ScreencopyView {
-        id: liquidGlassCapture
-        width: Math.max(1, root.screen?.width ?? 1)
-        height: Math.max(1, root.screen?.height ?? 1)
-        captureSource: GlobalStates.overviewOpen && !root.backdropCaptureTimedOut ? root.screen : null
-        live: false
-        paintCursor: false
-    }
+    Loader {
+        id: liquidGlassPipeline
+        active: GlobalStates.overviewOpen && !root.backdropCaptureTimedOut
 
-    ShaderEffectSource {
-        id: liquidGlassCrop
-        readonly property real padding: 48
-        readonly property real screenWidth: Math.max(1, root.screen?.width ?? root.width)
-        readonly property real screenHeight: Math.max(1, root.screen?.height ?? root.height)
-        readonly property real panelX: (screenWidth - root.width) / 2
-        readonly property real panelY: liquidGlassSurface.screenY
-            - (!Config.options.bar.vertical && !Config.options.bar.bottom ? Appearance.sizes.barHeight : 0)
-        readonly property real cropX: Math.max(0, panelX - padding)
-        readonly property real cropY: Math.max(0, panelY - padding)
-        readonly property real cropRight: Math.min(screenWidth,
-            panelX + Math.max(liquidGlassSurface.width, root.retainedBackdropWidth) + padding)
-        readonly property real cropBottom: Math.min(screenHeight,
-            panelY + Math.max(liquidGlassSurface.height, root.retainedBackdropHeight) + padding)
+        sourceComponent: Item {
+            id: pipeline
 
-        visible: false
-        width: Math.max(1, cropRight - cropX)
-        height: Math.max(1, cropBottom - cropY)
-        sourceItem: liquidGlassCapture
-        sourceRect: Qt.rect(cropX, cropY, width, height)
-        textureSize: Qt.size(
-            Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
-            Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
-        )
-        hideSource: true
-        live: GlobalStates.overviewOpen && liquidGlassCapture.hasContent
-    }
+            readonly property real padding: 48
+            readonly property real screenWidth: Math.max(1, root.screen?.width ?? root.width)
+            readonly property real screenHeight: Math.max(1, root.screen?.height ?? root.height)
+            readonly property real panelX: (screenWidth - root.width) / 2
+            readonly property real panelY: liquidGlassSurface.screenY
+                - (!Config.options.bar.vertical && !Config.options.bar.bottom ? Appearance.sizes.barHeight : 0)
+            readonly property real cropX: Math.max(0, panelX - padding)
+            readonly property real cropY: Math.max(0, panelY - padding)
+            readonly property real cropRight: Math.min(screenWidth,
+                panelX + Math.max(liquidGlassSurface.width, root.retainedBackdropWidth) + padding)
+            readonly property real cropBottom: Math.min(screenHeight,
+                panelY + Math.max(liquidGlassSurface.height, root.retainedBackdropHeight) + padding)
+            readonly property real targetOffsetX: panelX - cropX
+            readonly property real targetOffsetY: panelY - cropY
+            readonly property real sourceWidth: backdrop.width
+            readonly property real sourceHeight: backdrop.height
+            readonly property var source: backdrop
+            readonly property bool ready: capture.hasContent
 
-    MultiEffect {
-        id: liquidGlassBlur
-        width: liquidGlassCrop.width
-        height: liquidGlassCrop.height
-        source: liquidGlassCrop
-        autoPaddingEnabled: false
-        blurEnabled: true
-        blurMax: 40
-        blur: 1
-    }
+            width: 1
+            height: 1
 
-    ShaderEffectSource {
-        id: liquidGlassBackdrop
-        visible: false
-        width: liquidGlassBlur.width
-        height: liquidGlassBlur.height
-        sourceItem: liquidGlassBlur
-        sourceRect: Qt.rect(0, 0, width, height)
-        textureSize: Qt.size(
-            Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
-            Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
-        )
-        hideSource: true
-        live: GlobalStates.overviewOpen && liquidGlassCapture.hasContent
+            ScreencopyView {
+                id: capture
+                width: pipeline.screenWidth
+                height: pipeline.screenHeight
+                captureSource: root.screen
+                live: false
+                paintCursor: false
+            }
+
+            ShaderEffectSource {
+                id: crop
+                visible: false
+                width: Math.max(1, pipeline.cropRight - pipeline.cropX)
+                height: Math.max(1, pipeline.cropBottom - pipeline.cropY)
+                sourceItem: capture
+                sourceRect: Qt.rect(pipeline.cropX, pipeline.cropY, width, height)
+                textureSize: Qt.size(
+                    Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
+                    Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
+                )
+                hideSource: true
+                live: capture.hasContent
+            }
+
+            MultiEffect {
+                id: blur
+                width: crop.width
+                height: crop.height
+                source: crop
+                autoPaddingEnabled: false
+                blurEnabled: true
+                blurMax: 40
+                blur: 1
+            }
+
+            ShaderEffectSource {
+                id: backdrop
+                visible: false
+                width: blur.width
+                height: blur.height
+                sourceItem: blur
+                sourceRect: Qt.rect(0, 0, width, height)
+                textureSize: Qt.size(
+                    Math.ceil(width * (root.screen?.devicePixelRatio ?? 1)),
+                    Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
+                )
+                hideSource: true
+                live: capture.hasContent
+            }
+        }
     }
 
     Connections {
@@ -344,16 +362,13 @@ Item { // Wrapper
             if (GlobalStates.overviewOpen) {
                 root.scheduleResultsRefresh();
                 root.retainBackdropSize(gridLayout.implicitWidth, gridLayout.implicitHeight);
-            } else {
-                root.retainedBackdropWidth = 1;
-                root.retainedBackdropHeight = 1;
             }
         }
     }
 
     Timer {
         interval: 200
-        running: GlobalStates.overviewOpen && !liquidGlassCapture.hasContent
+        running: GlobalStates.overviewOpen && !(liquidGlassPipeline.item?.ready ?? false)
         onTriggered: root.backdropCaptureTimedOut = true
     }
 
@@ -400,8 +415,8 @@ Item { // Wrapper
             id: liquidGlassSurface
             anchors.fill: parent
             shown: GlobalStates.overviewOpen
-            wallpaperSource: liquidGlassBackdrop
-            sourceReady: liquidGlassCapture.hasContent
+            wallpaperSource: liquidGlassPipeline.item?.source ?? null
+            sourceReady: liquidGlassPipeline.item?.ready ?? false
             sourceFillsItem: true
             enhancedOptics: true
             interactiveOptics: true
@@ -409,12 +424,18 @@ Item { // Wrapper
             interactionPoint: Qt.point(searchWidgetContent.opticalX, searchWidgetContent.opticalY)
             thicknessOverride: 0.15
             edgeLighting: 0
-            itemSourceRect: Qt.rect(
-                (liquidGlassCrop.panelX - liquidGlassCrop.cropX) / liquidGlassBackdrop.width,
-                (liquidGlassCrop.panelY - liquidGlassCrop.cropY) / liquidGlassBackdrop.height,
-                width / liquidGlassBackdrop.width,
-                height / liquidGlassBackdrop.height
-            )
+            refraction: 0
+            itemSourceRect: {
+                const pipeline = liquidGlassPipeline.item;
+                if (!pipeline)
+                    return Qt.rect(0, 0, 1, 1);
+                return Qt.rect(
+                    pipeline.targetOffsetX / pipeline.sourceWidth,
+                    pipeline.targetOffsetY / pipeline.sourceHeight,
+                    width / pipeline.sourceWidth,
+                    height / pipeline.sourceHeight
+                );
+            }
             screen: root.screen
             tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
             radius: searchWidgetContent.radius

@@ -46,13 +46,16 @@ ShellRoot {
         onTriggered: {
             if (widgetLoader.status === Loader.Error)
                 return root.fail("launcher widget failed to load");
+            if (root.searchStarted) {
+                if (++root.attempts >= 300)
+                    return root.fail("search did not finish in time");
+                return;
+            }
             if (widgetLoader.status !== Loader.Ready || !NativeAppSearch.available || !NativeAppSearch.model?.indexReady) {
                 if (++root.attempts >= 150)
                     return root.fail("launcher widget, native backend, or application index timed out");
                 return;
             }
-            if (root.searchStarted)
-                return;
             if (!widgetLoader.item.appMode
                     || widgetLoader.item.appGridColumns !== 5
                     || widgetLoader.item.appGridRows !== 4

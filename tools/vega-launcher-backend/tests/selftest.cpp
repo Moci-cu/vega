@@ -35,6 +35,13 @@ int main(int argc, char **argv)
     QCoreApplication application(argc, argv);
     NativeAppSearchModel model;
 
+    int searchCompletions = 0;
+    QObject::connect(&model, &NativeAppSearchModel::searchFinished,
+                     [&searchCompletions] { ++searchCompletions; });
+    model.search("pre-index", 1, {QVariantMap{{"key", "fallback"}, {"name", "Fallback"}}});
+    if (searchCompletions != 1 || model.rowCount() != 1)
+        return fail("pre-index fallback search did not signal completion");
+
     model.rebuildIndex({
         QVariantMap{{"id", "firefox.desktop"}, {"name", "Firefox"}, {"iconName", "firefox"}},
         QVariantMap{{"id", "firefox.desktop"}, {"name", "Firefox Duplicate"}, {"iconName", "firefox"}},

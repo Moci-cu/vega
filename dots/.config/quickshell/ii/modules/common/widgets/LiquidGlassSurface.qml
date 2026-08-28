@@ -16,6 +16,7 @@ Item {
     property point interactionPoint: Qt.point(0.5, 0.5)
     property real thicknessOverride: -1
     property real edgeLighting: 1
+    property real refraction: 5
     property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
     property bool sourceReady: wallpaperSource?.status === Image.Ready
@@ -125,7 +126,7 @@ Item {
             + 0.08 * root.parallaxSidebarBalance
             + 0.45 * root.interaction * (root.interactionPoint.x - 0.5)
         property vector2d lightDirection: Qt.vector2d(Math.cos(lightAngle), Math.sin(lightAngle))
-        property real refraction: 5
+        property real refraction: root.refraction
         property real enhancedOptics: root.enhancedOptics ? 1 : 0
         property real interactiveOptics: root.interactiveOptics ? 1 : 0
         property real responsiveOptics: root.responsiveOptics ? 1 : 0

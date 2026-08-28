@@ -300,6 +300,7 @@ void NativeAppSearchModel::search(const QString &query, int limit, const QVarian
     if (!indexReady_) {
         setBusy(false);
         applyRows(fallbackRows.mid(0, lastLimit_));
+        emit searchFinished();
         return;
     }
 
