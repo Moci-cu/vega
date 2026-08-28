@@ -1,16 +1,16 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
-import qs.modules.common.functions
 
 RowLayout {
     id: root
-    spacing: 6
+    spacing: 8
     property bool animateWidth: false
     property bool forceExpanded: false
     property alias searchInput: searchInput
@@ -64,22 +64,12 @@ RowLayout {
         }
     }
     
-    MaterialShapeWrappedMaterialSymbol {
+    MaterialSymbol {
         id: searchIcon
         Layout.alignment: Qt.AlignVCenter
-        iconSize: Appearance.font.pixelSize.huge
-        shape: switch(root.searchPrefixType) {
-            case SearchBar.SearchPrefixType.Action: return MaterialShape.Shape.Pill;
-            case SearchBar.SearchPrefixType.App: return MaterialShape.Shape.Clover4Leaf;
-            case SearchBar.SearchPrefixType.Clipboard: return MaterialShape.Shape.Gem;
-            case SearchBar.SearchPrefixType.Emojis: return MaterialShape.Shape.Sunny;
-            case SearchBar.SearchPrefixType.Math: return MaterialShape.Shape.PuffyDiamond;
-            case SearchBar.SearchPrefixType.ShellCommand: return MaterialShape.Shape.PixelCircle;
-            case SearchBar.SearchPrefixType.WebSearch: return MaterialShape.Shape.SoftBurst;
-            case SearchBar.SearchPrefixType.FileSearch: return MaterialShape.Shape.Cookie4Sided;
-            case SearchBar.SearchPrefixType.Window: return MaterialShape.Shape.Cookie9Sided;
-            default: return MaterialShape.Shape.Cookie7Sided;
-        }
+        Layout.leftMargin: 4
+        iconSize: 25
+        color: Qt.rgba(1, 1, 1, 0.72)
         text: switch (root.searchPrefixType) {
             case SearchBar.SearchPrefixType.Action: return "settings_suggest";
             case SearchBar.SearchPrefixType.App: return "apps";
@@ -96,24 +86,56 @@ RowLayout {
     }
     ToolbarTextField { // Search box
         id: searchInput
-        Layout.topMargin: 4
-        Layout.bottomMargin: 4
-        implicitHeight: 40
+        Layout.fillWidth: true
+        implicitHeight: 46
         focus: GlobalStates.overviewOpen
-        font.pixelSize: Appearance.font.pixelSize.small
-        color: Appearance.colors.colOnSurface
-        placeholderTextColor: Appearance.colors.colOnSurfaceVariant
-        placeholderText: Translation.tr("Search, calculate or run")
-        implicitWidth: root.forceExpanded || root.searchingText != ""
-            ? Appearance.sizes.searchWidth : Appearance.sizes.searchWidthCollapsed
+        padding: 0
+        font.pixelSize: Appearance.font.pixelSize.normal
+        color: Qt.rgba(1, 1, 1, 0.9)
+        placeholderTextColor: Qt.rgba(1, 1, 1, 0.58)
+        placeholderText: Translation.tr("Search or Ask")
+        colBackground: "transparent"
+        renderType: Text.QtRendering
 
-        Behavior on implicitWidth {
-            id: searchWidthBehavior
-            enabled: root.animateWidth
-            NumberAnimation {
-                duration: 300
-                easing.type: Appearance.animation.elementMove.type
-                easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        cursorDelegate: Item {
+            width: 3
+            height: searchInput.font.pixelSize + 8
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 7
+                height: parent.height
+                radius: 3.5
+                color: Qt.rgba(0.48, 0.78, 1, 0.2)
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 2.2
+                height: parent.height
+                radius: 1.1
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(0.78, 0.9, 1, 0.72)
+                    }
+                    GradientStop {
+                        position: 0.5
+                        color: Qt.rgba(1, 1, 1, 1)
+                    }
+                    GradientStop {
+                        position: 1
+                        color: Qt.rgba(0.68, 0.86, 1, 0.72)
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 0.7
+                height: parent.height - 2
+                radius: 0.35
+                color: Qt.rgba(1, 1, 1, 0.94)
             }
         }
 
@@ -176,22 +198,37 @@ RowLayout {
     }
 
     IconToolbarButton {
-        Layout.topMargin: 4
-        Layout.bottomMargin: 4
-        onClicked: {
-            GlobalStates.overviewOpen = false;
-            const overviewAnimationEnabled = Config.options.overview.showOpeningAnimation
+        id: moreActionsButton
 
-            if (!overviewAnimationEnabled) {
-                Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
-                return
+        Layout.preferredWidth: 42
+        Layout.preferredHeight: 42
+        Layout.rightMargin: 2
+        text: "more_horiz"
+        colText: Qt.rgba(1, 1, 1, 0.68)
+        onClicked: moreActionsMenu.open()
+
+        Menu {
+            id: moreActionsMenu
+
+            x: moreActionsButton.width - width
+            y: moreActionsButton.height + 4
+
+            MenuItem {
+                text: Translation.tr("Google Lens")
+                onTriggered: {
+                    GlobalStates.overviewOpen = false;
+                    if (!Config.options.overview.showOpeningAnimation) {
+                        Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
+                        return;
+                    }
+                    lensDelayTimer.start();
+                }
             }
-            lensDelayTimer.start();
-        }
-        text: "image_search"
-        StyledToolTip {
-            text: Translation.tr("Google Lens")
-            y: parent.height + 3
+
+            MenuItem {
+                text: SongRec.running ? Translation.tr("Stop recognizing music") : Translation.tr("Recognize music")
+                onTriggered: SongRec.toggleRunning()
+            }
         }
     }
 
@@ -203,47 +240,4 @@ RowLayout {
         }
     }
 
-    IconToolbarButton {
-        id: songRecButton
-        Layout.topMargin: 4
-        Layout.bottomMargin: 4
-        Layout.rightMargin: 4
-        toggled: SongRec.running
-        onClicked: SongRec.toggleRunning()
-        text: "music_cast"
-
-        StyledToolTip {
-            text: Translation.tr("Recognize music")
-            y: parent.height + 3
-        }
-
-        colText: toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
-        background: MaterialShape {
-            RotationAnimation on rotation {
-                running: songRecButton.toggled
-                duration: 12000
-                easing.type: Easing.Linear
-                loops: Animation.Infinite
-                from: 0
-                to: 360
-            }
-            shape: {
-                if (songRecButton.down) {
-                    return songRecButton.toggled ? MaterialShape.Shape.Circle : MaterialShape.Shape.Square
-                } else {
-                    return songRecButton.toggled ? MaterialShape.Shape.SoftBurst : MaterialShape.Shape.Circle
-                }
-            }
-            color: {
-                if (songRecButton.toggled) {
-                    return songRecButton.hovered ? Appearance.colors.colPrimaryHover : Appearance.colors.colPrimary
-                } else {
-                    return songRecButton.hovered ? Appearance.colors.colSurfaceContainerHigh : ColorUtils.transparentize(Appearance.colors.colSurfaceContainerHigh)
-                }
-            }
-            Behavior on color {
-                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-            }
-        }
-    }
 }

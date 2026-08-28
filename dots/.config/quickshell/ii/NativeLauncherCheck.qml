@@ -25,8 +25,9 @@ ShellRoot {
             if (!root.searchStarted)
                 return;
             const first = NativeAppSearch.get(0);
-            if (!first?.nativeApp || first.id !== root.expectedId || NativeAppSearch.model.count < 1)
-                return root.fail("'her' did not rank Heroic Games Launcher first");
+            if (!first?.nativeApp || first.id !== root.expectedId || !first.iconName
+                    || NativeAppSearch.model.count < 1)
+                return root.fail("'her' did not return Heroic Games Launcher with an icon");
             console.log(`[NativeLauncherCheck] first=${first.name} count=${NativeAppSearch.model.count}`);
             Qt.exit(0);
         }
@@ -57,10 +58,11 @@ ShellRoot {
                 return;
             }
             if (!widgetLoader.item.appMode
-                    || widgetLoader.item.appGridColumns !== 5
+                    || widgetLoader.item.appGridColumns !== 7
                     || widgetLoader.item.appGridRows !== 4
+                    || widgetLoader.item.searchPillWidth >= widgetLoader.item.resultsPanelWidth
                     || !LauncherSearch.shouldUseNativeAppSearch(""))
-                return root.fail("blank query did not enter the 5x4 native application grid");
+                return root.fail("launcher did not enter the detached 7x4 application layout");
 
             const entry = Array.from(DesktopEntries.applications.values)
                 .find(app => String(app.name).toLowerCase().startsWith("heroic"));

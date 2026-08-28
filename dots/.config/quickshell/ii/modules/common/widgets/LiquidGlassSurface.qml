@@ -16,6 +16,7 @@ Item {
     property point interactionPoint: Qt.point(0.5, 0.5)
     property real thicknessOverride: -1
     property real edgeLighting: 1
+    property real lowerGlow: 0
     property real refraction: 5
     property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
@@ -84,15 +85,17 @@ Item {
         gradient: Gradient {
             GradientStop {
                 position: 0
-                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b, Math.min(0.32, root.tintColor.a + 0.1))
+                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
+                    root.lowerGlow > 0 ? Math.min(0.82, root.tintColor.a + 0.12) : Math.min(0.32, root.tintColor.a + 0.1))
             }
             GradientStop {
-                position: 0.48
+                position: root.lowerGlow > 0 ? 0.68 : 0.48
                 color: root.tintColor
             }
             GradientStop {
                 position: 1
-                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b, Math.max(0.08, root.tintColor.a - 0.06))
+                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
+                    root.lowerGlow > 0 ? Math.max(0.08, root.tintColor.a * 0.72) : Math.max(0.08, root.tintColor.a - 0.06))
             }
         }
 
@@ -134,8 +137,9 @@ Item {
         property vector2d interactionPoint: Qt.vector2d(root.interactionPoint.x, root.interactionPoint.y)
         property real thicknessOverride: root.thicknessOverride
         property real edgeLighting: root.edgeLighting
+        property real lowerGlow: root.lowerGlow
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb")
+        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-8")
 
         Behavior on opacity {
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)

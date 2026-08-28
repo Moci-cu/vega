@@ -19,6 +19,7 @@ layout(std140, binding = 0) uniform buf {
     vec2 interactionPoint;
     float thicknessOverride;
     float edgeLighting;
+    float lowerGlow;
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -103,13 +104,14 @@ void main() {
     }
 
     float backdropLuminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
+    float lowerGlowAmount = clamp(lowerGlow, 0.0, 1.0);
     if (enhancedOptics > 0.5) {
         float luminanceShift = (0.46 - backdropLuminance) * mix(0.10, 0.14, thickness);
         backdrop = clamp(backdrop + vec3(luminanceShift), 0.0, 1.0);
         float shiftedLuminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
-        float saturation = mix(1.02, 0.82, thickness);
+        float saturation = mix(mix(1.02, 0.82, thickness), 1.12, lowerGlowAmount);
         backdrop = clamp(mix(vec3(shiftedLuminance), backdrop, saturation), 0.0, 1.0);
-        float dynamicRange = mix(0.92, 0.62, thickness);
+        float dynamicRange = mix(mix(0.92, 0.62, thickness), 1.12, lowerGlowAmount);
         backdrop = clamp(vec3(0.5) + (backdrop - vec3(0.5)) * dynamicRange, 0.0, 1.0);
     } else if (responsive > 0.5) {
         backdrop = clamp(backdrop + vec3((0.50 - backdropLuminance) * 0.045), 0.0, 1.0);
@@ -119,10 +121,16 @@ void main() {
     }
 
     float tintAlpha = glassTint.a;
-    if (enhancedOptics > 0.5)
-        tintAlpha = clamp(tintAlpha + 0.055 + 0.18 * thickness + 0.075 * smoothstep(0.58, 0.92, backdropLuminance), 0.0, 0.80);
+    if (enhancedOptics > 0.5) {
+        float maxTintAlpha = mix(0.80, 0.94, lowerGlowAmount);
+        tintAlpha = clamp(tintAlpha + 0.055 + 0.18 * thickness
+            + 0.075 * smoothstep(0.58, 0.92, backdropLuminance)
+            + 0.08 * lowerGlowAmount, 0.0, maxTintAlpha);
+    }
     else if (responsive > 0.5)
         tintAlpha = clamp(tintAlpha + 0.065 + 0.05 * thickness + 0.015 * smoothstep(0.75, 0.95, backdropLuminance), 0.0, 0.58);
+    float lowerFade = lowerGlowAmount * smoothstep(0.20, 1.0, qt_TexCoord0.y);
+    tintAlpha *= 1.0 - 0.56 * lowerFade;
     vec3 color = mix(backdrop, glassTint.rgb, tintAlpha);
 
     vec2 responsiveLight = normalize(lightDirection
@@ -165,26 +173,87 @@ void main() {
             * (1.0 - smoothstep(2.4, mix(6.2, 8.2, expansion), edgeDistance)) * coverage;
         float depthRim = smoothstep(3.0, 4.8, edgeDistance)
             * (1.0 - smoothstep(4.8, mix(7.0, 9.5, expansion), edgeDistance)) * coverage;
+        float innerOptics = 1.0 - lowerGlowAmount;
         float interactionGlow = interactionAmount * pointerFalloff;
-        specular = rim * (0.08 + 0.28 * pow(facingLight, 3.5))
-            + innerRim * (0.018 + 0.07 * facingLight + 0.025 * expansion)
-            + (rim + 0.4 * innerRim) * 0.10 * interactionGlow;
+        specular = rim * (0.08 + 0.28 * pow(facingLight, 3.5) + 0.10 * interactionGlow)
+            + innerOptics * innerRim
+                * (0.018 + 0.07 * facingLight + 0.025 * expansion + 0.04 * interactionGlow);
 
         float ambientLuminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
         vec3 ambientSpill = clamp(backdrop
             + (backdrop - vec3(ambientLuminance)) * 0.22, 0.0, 1.0);
         color = mix(color, ambientSpill,
-            innerRim * (0.035 + 0.045 * expansion) + rim * 0.018 * expansion);
-        color = mix(color, vec3(1.0), clamp(specular * edgeLight, 0.0, 0.40));
+            innerOptics * innerRim * (0.035 + 0.045 * expansion) + rim * 0.018 * expansion);
+        color = mix(color, vec3(1.0),
+            clamp(specular * edgeLight * (1.0 - lowerGlowAmount), 0.0, 0.40));
 
         float opposingLight = pow(max(dot(edgeNormal, -activeLight), 0.0), 2.5);
         float edgeShadow = (rim * (0.045 + 0.025 * expansion)
-            + innerRim * (0.012 + 0.022 * expansion)) * opposingLight
-            + depthRim * 0.018 * expansion;
+            + innerOptics * innerRim * (0.012 + 0.022 * expansion)) * opposingLight
+            + innerOptics * depthRim * 0.018 * expansion;
         color *= 1.0 - edgeShadow * edgeLight;
     } else {
         color = mix(color, vec3(1.0), specular * edgeLight);
         color *= 1.0 - rim * (1.0 - facingLight) * 0.045 * edgeLight;
+    }
+
+    if (lowerGlowAmount > 0.0) {
+        float interactionEnergy = 1.0 + 0.18 * interactionAmount * pointerFalloff;
+        vec2 environmentStep = edgeNormal * pixelUv;
+        vec2 environmentUv = clamp(backdropUv + environmentStep
+            * (2.5 + 1.5 * interactionAmount * pointerFalloff), vec2(0.001), vec2(0.999));
+        vec2 farEnvironmentUv = clamp(backdropUv + environmentStep
+            * (7.0 + 2.0 * interactionAmount * pointerFalloff), vec2(0.001), vec2(0.999));
+        vec2 environmentTangent = vec2(-edgeNormal.y * pixelUv.x, edgeNormal.x * pixelUv.y) * 2.4;
+        vec3 nearEnvironment = texture(source, environmentUv).rgb;
+        vec3 farEnvironment = texture(source, farEnvironmentUv).rgb;
+        vec3 environment = nearEnvironment * 0.35 + farEnvironment * 0.25
+            + texture(source, clamp(environmentUv + environmentTangent, vec2(0.001), vec2(0.999))).rgb * 0.20
+            + texture(source, clamp(environmentUv - environmentTangent, vec2(0.001), vec2(0.999))).rgb * 0.20;
+        float environmentLuminance = dot(environment, vec3(0.2126, 0.7152, 0.0722));
+        float environmentLight = pow(smoothstep(0.03, 0.86, environmentLuminance), 0.65);
+        float environmentPeak = max(max(environment.r, environment.g), environment.b);
+        vec3 environmentHue = environment / max(environmentPeak, 0.08);
+        vec3 environmentColor = mix(environment,
+            environmentHue * mix(0.32, 1.0, environmentLight), 0.82);
+        environmentColor = clamp(environmentColor, 0.0, 1.0);
+
+        vec3 diffuseBackdrop = sampleScatteredBackdrop(backdropUv, pixelUv, 6.5);
+        float diffuseLuminance = dot(diffuseBackdrop, vec3(0.2126, 0.7152, 0.0722));
+        float diffuseLight = pow(smoothstep(0.03, 0.86, diffuseLuminance), 0.72);
+        vec3 diffuseColor = clamp(mix(vec3(diffuseLuminance), diffuseBackdrop, 1.08), 0.0, 1.0);
+        float lowerBand = smoothstep(0.18, 1.0, qt_TexCoord0.y);
+        float ambientStrength = lowerGlowAmount * lowerBand
+            * (0.08 + 0.20 * diffuseLight) * interactionEnergy;
+        color = mix(color, diffuseColor, clamp(ambientStrength, 0.0, 0.30));
+
+        float sideFacing = smoothstep(0.18, 0.95, abs(edgeNormal.x));
+        float lowerFacing = smoothstep(0.50, 0.92, qt_TexCoord0.y);
+        float sideInset = max(size.x * 0.5 - abs(point.x), 0.0);
+        float sideCap = (1.0 - smoothstep(0.0, size.y * 0.52, sideInset)) * coverage;
+        float lowerSurface = (1.0 - smoothstep(0.5, 18.0, edgeDistance))
+            * lowerFacing * coverage;
+        float surfaceLens = max(lowerSurface, sideCap);
+        float surfaceStrength = lowerGlowAmount * surfaceLens
+            * (0.09 + 0.34 * environmentLight) * interactionEnergy;
+        vec3 surfaceColor = mix(diffuseColor, environmentColor, 0.35 + 0.40 * sideCap);
+        color = mix(color, surfaceColor, clamp(surfaceStrength, 0.0, 0.46));
+
+        vec3 rimEnvironment = nearEnvironment * 0.82 + farEnvironment * 0.18;
+        float rimLuminance = dot(rimEnvironment, vec3(0.2126, 0.7152, 0.0722));
+        float rimLight = pow(smoothstep(0.02, 0.90, rimLuminance), 0.58);
+        float rimPeak = max(max(rimEnvironment.r, rimEnvironment.g), rimEnvironment.b);
+        vec3 rimHue = rimEnvironment / max(rimPeak, 0.08);
+        vec3 rimColor = mix(rimEnvironment,
+            rimHue * mix(0.12, 0.92, rimLight), 0.80);
+        rimColor = clamp(rimColor, 0.0, 1.0);
+        float outerRim = 1.0 - smoothstep(0.30, 1.20, edgeDistance);
+        float rimFacing = max(lowerFacing, 0.62 * sideFacing);
+        float rimStrength = lowerGlowAmount * outerRim * rimFacing
+            * (0.30 + 1.0 * rimLight) * interactionEnergy;
+        float reflectedEnergy = clamp(rimStrength * edgeLight
+            * (0.12 + 0.88 * rimLight), 0.0, 0.78);
+        color = mix(color, rimColor, reflectedEnergy);
     }
 
     float alpha = coverage * qt_Opacity;

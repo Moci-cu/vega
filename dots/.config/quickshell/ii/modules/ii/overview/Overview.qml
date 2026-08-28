@@ -145,7 +145,7 @@ Scope {
                     PropertyAction {
                         target: root
                         property: "launcherScale"
-                        value: 1.01
+                        value: 1.006
                     }
                     PauseAnimation {
                         duration: 30
@@ -153,8 +153,8 @@ Scope {
                     NumberAnimation {
                         target: root
                         property: "launcherScale"
-                        from: 1.01
-                        to: 0.99
+                        from: 1.006
+                        to: 0.994
                         duration: 180
                         easing.type: Easing.BezierSpline
                         easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
@@ -162,11 +162,11 @@ Scope {
                     NumberAnimation {
                         target: root
                         property: "launcherScale"
-                        from: 0.99
+                        from: 0.994
                         to: 1
                         duration: 180
                         easing.type: Easing.OutBack
-                        easing.overshoot: 0.1
+                        easing.overshoot: 0.06
                     }
                 }
 
