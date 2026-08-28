@@ -18,6 +18,7 @@ layout(std140, binding = 0) uniform buf {
     float interaction;
     vec2 interactionPoint;
     float thicknessOverride;
+    float edgeLighting;
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -130,6 +131,7 @@ void main() {
     float facingLight = max(dot(edgeNormal, activeLight), 0.0);
     float rim = (1.0 - smoothstep(0.25, 2.0, edgeDistance)) * coverage;
     float specular = rim * (0.14 + 0.34 * pow(facingLight, 2.5));
+    float edgeLight = clamp(edgeLighting, 0.0, 1.0);
     if (responsive > 0.5) {
         float innerRim = smoothstep(0.8, 2.4, edgeDistance)
             * (1.0 - smoothstep(2.4, 5.8, edgeDistance)) * coverage;
@@ -150,14 +152,14 @@ void main() {
             + texture(source, clamp(spillUv - spillTangent, vec2(0.001), vec2(0.999))).rgb * 0.25;
         color = mix(color, ambientSpill, innerRim * 0.06);
         color = mix(color, texture(source, depthUv).rgb, depthRim * (0.10 + 0.05 * interactionAmount));
-        color = mix(color, vec3(1.0), clamp(specular, 0.0, 0.48));
+        color = mix(color, vec3(1.0), clamp(specular * edgeLight, 0.0, 0.48));
 
         float lowerFacing = smoothstep(0.05, 0.90, edgeNormal.y);
         float lowerHighlight = lowerFacing * (0.10 * rim + 0.048 * innerRim + 0.015 * depthRim);
-        color = mix(color, vec3(1.0), lowerHighlight);
+        color = mix(color, vec3(1.0), lowerHighlight * edgeLight);
 
         float opposingLight = pow(max(dot(edgeNormal, -activeLight), 0.0), 2.5);
-        color *= 1.0 - (rim * 0.075 + innerRim * 0.035) * opposingLight * (1.0 + 0.25 * thickness);
+        color *= 1.0 - (rim * 0.075 + innerRim * 0.035) * opposingLight * (1.0 + 0.25 * thickness) * edgeLight;
     } else if (interactive > 0.5) {
         float innerRim = smoothstep(0.8, 2.4, edgeDistance)
             * (1.0 - smoothstep(2.4, mix(6.2, 8.2, expansion), edgeDistance)) * coverage;
@@ -173,16 +175,16 @@ void main() {
             + (backdrop - vec3(ambientLuminance)) * 0.22, 0.0, 1.0);
         color = mix(color, ambientSpill,
             innerRim * (0.035 + 0.045 * expansion) + rim * 0.018 * expansion);
-        color = mix(color, vec3(1.0), clamp(specular, 0.0, 0.40));
+        color = mix(color, vec3(1.0), clamp(specular * edgeLight, 0.0, 0.40));
 
         float opposingLight = pow(max(dot(edgeNormal, -activeLight), 0.0), 2.5);
         float edgeShadow = (rim * (0.045 + 0.025 * expansion)
             + innerRim * (0.012 + 0.022 * expansion)) * opposingLight
             + depthRim * 0.018 * expansion;
-        color *= 1.0 - edgeShadow;
+        color *= 1.0 - edgeShadow * edgeLight;
     } else {
-        color = mix(color, vec3(1.0), specular);
-        color *= 1.0 - rim * (1.0 - facingLight) * 0.045;
+        color = mix(color, vec3(1.0), specular * edgeLight);
+        color *= 1.0 - rim * (1.0 - facingLight) * 0.045 * edgeLight;
     }
 
     float alpha = coverage * qt_Opacity;

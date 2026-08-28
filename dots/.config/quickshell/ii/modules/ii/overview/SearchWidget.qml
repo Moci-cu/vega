@@ -408,6 +408,7 @@ Item { // Wrapper
             interaction: searchWidgetContent.opticalEnergy
             interactionPoint: Qt.point(searchWidgetContent.opticalX, searchWidgetContent.opticalY)
             thicknessOverride: 0.15
+            edgeLighting: 0
             itemSourceRect: Qt.rect(
                 (liquidGlassCrop.panelX - liquidGlassCrop.cropX) / liquidGlassBackdrop.width,
                 (liquidGlassCrop.panelY - liquidGlassCrop.cropY) / liquidGlassBackdrop.height,

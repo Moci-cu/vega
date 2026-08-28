@@ -15,6 +15,7 @@ Item {
     property real interaction: 0
     property point interactionPoint: Qt.point(0.5, 0.5)
     property real thicknessOverride: -1
+    property real edgeLighting: 1
     property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
     property bool sourceReady: wallpaperSource?.status === Image.Ready
@@ -77,7 +78,7 @@ Item {
         bottomLeftRadius: root.bottomLeftRadius
         bottomRightRadius: root.bottomRightRadius
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.52)
+        border.color: Qt.rgba(1, 1, 1, 0.52 * root.edgeLighting)
         opacity: root.shaderReady ? 0 : 1
         gradient: Gradient {
             GradientStop {
@@ -131,6 +132,7 @@ Item {
         property real interaction: root.interaction
         property vector2d interactionPoint: Qt.vector2d(root.interactionPoint.x, root.interactionPoint.y)
         property real thicknessOverride: root.thicknessOverride
+        property real edgeLighting: root.edgeLighting
 
         fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb")
 
@@ -150,7 +152,7 @@ Item {
         }
         height: 1
         radius: 0.5
-        color: Qt.rgba(1, 1, 1, 0.3)
+        color: Qt.rgba(1, 1, 1, 0.3 * root.edgeLighting)
         opacity: root.shaderReady ? 0 : 1
 
         Behavior on opacity {
