@@ -42,6 +42,7 @@ Item { // Wrapper
     ]
     readonly property real searchPillWidth: 445
     readonly property real searchPillHeight: 78
+    readonly property real calculatorPanelHeight: 64
     readonly property real searchPanelGap: 8
     readonly property var screen: root.QsWindow.window?.screen ?? null
 
@@ -53,9 +54,17 @@ Item { // Wrapper
     readonly property int activeCurrentIndex: appMode ? appGrid.currentIndex : listResults.currentIndex
     property string searchingText: LauncherSearch.query
     property bool showResults: false
+    property bool applicationGridMode: false
     property bool showCategories: false
     property bool showClipboard: false
     readonly property bool clipboardMode: showClipboard
+    readonly property string calculatorExpression: applicationGridMode || clipboardMode
+        ? "" : LauncherSearch.mathExpression(searchingText)
+    readonly property string calculatorResult: LauncherSearch.mathResult.trim()
+    readonly property bool calculatorActive: calculatorExpression.length > 0
+    readonly property bool calculatorVisible: calculatorActive
+    property real searchSurfaceHeight: searchPillHeight
+        + (calculatorActive ? calculatorPanelHeight : 0)
     readonly property bool deepGlassMode: appMode || clipboardMode
     readonly property bool categoriesVisible: showCategories
         && !showResults
@@ -69,6 +78,14 @@ Item { // Wrapper
     implicitHeight: searchWidgetContent.implicitHeight + Appearance.sizes.elevationMargin * 2
     width: implicitWidth
     height: implicitHeight
+
+    Behavior on searchSurfaceHeight {
+        NumberAnimation {
+            duration: 280
+            easing.type: Easing.OutBack
+            easing.overshoot: 0.12
+        }
+    }
 
     function retainBackdropSize(targetWidth, targetHeight) {
         if (!GlobalStates.overviewOpen)
@@ -467,7 +484,7 @@ Item { // Wrapper
         width: implicitWidth
         height: implicitHeight
         implicitWidth: root.resultsPanelWidth
-        implicitHeight: root.searchPillHeight
+        implicitHeight: root.searchSurfaceHeight
             + (root.showResults
                 ? root.searchPanelGap + root.resultsPanelHeight
                 : root.categoriesVisible ? root.searchPanelGap + root.categoryPanelHeight : 0)
@@ -512,7 +529,7 @@ Item { // Wrapper
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             width: root.searchPillWidth
-            height: root.searchPillHeight
+            height: root.searchSurfaceHeight
             z: 2
 
             RectangularShadow {
@@ -551,14 +568,18 @@ Item { // Wrapper
             SearchBar {
                 id: searchBar
 
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
                 anchors.leftMargin: 26
                 anchors.rightMargin: 10
                 anchors.topMargin: 9
-                anchors.bottomMargin: 9
+                height: root.searchPillHeight - 18
                 debounceInterval: root.typingDebounceInterval
                 forceExpanded: true
-                queryPrefix: root.clipboardMode ? Config.options.search.prefix.clipboard : ""
+                calculatorActive: root.calculatorActive
+                queryPrefix: root.applicationGridMode ? Config.options.search.prefix.app
+                    : root.clipboardMode ? Config.options.search.prefix.clipboard : ""
                 inputPlaceholder: root.clipboardMode ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
                 leadingIcon: root.clipboardMode ? "content_copy" : ""
                 resultCount: root.activeResultCount
@@ -577,6 +598,78 @@ Item { // Wrapper
 
                 Synchronizer on searchingText {
                     property alias source: root.searchingText
+                }
+            }
+
+            Item {
+                id: calculatorPanel
+
+                visible: opacity > 0
+                opacity: root.calculatorVisible
+                    ? Math.max(0, Math.min(1, (root.searchSurfaceHeight
+                        - root.searchPillHeight - 12) / (root.calculatorPanelHeight - 12)))
+                    : 0
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: root.searchPillHeight - 2
+                height: root.calculatorPanelHeight - 10
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: root.sharpMode ? 0 : height / 2
+                    color: Qt.rgba(0.82, 0.84, 0.86, 0.16)
+                    border.width: 0.6
+                    border.color: Qt.rgba(1, 1, 1, 0.18)
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 8
+                    spacing: 10
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: -1
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: `${root.calculatorExpression} =`
+                            color: Qt.rgba(1, 1, 1, 0.64)
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            renderType: Text.QtRendering
+                            elide: Text.ElideLeft
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: root.calculatorResult || "…"
+                            color: Qt.rgba(1, 1, 1, 0.94)
+                            font.pixelSize: Appearance.font.pixelSize.normal
+                            font.weight: Font.DemiBold
+                            renderType: Text.QtRendering
+                            elide: Text.ElideLeft
+                        }
+                    }
+
+                    IconToolbarButton {
+                        enabled: root.calculatorResult.length > 0
+                        opacity: enabled ? 1 : 0.45
+                        Layout.preferredWidth: 34
+                        Layout.preferredHeight: 34
+                        text: "content_copy"
+                        colText: Qt.rgba(1, 1, 1, 0.82)
+                        colBackground: Qt.rgba(1, 1, 1, 0.12)
+                        onClicked: Quickshell.clipboardText = root.calculatorResult
+
+                        StyledToolTip {
+                            text: Translation.tr("Copy")
+                        }
+                    }
                 }
             }
 
@@ -856,7 +949,7 @@ Item { // Wrapper
                             if (event.key === Qt.Key_Tab) {
                                 if (listResults.count === 0)
                                     return;
-                                const tabbedText = root.resultAt(0)?.name ?? "";
+                                const tabbedText = root.resultAt(searchItem.index)?.name ?? "";
                                 searchBar.setQueryImmediately(tabbedText);
                                 event.accepted = true;
                                 root.focusSearchInput();

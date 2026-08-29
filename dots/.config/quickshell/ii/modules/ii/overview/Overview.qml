@@ -15,6 +15,7 @@ Scope {
     id: overviewScope
     property bool dontAutoCancelSearch: false
     property bool applicationsPending: false
+    property bool applicationsOpen: false
     property bool categoriesOpen: false
     property bool clipboardOpen: false
     property bool workspaceMode: false
@@ -52,17 +53,34 @@ Scope {
     }
 
     function toggleSearch() {
+        if (GlobalStates.overviewOpen && !workspaceMode && !categoriesOpen && !clipboardOpen
+                && !dontAutoCancelSearch && !applicationsPending) {
+            GlobalStates.overviewOpen = false
+            return
+        }
         workspaceMode = false
+        applicationsPending = false
+        applicationsOpen = false
+        dontAutoCancelSearch = false
         categoriesOpen = false
         clipboardOpen = false
-        GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+        setSearchingTextRequested("")
+        GlobalStates.overviewOpen = true
     }
 
     function toggleWorkspaces() {
+        if (GlobalStates.overviewOpen && workspaceMode) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        applicationsPending = false
+        applicationsOpen = false
+        dontAutoCancelSearch = false
         categoriesOpen = false
         clipboardOpen = false
         workspaceMode = true
-        GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+        setSearchingTextRequested("")
+        GlobalStates.overviewOpen = true
     }
 
     function toggleCategories() {
@@ -72,6 +90,7 @@ Scope {
         }
         workspaceMode = false
         applicationsPending = false
+        applicationsOpen = false
         dontAutoCancelSearch = false
         categoriesOpen = true
         clipboardOpen = false
@@ -80,21 +99,19 @@ Scope {
     }
 
     function toggleApplications() {
-        if (GlobalStates.overviewOpen && (dontAutoCancelSearch || applicationsPending)) {
+        if (GlobalStates.overviewOpen && applicationsOpen) {
             applicationsPending = false
+            applicationsOpen = false
             GlobalStates.overviewOpen = false
             return
         }
         categoriesOpen = false
         clipboardOpen = false
         workspaceMode = false
-        setSearchingTextRequested("")
-        if (GlobalStates.overviewOpen) {
-            dontAutoCancelSearch = true
-            return
-        }
-        applicationsPending = true
-        dontAutoCancelSearch = false
+        applicationsOpen = true
+        applicationsPending = !GlobalStates.overviewOpen
+        dontAutoCancelSearch = GlobalStates.overviewOpen
+        setSearchingTextRequested(Config.options.search.prefix.app)
         GlobalStates.overviewOpen = true
     }
 
@@ -289,6 +306,7 @@ Scope {
                             root.workspaceContentReady = false;
                             searchWidget.disableExpandAnimation();
                             overviewScope.applicationsPending = false;
+                            overviewScope.applicationsOpen = false;
                             overviewScope.categoriesOpen = false;
                             overviewScope.clipboardOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
@@ -383,6 +401,7 @@ Scope {
                         SearchWidget {
                             id: searchWidget
                             showResults: overviewScope.dontAutoCancelSearch
+                            applicationGridMode: overviewScope.applicationsOpen
                             showCategories: overviewScope.categoriesOpen
                             showClipboard: overviewScope.clipboardOpen
                             revealProgress: root.launcherRevealProgress
@@ -442,6 +461,7 @@ Scope {
         overviewScope.workspaceMode = false;
         overviewScope.categoriesOpen = false;
         overviewScope.applicationsPending = false;
+        overviewScope.applicationsOpen = false;
         overviewScope.dontAutoCancelSearch = true;
         overviewScope.clipboardOpen = true;
         overviewScope.setSearchingTextRequested(Config.options.search.prefix.clipboard);
@@ -449,11 +469,17 @@ Scope {
     }
 
     function toggleEmojis() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
+        const emojisActive = GlobalStates.overviewOpen
+            && !overviewScope.workspaceMode && !overviewScope.categoriesOpen
+            && !overviewScope.clipboardOpen && overviewScope.dontAutoCancelSearch
+            && LauncherSearch.matchedPrefixName() === "emojis";
+        if (emojisActive) {
             GlobalStates.overviewOpen = false;
             return;
         }
         overviewScope.workspaceMode = false;
+        overviewScope.applicationsPending = false;
+        overviewScope.applicationsOpen = false;
         overviewScope.categoriesOpen = false;
         overviewScope.clipboardOpen = false;
         overviewScope.dontAutoCancelSearch = true;

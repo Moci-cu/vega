@@ -18,6 +18,7 @@ RowLayout {
     property string queryPrefix: ""
     property string inputPlaceholder: Translation.tr("Search or Ask")
     property string leadingIcon: ""
+    property bool calculatorActive: false
     property alias searchInput: searchInput
     property string searchingText
     property int debounceInterval: 35
@@ -43,6 +44,8 @@ RowLayout {
     readonly property bool autocompleteIsApp: root.autocompleteEntry?.nativeApp
         || String(root.autocompleteEntry?.key ?? "").startsWith("app:")
     readonly property string autocompleteAction: {
+        if (root.calculatorActive)
+            return Translation.tr("Copy");
         const entry = root.autocompleteEntry;
         if (!entry)
             return "";
@@ -52,9 +55,12 @@ RowLayout {
     }
     readonly property string autocompleteInputQuery: LauncherSearch.nativeAppQuery(searchInput.text).trim()
     readonly property string autocompleteName: String(root.autocompleteEntry?.name ?? "")
-    readonly property bool autocompleteMatchesInput: root.autocompleteInputQuery.length > 0
-        && root.autocompleteName.toLowerCase().startsWith(root.autocompleteInputQuery.toLowerCase())
+    readonly property bool autocompleteMatchesInput: root.calculatorActive
+        || (root.autocompleteInputQuery.length > 0
+            && root.autocompleteName.toLowerCase().startsWith(root.autocompleteInputQuery.toLowerCase()))
     readonly property string autocompleteCompletion: {
+        if (root.calculatorActive)
+            return "";
         return root.autocompleteMatchesInput
             ? root.autocompleteName.slice(root.autocompleteInputQuery.length) : "";
     }
@@ -305,6 +311,7 @@ RowLayout {
     IconToolbarButton {
         id: moreActionsButton
 
+        visible: !root.calculatorActive
         Layout.preferredWidth: 42
         Layout.preferredHeight: 42
         Layout.rightMargin: 2

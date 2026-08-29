@@ -125,12 +125,6 @@ Singleton {
             }
         },
         {
-            action: "konachanwallpaper",
-            execute: () => {
-                Quickshell.execDetached([Quickshell.shellPath("scripts/colors/random/random_konachan_wall.sh")]);
-            }
-        },
-        {
             action: "light",
             execute: () => {
                 Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "light", "--noswitch"]);
@@ -175,18 +169,6 @@ Singleton {
             action: "wipeclipboard",
             execute: () => {
                 Cliphist.wipe();
-            }
-        },
-        {
-            action: "genius",
-            execute: args => {
-                if (!args || args.trim().length === 0) {
-                    Quickshell.execDetached(["notify-send", "Genius API", 
-                        Translation.tr("Usage: /genius YOUR_API_KEY"), "-a", "Shell"]);
-                    return;
-                }
-                KeyringStorage.setNestedField(["apiKeys", "genius"], args.trim());
-                Quickshell.execDetached(["notify-send", "Genius API", Translation.tr("API key saved!"), "-a", "Shell"]);
             }
         },
     ]
@@ -592,9 +574,9 @@ Singleton {
         const startsWithShellCommandPrefix = prefixName === "shellCommand";
         const startsWithWebSearchPrefix = prefixName === "webSearch";
         const startsWithWindowPrefix = prefixName === "window";
-        if ((startsWithNumber || startsWithMathPrefix) && root.mathResult.length > 0) {
-            result.push(root.mathResultEntry());
-        } else if (startsWithShellCommandPrefix) {
+        if (startsWithNumber || startsWithMathPrefix)
+            return root.mathResult.length > 0 ? [root.mathResultEntry()] : [];
+        if (startsWithShellCommandPrefix) {
             result.push(root.commandResult());
         } else if (startsWithWebSearchPrefix) {
             result.push(root.webSearchResult());
