@@ -46,6 +46,39 @@ Singleton {
         return !!(/^\d+\t\[\[.*binary data.*\d+x\d+.*\]\]$/.test(entry))
     }
 
+    function presentation(entry) {
+        const value = StringUtils.cleanCliphistEntry(entry);
+        const image = value.match(/^\[\[\s*binary data\s+(\d+(?:\.\d+)?\s+\S+)\s+(\S+)\s+(\d+)x(\d+)\s*\]\]$/i);
+        if (image) {
+            const cachePath = FileUtils.trimFileProtocol(`${Directories.cache}/cliphist/db`)
+                .replace(FileUtils.trimFileProtocol(Directories.home), "~");
+            return {
+                title: `Image ${image[3]}×${image[4]}`,
+                subtitle: `${image[2].toUpperCase()} · ${image[1]} · ${cachePath}`,
+                icon: "image"
+            };
+        }
+        if (value.startsWith("file://")) {
+            let path = value.slice(7).split(/\r?\n/)[0];
+            try {
+                path = decodeURIComponent(path);
+            } catch (error) {
+                // Keep malformed clipboard URLs readable instead of dropping the row.
+            }
+            const home = FileUtils.trimFileProtocol(Directories.home);
+            return {
+                title: path.split("/").pop() || path,
+                subtitle: path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path,
+                icon: "draft"
+            };
+        }
+        return {
+            title: value,
+            subtitle: Translation.tr("Text") + " · " + Translation.tr("Clipboard history"),
+            icon: "description"
+        };
+    }
+
     function refresh() {
         readProc.buffer = []
         readProc.running = true

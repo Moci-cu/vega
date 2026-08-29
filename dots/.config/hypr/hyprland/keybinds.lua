@@ -19,6 +19,12 @@ hl.bind("SUPER_R", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = 
 hl.bind("SUPER_L", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = true, transparent = true, release = true })
 hl.bind("SUPER_R", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = true, transparent = true, release = true })
 hl.bind("SUPER + Tab", hl.dsp.global("quickshell:overviewWorkspacesToggle"), { description = "Shell: Toggle overview" })
+hl.bind("SUPER + Space", hl.dsp.global("quickshell:overviewCategoriesToggle"),
+    { description = "Shell: Toggle launcher categories" })
+hl.bind("ALT + code:10", hl.dsp.global("quickshell:overviewApplicationsToggle"),
+    { description = "Shell: Toggle application grid" })
+hl.bind("ALT + code:13", hl.dsp.global("quickshell:overviewClipboardToggle"),
+    { description = "Shell: Toggle clipboard history" })
 hl.bind("SUPER + V", hl.dsp.global("quickshell:overviewClipboardToggle"))
 hl.bind("SUPER + Period", hl.dsp.global("quickshell:overviewEmojiToggle"))
 hl.bind("SUPER + A", hl.dsp.global("quickshell:sidebarLeftToggle"), { description = "Shell: Toggle left sidebar" })

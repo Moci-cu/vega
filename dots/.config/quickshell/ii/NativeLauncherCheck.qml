@@ -60,10 +60,35 @@ ShellRoot {
             if (!widgetLoader.item.appMode
                     || widgetLoader.item.appGridColumns !== 7
                     || widgetLoader.item.appGridRows !== 4
-                    || widgetLoader.item.appGridCellHeight !== 90
+                    || widgetLoader.item.appGridCellWidth !== 100
+                    || widgetLoader.item.appGridCellHeight !== 104
+                    || widgetLoader.item.resultsPanelWidth !== 724
+                    || widgetLoader.item.resultsPanelHeight !== 440
+                    || widgetLoader.item.categoryEntries.length !== 4
+                    || widgetLoader.item.categoryPanelWidth !== 445
+                    || widgetLoader.item.categoryPanelHeight !== 184
+                    || widgetLoader.item.searchPillWidth !== 445
+                    || widgetLoader.item.searchPillHeight !== 78
                     || widgetLoader.item.searchPillWidth >= widgetLoader.item.resultsPanelWidth
+                    || widgetLoader.item.showResults
+                    || widgetLoader.item.showCategories
+                    || widgetLoader.item.showClipboard
+                    || widgetLoader.item.clipboardMode
+                    || widgetLoader.item.categoriesVisible
+                    || widgetLoader.item.implicitHeight >= widgetLoader.item.resultsPanelHeight
                     || !LauncherSearch.shouldUseNativeAppSearch(""))
-                return root.fail("launcher did not enter the detached 7x4 application layout");
+                return root.fail("launcher did not keep the compact default with a detached 7x4 application layout");
+
+            const clipboardImage = Cliphist.presentation("1\t[[ binary data 10 KiB png 64x32 ]]");
+            if (clipboardImage.title !== "Image 64×32"
+                    || !clipboardImage.subtitle.startsWith("PNG · 10 KiB · ")
+                    || clipboardImage.icon !== "image")
+                return root.fail("clipboard image presentation exposed raw binary data");
+
+            widgetLoader.item.showCategories = true;
+            if (!widgetLoader.item.categoriesVisible)
+                return root.fail("launcher category panel did not expose its four-category state");
+            widgetLoader.item.showCategories = false;
 
             const entry = Array.from(DesktopEntries.applications.values)
                 .find(app => String(app.name).toLowerCase().startsWith("heroic"));
@@ -72,6 +97,11 @@ ShellRoot {
             root.expectedId = entry.id || entry.name;
             root.searchStarted = true;
             GlobalStates.overviewOpen = true;
+            widgetLoader.item.showResults = true;
+            if (widgetLoader.item.retainedBackdropWidth < widgetLoader.item.resultsPanelWidth
+                    || widgetLoader.item.retainedBackdropHeight
+                        < widgetLoader.item.searchPillHeight + widgetLoader.item.resultsPanelHeight)
+                return root.fail("launcher backdrop did not grow with the application grid");
             LauncherSearch.query = "her";
         }
     }

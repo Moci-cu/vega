@@ -21,28 +21,47 @@ Item { // Wrapper
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 35
     readonly property int typingResultLimit: 7
+    readonly property int clipboardResultLimit: 8
     readonly property int appGridColumns: 7
     readonly property int appGridRows: 4
     readonly property int appGridCapacity: appGridColumns * appGridRows
-    readonly property real appGridCellWidth: 88
-    readonly property real appGridCellHeight: 90
+    readonly property real appGridCellWidth: 100
+    readonly property real appGridCellHeight: 104
     readonly property real resultsViewportWidth: appGridColumns * appGridCellWidth
     readonly property real resultsViewportHeight: appGridRows * appGridCellHeight
     readonly property real resultsPanelWidth: resultsViewportWidth + 24
     readonly property real resultsPanelHeight: resultsViewportHeight + 24
-    readonly property real searchPillWidth: 500
-    readonly property real searchPillHeight: 64
+    readonly property real categoryPanelWidth: searchPillWidth
+    readonly property real categoryRowHeight: 40
+    readonly property real categoryPanelHeight: categoryRowHeight * categoryEntries.length + 24
+    readonly property var categoryEntries: [
+        { label: "Applications", icon: "apps", themedIcon: "penguin-symbolic" },
+        { label: "Files", icon: "folder" },
+        { label: "Actions", icon: "layers" },
+        { label: "Clipboard", icon: "content_copy" }
+    ]
+    readonly property real searchPillWidth: 445
+    readonly property real searchPillHeight: 78
     readonly property real searchPanelGap: 8
     readonly property var screen: root.QsWindow.window?.screen ?? null
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
-    readonly property bool backdropReady: (liquidGlassPipeline.item?.ready ?? false) || backdropCaptureTimedOut
+    readonly property bool backdropReady: backdropSettled || backdropCaptureTimedOut
     readonly property bool appMode: LauncherSearch.isApplicationQuery(root.searchingText)
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
     readonly property int activeResultCount: appMode ? appGrid.count : listResults.count
     readonly property int activeCurrentIndex: appMode ? appGrid.currentIndex : listResults.currentIndex
     property string searchingText: LauncherSearch.query
-    readonly property bool showResults: GlobalStates.overviewOpen
+    property bool showResults: false
+    property bool showCategories: false
+    property bool showClipboard: false
+    readonly property bool clipboardMode: showClipboard
+    readonly property bool deepGlassMode: appMode || clipboardMode
+    readonly property bool categoriesVisible: showCategories
+        && !showResults
+        && searchingText.trim().length === 0
+    property real revealProgress: 1
+    property bool backdropSettled: false
     property bool backdropCaptureTimedOut: false
     property real retainedBackdropWidth: 1
     property real retainedBackdropHeight: 1
@@ -111,12 +130,29 @@ Item { // Wrapper
         const pipeline = liquidGlassPipeline.item;
         if (!pipeline || !item)
             return Qt.rect(0, 0, 1, 1);
-        const localPosition = item.mapToItem(searchWidgetContent, 0, 0);
+        item.x;
+        item.y;
+        item.scale;
+        let ancestor = item.parent;
+        while (ancestor && ancestor !== searchWidgetContent) {
+            ancestor.x;
+            ancestor.y;
+            ancestor.width;
+            ancestor.height;
+            ancestor.scale;
+            ancestor = ancestor.parent;
+        }
+        const topLeft = item.mapToItem(searchWidgetContent, 0, 0);
+        const bottomRight = item.mapToItem(searchWidgetContent, item.width, item.height);
+        const left = Math.min(topLeft.x, bottomRight.x);
+        const top = Math.min(topLeft.y, bottomRight.y);
+        const width = Math.abs(bottomRight.x - topLeft.x);
+        const height = Math.abs(bottomRight.y - topLeft.y);
         return Qt.rect(
-            (pipeline.targetOffsetX + localPosition.x) / pipeline.sourceWidth,
-            (pipeline.targetOffsetY + localPosition.y) / pipeline.sourceHeight,
-            item.width / pipeline.sourceWidth,
-            item.height / pipeline.sourceHeight
+            (pipeline.targetOffsetX + left) / pipeline.sourceWidth,
+            (pipeline.targetOffsetY + top) / pipeline.sourceHeight,
+            width / pipeline.sourceWidth,
+            height / pipeline.sourceHeight
         );
     }
 
@@ -140,7 +176,8 @@ Item { // Wrapper
             return;
         }
         NativeAppSearch.clear();
-        resultModel.values = (values ?? []).slice(0, root.typingResultLimit);
+        resultModel.values = (values ?? []).slice(0,
+            root.clipboardMode ? root.clipboardResultLimit : root.typingResultLimit);
         Qt.callLater(root.focusFirstItem);
     }
 
@@ -295,8 +332,8 @@ Item { // Wrapper
 
                     IconImage {
                         anchors.centerIn: parent
-                        width: 48
-                        height: 48
+                        width: 52
+                        height: 52
                         source: AppSearch.iconPath(gridItem.entry?.iconName ?? "", "image-missing")
                         asynchronous: true
                     }
@@ -311,40 +348,6 @@ Item { // Wrapper
                     elide: Text.ElideRight
                     text: gridItem.entry?.name ?? ""
                 }
-            }
-        }
-    }
-
-    component GlassOutline: Item {
-        id: outline
-
-        required property real cornerRadius
-        required property color tintColor
-        property real interaction: 0
-        property real highlightOpacity: 0.24
-
-        Rectangle {
-            anchors.fill: parent
-            color: "transparent"
-            radius: outline.cornerRadius
-            border.width: 0.65
-            border.color: ColorUtils.applyAlpha(
-                ColorUtils.mix("black", outline.tintColor, 0.3),
-                Math.max(0.42, outline.tintColor.a)
-            )
-            antialiasing: true
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 0.8
-                color: "transparent"
-                radius: Math.max(0, parent.radius - 0.8)
-                border.width: 0.8
-                border.color: ColorUtils.applyAlpha(
-                    ColorUtils.mix("white", outline.tintColor, 0.52),
-                    outline.highlightOpacity + 0.06 * outline.interaction
-                )
-                antialiasing: true
             }
         }
     }
@@ -410,7 +413,7 @@ Item { // Wrapper
                 autoPaddingEnabled: false
                 blurEnabled: true
                 blurMax: 40
-                blur: 1
+                blur: Math.max(0.12, root.revealProgress)
             }
 
             ShaderEffectSource {
@@ -434,6 +437,7 @@ Item { // Wrapper
         target: GlobalStates
 
         function onOverviewOpenChanged() {
+            root.backdropSettled = false;
             root.backdropCaptureTimedOut = false;
             if (GlobalStates.overviewOpen) {
                 root.scheduleResultsRefresh();
@@ -443,7 +447,15 @@ Item { // Wrapper
     }
 
     Timer {
-        interval: 200
+        interval: 34
+        running: GlobalStates.overviewOpen
+            && !root.backdropSettled
+            && (liquidGlassPipeline.item?.ready ?? false)
+        onTriggered: root.backdropSettled = true
+    }
+
+    Timer {
+        interval: 800
         running: GlobalStates.overviewOpen && !(liquidGlassPipeline.item?.ready ?? false)
         onTriggered: root.backdropCaptureTimedOut = true
     }
@@ -455,10 +467,17 @@ Item { // Wrapper
         width: implicitWidth
         height: implicitHeight
         implicitWidth: root.resultsPanelWidth
-        implicitHeight: root.searchPillHeight + root.searchPanelGap + root.resultsPanelHeight
+        implicitHeight: root.searchPillHeight
+            + (root.showResults
+                ? root.searchPanelGap + root.resultsPanelHeight
+                : root.categoriesVisible ? root.searchPanelGap + root.categoryPanelHeight : 0)
         readonly property real searchRadius: root.sharpMode ? 0 : root.searchPillHeight / 2
-        readonly property real panelRadius: root.sharpMode ? 0 : 28
+        readonly property real categoryRadius: root.sharpMode ? 0 : 36
+        readonly property real panelRadius: root.sharpMode ? 0 : (root.clipboardMode ? 36 : 28)
         property real opticalEnergy: glassHover.hovered ? 0.48 : 0
+
+        onImplicitWidthChanged: root.retainBackdropSize(implicitWidth, implicitHeight)
+        onImplicitHeightChanged: root.retainBackdropSize(implicitWidth, implicitHeight)
 
         function interactionPointFor(item) {
             if (!glassHover.hovered)
@@ -521,6 +540,7 @@ Item { // Wrapper
                 thicknessOverride: 0.34
                 edgeLighting: 0.58
                 lowerGlow: 1
+                ambientDiffusion: 1
                 refraction: 0
                 itemSourceRect: root.backdropRectFor(searchGlassSurface)
                 screen: root.screen
@@ -532,12 +552,15 @@ Item { // Wrapper
                 id: searchBar
 
                 anchors.fill: parent
-                anchors.leftMargin: 14
+                anchors.leftMargin: 26
                 anchors.rightMargin: 10
                 anchors.topMargin: 9
                 anchors.bottomMargin: 9
                 debounceInterval: root.typingDebounceInterval
                 forceExpanded: true
+                queryPrefix: root.clipboardMode ? Config.options.search.prefix.clipboard : ""
+                inputPlaceholder: root.clipboardMode ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
+                leadingIcon: root.clipboardMode ? "content_copy" : ""
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
                 navigationColumns: root.appMode ? root.appGridColumns : 1
@@ -560,22 +583,165 @@ Item { // Wrapper
         }
 
         Item {
-            id: resultsPanel
+            id: categoryPanel
 
+            visible: opacity > 0
+            opacity: root.categoriesVisible ? 1 : 0
+            scale: root.categoriesVisible ? 1 : 0.94
+            transformOrigin: Item.Top
             anchors.top: searchPill.bottom
             anchors.topMargin: root.searchPanelGap
             anchors.horizontalCenter: parent.horizontalCenter
-            width: root.resultsPanelWidth
+            width: root.categoryPanelWidth
+            height: root.categoryPanelHeight
+            z: 1
+
+            Behavior on opacity {
+                enabled: root.revealProgress >= 0.999
+
+                NumberAnimation {
+                    duration: 140
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on scale {
+                enabled: root.revealProgress >= 0.999
+
+                NumberAnimation {
+                    duration: 300
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 0.25
+                }
+            }
+
+            RectangularShadow {
+                anchors.fill: parent
+                radius: searchWidgetContent.categoryRadius
+                blur: 16
+                offset: Qt.vector2d(0, 3)
+                spread: -2
+                color: Qt.rgba(0, 0, 0, 0.3)
+                cached: true
+            }
+
+            LiquidGlassSurface {
+                id: categoryGlassSurface
+
+                anchors.fill: parent
+                shown: GlobalStates.overviewOpen && root.categoriesVisible
+                wallpaperSource: liquidGlassPipeline.item?.source ?? null
+                sourceReady: liquidGlassPipeline.item?.ready ?? false
+                sourceFillsItem: true
+                enhancedOptics: true
+                interactiveOptics: true
+                interaction: searchWidgetContent.opticalEnergy
+                interactionPoint: searchWidgetContent.interactionPointFor(categoryPanel)
+                thicknessOverride: 0.18
+                edgeLighting: 0.58
+                lowerGlow: 1
+                refraction: 0
+                itemSourceRect: root.backdropRectFor(categoryGlassSurface)
+                screen: root.screen
+                tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
+                radius: searchWidgetContent.categoryRadius
+            }
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 12
+
+                Repeater {
+                    model: root.categoryEntries
+
+                    delegate: Item {
+                        id: categoryItem
+
+                        required property var modelData
+                        width: parent.width
+                        height: root.categoryRowHeight
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            spacing: 14
+
+                            Item {
+                                Layout.preferredWidth: 26
+                                Layout.preferredHeight: 26
+                                Layout.alignment: Qt.AlignVCenter
+
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    visible: !categoryItem.modelData.themedIcon
+                                    iconSize: 23
+                                    color: Qt.rgba(1, 1, 1, 0.8)
+                                    text: categoryItem.modelData.icon
+                                }
+
+                                IconImage {
+                                    anchors.centerIn: parent
+                                    visible: !!categoryItem.modelData.themedIcon
+                                    implicitSize: 23
+                                    source: Quickshell.iconPath(categoryItem.modelData.themedIcon ?? "", "image-missing")
+                                }
+                            }
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignVCenter
+                                text: Translation.tr(categoryItem.modelData.label)
+                                color: Qt.rgba(1, 1, 1, 0.9)
+                                font.pixelSize: Appearance.font.pixelSize.normal
+                                font.weight: Font.Medium
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Item {
+            id: resultsPanel
+
+            visible: opacity > 0
+            opacity: root.showResults ? 1 : 0
+            scale: root.showResults ? 1 : 0.94
+            transformOrigin: Item.Top
+            anchors.top: searchPill.bottom
+            anchors.topMargin: root.searchPanelGap
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: root.clipboardMode ? root.searchPillWidth : root.resultsPanelWidth
             height: root.resultsPanelHeight
             z: 1
+
+            Behavior on opacity {
+                enabled: root.revealProgress >= 0.999
+
+                NumberAnimation {
+                    duration: 140
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on scale {
+                enabled: root.revealProgress >= 0.999
+
+                NumberAnimation {
+                    duration: 300
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 0.25
+                }
+            }
 
             RectangularShadow {
                 anchors.fill: parent
                 radius: searchWidgetContent.panelRadius
-                blur: 16
-                offset: Qt.vector2d(0, 3)
-                spread: -2
-                color: Qt.rgba(0, 0, 0, 0.32)
+                blur: root.deepGlassMode ? 24 : 16
+                offset: Qt.vector2d(0, root.deepGlassMode ? 6 : 3)
+                spread: root.deepGlassMode ? -3 : -2
+                color: Qt.rgba(0, 0, 0, root.deepGlassMode ? 0.38 : 0.32)
                 cached: true
             }
 
@@ -588,22 +754,24 @@ Item { // Wrapper
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
                 sourceFillsItem: true
                 enhancedOptics: true
-                interactiveOptics: true
+                interactiveOptics: !root.deepGlassMode
                 interaction: searchWidgetContent.opticalEnergy
                 interactionPoint: searchWidgetContent.interactionPointFor(resultsPanel)
-                thicknessOverride: 0.18
-                edgeLighting: 0.16
-                refraction: 0
+                thicknessOverride: root.deepGlassMode ? 0.32 : 0.18
+                edgeLighting: root.deepGlassMode ? 0.48 : 0.58
+                lowerGlow: root.deepGlassMode ? 0.12 : 1
+                ambientSpillStrength: root.deepGlassMode ? 0.82 : -1
+                refraction: root.deepGlassMode ? 4 : 0
                 itemSourceRect: root.backdropRectFor(liquidGlassSurface)
                 screen: root.screen
-                tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
+                tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer,
+                    root.deepGlassMode ? 0.44 : 0.62)
                 radius: searchWidgetContent.panelRadius
             }
 
             Item {
                 id: resultsViewport
 
-                visible: root.showResults
                 anchors.fill: parent
                 anchors.margins: 12
                 clip: true
@@ -698,13 +866,6 @@ Item { // Wrapper
                 }
             }
 
-            GlassOutline {
-                anchors.fill: parent
-                cornerRadius: searchWidgetContent.panelRadius
-                tintColor: liquidGlassSurface.tintColor
-                interaction: searchWidgetContent.opticalEnergy
-                highlightOpacity: 0.2
-            }
         }
     }
 }

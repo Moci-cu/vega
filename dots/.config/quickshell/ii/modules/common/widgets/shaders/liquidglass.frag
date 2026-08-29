@@ -20,6 +20,8 @@ layout(std140, binding = 0) uniform buf {
     float thicknessOverride;
     float edgeLighting;
     float lowerGlow;
+    float ambientSpillStrength;
+    float ambientDiffusion;
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -105,6 +107,9 @@ void main() {
 
     float backdropLuminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
     float lowerGlowAmount = clamp(lowerGlow, 0.0, 1.0);
+    float ambientAmount = ambientSpillStrength >= 0.0
+        ? clamp(ambientSpillStrength, 0.0, 1.0) : lowerGlowAmount;
+    float diffusionAmount = clamp(ambientDiffusion, 0.0, 1.0);
     if (enhancedOptics > 0.5) {
         float luminanceShift = (0.46 - backdropLuminance) * mix(0.10, 0.14, thickness);
         backdrop = clamp(backdrop + vec3(luminanceShift), 0.0, 1.0);
@@ -129,8 +134,9 @@ void main() {
     }
     else if (responsive > 0.5)
         tintAlpha = clamp(tintAlpha + 0.065 + 0.05 * thickness + 0.015 * smoothstep(0.75, 0.95, backdropLuminance), 0.0, 0.58);
-    float lowerFade = lowerGlowAmount * smoothstep(0.20, 1.0, qt_TexCoord0.y);
-    tintAlpha *= 1.0 - 0.56 * lowerFade;
+    float lowerFade = lowerGlowAmount
+        * smoothstep(mix(0.20, 0.16, diffusionAmount), 1.0, qt_TexCoord0.y);
+    tintAlpha *= 1.0 - mix(0.56, 0.44, diffusionAmount) * lowerFade;
     vec3 color = mix(backdrop, glassTint.rgb, tintAlpha);
 
     vec2 responsiveLight = normalize(lightDirection
@@ -197,7 +203,7 @@ void main() {
         color *= 1.0 - rim * (1.0 - facingLight) * 0.045 * edgeLight;
     }
 
-    if (lowerGlowAmount > 0.0) {
+    if (ambientAmount > 0.0) {
         float interactionEnergy = 1.0 + 0.18 * interactionAmount * pointerFalloff;
         vec2 environmentStep = edgeNormal * pixelUv;
         vec2 environmentUv = clamp(backdropUv + environmentStep
@@ -218,25 +224,38 @@ void main() {
             environmentHue * mix(0.32, 1.0, environmentLight), 0.82);
         environmentColor = clamp(environmentColor, 0.0, 1.0);
 
-        vec3 diffuseBackdrop = sampleScatteredBackdrop(backdropUv, pixelUv, 6.5);
+        float diffuseRadius = mix(mix(7.0, 14.0, ambientAmount), 38.0, diffusionAmount);
+        vec3 diffuseBackdrop = sampleScatteredBackdrop(backdropUv, pixelUv, diffuseRadius);
         float diffuseLuminance = dot(diffuseBackdrop, vec3(0.2126, 0.7152, 0.0722));
         float diffuseLight = pow(smoothstep(0.03, 0.86, diffuseLuminance), 0.72);
-        vec3 diffuseColor = clamp(mix(vec3(diffuseLuminance), diffuseBackdrop, 1.08), 0.0, 1.0);
-        float lowerBand = smoothstep(0.18, 1.0, qt_TexCoord0.y);
-        float ambientStrength = lowerGlowAmount * lowerBand
-            * (0.08 + 0.20 * diffuseLight) * interactionEnergy;
+        float mappedLuminance = mix(diffuseLuminance,
+            diffuseLuminance / (1.0 + 0.45 * diffuseLuminance), diffusionAmount);
+        vec3 mappedBackdrop = diffuseBackdrop
+            * (mappedLuminance / max(diffuseLuminance, 0.001));
+        float diffuseChroma = mix(1.08, mix(0.74, 0.82, diffuseLight), diffusionAmount);
+        vec3 diffuseColor = clamp(vec3(mappedLuminance)
+            + (mappedBackdrop - vec3(mappedLuminance)) * diffuseChroma, 0.0, 1.0);
+        float lowerBand = smoothstep(mix(0.18, 0.14, diffusionAmount), 1.0, qt_TexCoord0.y);
+        float ambientStrength = ambientAmount * lowerBand
+            * (0.08 + 0.20 * diffuseLight) * interactionEnergy
+            * mix(1.0, 0.80, diffusionAmount);
         color = mix(color, diffuseColor, clamp(ambientStrength, 0.0, 0.30));
 
         float sideFacing = smoothstep(0.18, 0.95, abs(edgeNormal.x));
         float lowerFacing = smoothstep(0.50, 0.92, qt_TexCoord0.y);
         float sideInset = max(size.x * 0.5 - abs(point.x), 0.0);
-        float sideCap = (1.0 - smoothstep(0.0, size.y * 0.52, sideInset)) * coverage;
-        float lowerSurface = (1.0 - smoothstep(0.5, 18.0, edgeDistance))
+        float sideCap = (1.0 - smoothstep(0.0,
+            size.y * mix(0.52, 0.78, diffusionAmount), sideInset)) * coverage;
+        float lowerDepth = mix(18.0, max(18.0, size.y * 0.48), diffusionAmount);
+        float lowerSurface = (1.0 - smoothstep(0.5, lowerDepth, edgeDistance))
             * lowerFacing * coverage;
         float surfaceLens = max(lowerSurface, sideCap);
-        float surfaceStrength = lowerGlowAmount * surfaceLens
-            * (0.09 + 0.34 * environmentLight) * interactionEnergy;
-        vec3 surfaceColor = mix(diffuseColor, environmentColor, 0.35 + 0.40 * sideCap);
+        float surfaceStrength = ambientAmount * surfaceLens
+            * (0.09 + 0.34 * environmentLight) * interactionEnergy
+            * mix(1.0, 0.80, diffusionAmount);
+        float localColorMix = mix(0.35 + 0.40 * sideCap,
+            0.20 + 0.20 * sideCap, diffusionAmount);
+        vec3 surfaceColor = mix(diffuseColor, environmentColor, localColorMix);
         color = mix(color, surfaceColor, clamp(surfaceStrength, 0.0, 0.46));
 
         vec3 rimEnvironment = nearEnvironment * 0.82 + farEnvironment * 0.18;
@@ -249,11 +268,16 @@ void main() {
         rimColor = clamp(rimColor, 0.0, 1.0);
         float outerRim = 1.0 - smoothstep(0.30, 1.20, edgeDistance);
         float rimFacing = max(lowerFacing, 0.62 * sideFacing);
-        float rimStrength = lowerGlowAmount * outerRim * rimFacing
+        float rimStrength = ambientAmount * outerRim * rimFacing
             * (0.30 + 1.0 * rimLight) * interactionEnergy;
         float reflectedEnergy = clamp(rimStrength * edgeLight
-            * (0.12 + 0.88 * rimLight), 0.0, 0.78);
+            * (0.12 + 0.88 * rimLight) * mix(1.0, 1.02, diffusionAmount), 0.0, 0.78);
         color = mix(color, rimColor, reflectedEnergy);
+    }
+
+    if (diffusionAmount > 0.0) {
+        float topCap = (1.0 - smoothstep(0.06, 0.52, qt_TexCoord0.y)) * diffusionAmount;
+        color = mix(color, vec3(0.012), 0.22 * topCap);
     }
 
     float alpha = coverage * qt_Opacity;

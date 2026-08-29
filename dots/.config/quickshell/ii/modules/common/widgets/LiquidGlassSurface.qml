@@ -17,6 +17,8 @@ Item {
     property real thicknessOverride: -1
     property real edgeLighting: 1
     property real lowerGlow: 0
+    property real ambientSpillStrength: -1
+    property real ambientDiffusion: 0
     property real refraction: 5
     property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
@@ -138,8 +140,10 @@ Item {
         property real thicknessOverride: root.thicknessOverride
         property real edgeLighting: root.edgeLighting
         property real lowerGlow: root.lowerGlow
+        property real ambientSpillStrength: root.ambientSpillStrength
+        property real ambientDiffusion: root.ambientDiffusion
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-8")
+        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-14")
 
         Behavior on opacity {
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)

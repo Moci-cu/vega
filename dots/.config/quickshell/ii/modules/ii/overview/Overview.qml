@@ -14,6 +14,10 @@ import Quickshell.Hyprland
 Scope {
     id: overviewScope
     property bool dontAutoCancelSearch: false
+    property bool applicationsPending: false
+    property bool categoriesOpen: false
+    property bool clipboardOpen: false
+    property bool workspaceMode: false
     property string focusRestoreAddress: ""
     property int focusRestoreGeneration: 0
 
@@ -45,6 +49,53 @@ Scope {
                 return
             Hyprland.dispatch(`hl.dsp.focus({window = "address:${address}"})`)
         })
+    }
+
+    function toggleSearch() {
+        workspaceMode = false
+        categoriesOpen = false
+        clipboardOpen = false
+        GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+    }
+
+    function toggleWorkspaces() {
+        categoriesOpen = false
+        clipboardOpen = false
+        workspaceMode = true
+        GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+    }
+
+    function toggleCategories() {
+        if (GlobalStates.overviewOpen && categoriesOpen) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        workspaceMode = false
+        applicationsPending = false
+        dontAutoCancelSearch = false
+        categoriesOpen = true
+        clipboardOpen = false
+        setSearchingTextRequested("")
+        GlobalStates.overviewOpen = true
+    }
+
+    function toggleApplications() {
+        if (GlobalStates.overviewOpen && (dontAutoCancelSearch || applicationsPending)) {
+            applicationsPending = false
+            GlobalStates.overviewOpen = false
+            return
+        }
+        categoriesOpen = false
+        clipboardOpen = false
+        workspaceMode = false
+        setSearchingTextRequested("")
+        if (GlobalStates.overviewOpen) {
+            dontAutoCancelSearch = true
+            return
+        }
+        applicationsPending = true
+        dontAutoCancelSearch = false
+        GlobalStates.overviewOpen = true
     }
 
     Connections {
@@ -81,7 +132,7 @@ Scope {
                 readonly property bool isScrollingLayout: Persistent.states.hyprland.layout === "scrolling"
                 property string searchingText: ""
                 readonly property bool hasSearchQuery: searchingText.length > 0
-                readonly property bool showWorkspaceOverview: !hasSearchQuery
+                readonly property bool showWorkspaceOverview: overviewScope.workspaceMode && !hasSearchQuery
 
                 WlrLayershell.namespace: "quickshell:overview"
                 WlrLayershell.layer: WlrLayer.Top
@@ -109,6 +160,8 @@ Scope {
                 readonly property bool launcherReady: GlobalStates.overviewOpen && searchWidget.backdropReady
                 property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1 
                 property real launcherScale: 1
+                property real launcherOpacity: 0.2
+                property real launcherRevealProgress: 0.12
                 property bool workspaceContentReady: false
                 readonly property bool contentShown: {
                     if (!showOpeningAnimation) return GlobalStates.overviewOpen;
@@ -127,6 +180,10 @@ Scope {
                     launcherCloseAnimation.stop();
                     if (launcherReady) {
                         launcherPopAnimation.restart();
+                        if (overviewScope.applicationsPending) {
+                            overviewScope.applicationsPending = false;
+                            overviewScope.dontAutoCancelSearch = true;
+                        }
                     } else if (!GlobalStates.overviewOpen) {
                         launcherCloseAnimation.restart();
                     }
@@ -139,34 +196,51 @@ Scope {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
                 }
 
-                SequentialAnimation {
+                ParallelAnimation {
                     id: launcherPopAnimation
 
-                    PropertyAction {
-                        target: root
-                        property: "launcherScale"
-                        value: 1.006
-                    }
-                    PauseAnimation {
-                        duration: 30
-                    }
                     NumberAnimation {
                         target: root
-                        property: "launcherScale"
-                        from: 1.006
-                        to: 0.994
-                        duration: 180
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
-                    }
-                    NumberAnimation {
-                        target: root
-                        property: "launcherScale"
-                        from: 0.994
+                        property: "launcherOpacity"
+                        from: 0.2
                         to: 1
-                        duration: 180
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 0.06
+                        duration: 160
+                        easing.type: Easing.OutCubic
+                    }
+
+                    NumberAnimation {
+                        target: root
+                        property: "launcherRevealProgress"
+                        from: 0.12
+                        to: 1
+                        duration: 280
+                        easing.type: Easing.OutCubic
+                    }
+
+                    SequentialAnimation {
+                        PropertyAction {
+                            target: root
+                            property: "launcherScale"
+                            value: 1.06
+                        }
+                        NumberAnimation {
+                            target: root
+                            property: "launcherScale"
+                            from: 1.06
+                            to: 0.992
+                            duration: 300
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
+                        }
+                        NumberAnimation {
+                            target: root
+                            property: "launcherScale"
+                            from: 0.992
+                            to: 1
+                            duration: 170
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 0.1
+                        }
                     }
                 }
 
@@ -214,10 +288,15 @@ Scope {
                             workspaceContentDelayTimer.stop();
                             root.workspaceContentReady = false;
                             searchWidget.disableExpandAnimation();
+                            overviewScope.applicationsPending = false;
+                            overviewScope.categoriesOpen = false;
+                            overviewScope.clipboardOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
                             launcherCloseAnimation.stop();
-                            root.launcherScale = 1;
+                            root.launcherScale = 1.06;
+                            root.launcherOpacity = 0.2;
+                            root.launcherRevealProgress = 0.12;
                             if (!overviewScope.dontAutoCancelSearch) {
                                 searchWidget.cancelSearch();
                             }
@@ -276,7 +355,7 @@ Scope {
                 Item {
                     id: contentItem
                     anchors.fill: parent
-                    opacity: root.contentShown && searchWidget.backdropReady ? 1 : 0
+                    opacity: root.contentShown && searchWidget.backdropReady ? root.launcherOpacity : 0
 
                     MouseArea { // We could have used PanelWindow.mask to detect this, but this is more stable
                         anchors.fill: parent
@@ -295,12 +374,27 @@ Scope {
                             }
                         }
 
-                        anchors.centerIn: parent
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: Math.round(parent.height / 2
+                            - searchWidget.searchPillHeight / 2
+                            - Appearance.sizes.elevationMargin
+                            - realOverviewLoader.modelData.height * 0.20)
+
                         SearchWidget {
                             id: searchWidget
-                            scale: root.launcherScale
-                            transformOrigin: Item.Center
+                            showResults: overviewScope.dontAutoCancelSearch
+                            showCategories: overviewScope.categoriesOpen
+                            showClipboard: overviewScope.clipboardOpen
+                            revealProgress: root.launcherRevealProgress
                             anchors.centerIn: parent
+
+                            transform: Scale {
+                                origin.x: searchWidget.width / 2
+                                origin.y: Appearance.sizes.elevationMargin + searchWidget.searchPillHeight / 2
+                                xScale: root.launcherScale
+                                yScale: root.launcherScale
+                            }
+
                             Synchronizer on searchingText {
                                 property alias source: root.searchingText
                             }
@@ -341,11 +435,15 @@ Scope {
     
 
     function toggleClipboard() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
+        if (GlobalStates.overviewOpen && overviewScope.clipboardOpen) {
             GlobalStates.overviewOpen = false;
             return;
         }
+        overviewScope.workspaceMode = false;
+        overviewScope.categoriesOpen = false;
+        overviewScope.applicationsPending = false;
         overviewScope.dontAutoCancelSearch = true;
+        overviewScope.clipboardOpen = true;
         overviewScope.setSearchingTextRequested(Config.options.search.prefix.clipboard);
         GlobalStates.overviewOpen = true;
     }
@@ -355,6 +453,9 @@ Scope {
             GlobalStates.overviewOpen = false;
             return;
         }
+        overviewScope.workspaceMode = false;
+        overviewScope.categoriesOpen = false;
+        overviewScope.clipboardOpen = false;
         overviewScope.dontAutoCancelSearch = true;
         overviewScope.setSearchingTextRequested(Config.options.search.prefix.emojis);
         GlobalStates.overviewOpen = true;
@@ -364,15 +465,23 @@ Scope {
         target: "search"
 
         function toggle() {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleSearch();
         }
         function workspacesToggle() {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleWorkspaces();
+        }
+        function applicationsToggle() {
+            overviewScope.toggleApplications();
+        }
+        function categoriesToggle() {
+            overviewScope.toggleCategories();
         }
         function close() {
             GlobalStates.overviewOpen = false;
         }
         function open() {
+            overviewScope.workspaceMode = false;
+            overviewScope.categoriesOpen = false;
             GlobalStates.overviewOpen = true;
         }
         function toggleReleaseInterrupt() {
@@ -388,7 +497,7 @@ Scope {
         description: "Toggles search on press"
 
         onPressed: {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleSearch();
         }
     }
     GlobalShortcut {
@@ -404,7 +513,7 @@ Scope {
         description: "Toggles overview on press"
 
         onPressed: {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleWorkspaces();
         }
     }
     GlobalShortcut {
@@ -420,7 +529,7 @@ Scope {
                 GlobalStates.superReleaseMightTrigger = true;
                 return;
             }
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleSearch();
         }
     }
     GlobalShortcut {
@@ -429,6 +538,22 @@ Scope {
 
         onPressed: {
             GlobalStates.superReleaseMightTrigger = false;
+        }
+    }
+    GlobalShortcut {
+        name: "overviewCategoriesToggle"
+        description: "Toggle launcher categories"
+
+        onPressed: {
+            overviewScope.toggleCategories();
+        }
+    }
+    GlobalShortcut {
+        name: "overviewApplicationsToggle"
+        description: "Toggle application grid"
+
+        onPressed: {
+            overviewScope.toggleApplications();
         }
     }
     GlobalShortcut {

@@ -15,6 +15,9 @@ RowLayout {
     spacing: 8
     property bool animateWidth: false
     property bool forceExpanded: false
+    property string queryPrefix: ""
+    property string inputPlaceholder: Translation.tr("Search or Ask")
+    property string leadingIcon: ""
     property alias searchInput: searchInput
     property string searchingText
     property int debounceInterval: 35
@@ -62,13 +65,15 @@ RowLayout {
 
     function flushPendingQuery() {
         queryCommitTimer.stop();
-        LauncherSearch.query = searchInput.text;
+        LauncherSearch.query = root.queryPrefix + searchInput.text;
     }
 
     function setQueryImmediately(text) {
-        searchInput.text = text;
+        const query = String(text ?? "");
+        searchInput.text = root.queryPrefix && query.startsWith(root.queryPrefix)
+            ? query.slice(root.queryPrefix.length) : query;
         queryCommitTimer.stop();
-        LauncherSearch.query = text;
+        LauncherSearch.query = root.queryPrefix + searchInput.text;
     }
 
     function selectedEntry() {
@@ -80,43 +85,15 @@ RowLayout {
         searchInput.forceActiveFocus();
     }
 
-    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, FileSearch, Window, DefaultSearch }
-
-    property var searchPrefixType: {
-        switch (LauncherSearch.matchedPrefixName(root.searchingText)) {
-        case "action": return SearchBar.SearchPrefixType.Action;
-        case "app": return SearchBar.SearchPrefixType.App;
-        case "clipboard": return SearchBar.SearchPrefixType.Clipboard;
-        case "emojis": return SearchBar.SearchPrefixType.Emojis;
-        case "math": return SearchBar.SearchPrefixType.Math;
-        case "shellCommand": return SearchBar.SearchPrefixType.ShellCommand;
-        case "webSearch": return SearchBar.SearchPrefixType.WebSearch;
-        case "fileSearch": return SearchBar.SearchPrefixType.FileSearch;
-        case "window": return SearchBar.SearchPrefixType.Window;
-        default: return SearchBar.SearchPrefixType.DefaultSearch;
-        }
-    }
-    
     MaterialSymbol {
-        id: searchIcon
+        visible: root.leadingIcon.length > 0
+        Layout.preferredWidth: 26
         Layout.alignment: Qt.AlignVCenter
-        Layout.leftMargin: 4
-        iconSize: 25
+        text: root.leadingIcon
+        iconSize: 24
         color: Qt.rgba(1, 1, 1, 0.72)
-        text: switch (root.searchPrefixType) {
-            case SearchBar.SearchPrefixType.Action: return "settings_suggest";
-            case SearchBar.SearchPrefixType.App: return "apps";
-            case SearchBar.SearchPrefixType.Clipboard: return "content_paste_search";
-            case SearchBar.SearchPrefixType.Emojis: return "add_reaction";
-            case SearchBar.SearchPrefixType.Math: return "calculate";
-            case SearchBar.SearchPrefixType.ShellCommand: return "terminal";
-            case SearchBar.SearchPrefixType.WebSearch: return "travel_explore";
-            case SearchBar.SearchPrefixType.FileSearch: return "folder";
-            case SearchBar.SearchPrefixType.Window: return "select_window";
-            case SearchBar.SearchPrefixType.DefaultSearch: return "search";
-            default: return "search";
-        }
     }
+
     ToolbarTextField { // Search box
         id: searchInput
         Layout.fillWidth: true
@@ -126,7 +103,7 @@ RowLayout {
         font.pixelSize: Appearance.font.pixelSize.larger
         color: Qt.rgba(1, 1, 1, 0.9)
         placeholderTextColor: Qt.rgba(1, 1, 1, 0.58)
-        placeholderText: Translation.tr("Search or Ask")
+        placeholderText: root.inputPlaceholder
         colBackground: "transparent"
         renderType: Text.QtRendering
 
@@ -250,7 +227,7 @@ RowLayout {
 
         onTextChanged: {
             root.caretBlinkOn = true;
-            queryCommitTimer.pendingQuery = text;
+            queryCommitTimer.pendingQuery = root.queryPrefix + text;
             queryCommitTimer.restart();
         }
 
@@ -332,7 +309,7 @@ RowLayout {
         Layout.preferredHeight: 42
         Layout.rightMargin: 2
         text: "more_horiz"
-        colText: Qt.rgba(1, 1, 1, 0.68)
+        colText: Qt.rgba(1, 1, 1, 0.46)
         onClicked: moreActionsMenu.open()
 
         Menu {
