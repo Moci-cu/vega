@@ -115,8 +115,8 @@ Singleton {
     }
 
     Connections {
-        target: DesktopEntries
-        function onApplicationsChanged() { root.clearCaches() }
+        target: DesktopEntries.applications
+        function onValuesChanged() { root.clearCaches() }
     }
 
     function fuzzyQuery(search: string, limit): var { // Idk why list<DesktopEntry> doesn't work

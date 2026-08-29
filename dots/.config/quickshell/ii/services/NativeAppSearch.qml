@@ -42,14 +42,20 @@ Singleton {
     Loader {
         id: backendLoader
         source: Quickshell.shellPath("native/NativeAppSearchBackend.qml")
-        onLoaded: root.rebuildIndex()
+        onLoaded: indexRebuildTimer.restart()
+    }
+
+    Timer {
+        id: indexRebuildTimer
+        interval: 50
+        onTriggered: root.rebuildIndex()
     }
 
     Connections {
-        target: DesktopEntries
+        target: DesktopEntries.applications
 
-        function onApplicationsChanged() {
-            Qt.callLater(root.rebuildIndex);
+        function onValuesChanged() {
+            indexRebuildTimer.restart();
         }
     }
 }

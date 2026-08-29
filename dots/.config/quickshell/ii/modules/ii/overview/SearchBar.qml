@@ -123,7 +123,7 @@ RowLayout {
         implicitHeight: 46
         focus: GlobalStates.overviewOpen
         padding: 0
-        font.pixelSize: Appearance.font.pixelSize.normal
+        font.pixelSize: Appearance.font.pixelSize.larger
         color: Qt.rgba(1, 1, 1, 0.9)
         placeholderTextColor: Qt.rgba(1, 1, 1, 0.58)
         placeholderText: Translation.tr("Search or Ask")
@@ -200,7 +200,7 @@ RowLayout {
             x: desiredX
             anchors.verticalCenter: parent.verticalCenter
             width: autocompleteContent.implicitWidth + 4
-            height: searchInput.font.pixelSize + 6
+            height: autocompleteContent.implicitHeight + 6
             z: 5
             visible: root.autocompleteAction.length > 0
                 && root.autocompleteMatchesInput
@@ -223,7 +223,7 @@ RowLayout {
                 itemSourceRect: root.autocompleteSourceRectFor(autocompleteGlass)
                 screen: root.autocompleteScreen
                 tintColor: Qt.rgba(0.86, 0.9, 0.94, 0.12)
-                radius: 4
+                radius: 10
             }
 
             RowLayout {
@@ -235,7 +235,7 @@ RowLayout {
 
                 StyledText {
                     visible: root.autocompleteCompletion.length > 0
-                    text: root.autocompleteCompletion
+                    text: root.autocompleteCompletion.replace(/^ /, "\u00a0")
                     color: Qt.rgba(1, 1, 1, 0.86)
                     font: searchInput.font
                 }

@@ -30,7 +30,7 @@ Item { // Wrapper
     readonly property real resultsViewportHeight: appGridRows * appGridCellHeight
     readonly property real resultsPanelWidth: resultsViewportWidth + 24
     readonly property real resultsPanelHeight: resultsViewportHeight + 24
-    readonly property real searchPillWidth: 392
+    readonly property real searchPillWidth: 500
     readonly property real searchPillHeight: 64
     readonly property real searchPanelGap: 8
     readonly property var screen: root.QsWindow.window?.screen ?? null
