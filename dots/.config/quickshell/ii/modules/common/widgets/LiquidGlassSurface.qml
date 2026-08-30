@@ -19,9 +19,11 @@ Item {
     property real lowerGlow: 0
     property real ambientSpillStrength: -1
     property real ambientDiffusion: 0
+    property bool detailedEnvironment: false
     property real refraction: 5
     property rect itemSourceRect: Qt.rect(0, 0, 1, 1)
     property var wallpaperSource
+    property var environmentSource
     property bool sourceReady: wallpaperSource?.status === Image.Ready
     property var screen
     property real parallaxWorkspaceValue: 0.5
@@ -111,6 +113,7 @@ Item {
         opacity: root.shaderReady ? 1 : 0
 
         property var source: root.wallpaperSource
+        property var environmentSource: root.environmentSource ?? root.wallpaperSource
         property vector2d itemSize: Qt.vector2d(width, height)
         property vector4d sourceRect: Qt.vector4d(
             root.sampleRect.x,
@@ -142,8 +145,9 @@ Item {
         property real lowerGlow: root.lowerGlow
         property real ambientSpillStrength: root.ambientSpillStrength
         property real ambientDiffusion: root.ambientDiffusion
+        property bool detailedEnvironment: root.detailedEnvironment
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-14")
+        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-22")
 
         Behavior on opacity {
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)

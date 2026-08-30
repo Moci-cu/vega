@@ -60,14 +60,16 @@ ShellRoot {
             if (!widgetLoader.item.appMode
                     || widgetLoader.item.appGridColumns !== 7
                     || widgetLoader.item.appGridRows !== 4
-                    || widgetLoader.item.appGridCellWidth !== 100
+                    || widgetLoader.item.clipboardVisibleRowLimit !== 8
+                    || widgetLoader.item.clipboardPanelHeight !== 518
+                    || widgetLoader.item.appGridCellWidth !== 110
                     || widgetLoader.item.appGridCellHeight !== 104
-                    || widgetLoader.item.resultsPanelWidth !== 724
+                    || widgetLoader.item.resultsPanelWidth !== 794
                     || widgetLoader.item.resultsPanelHeight !== 440
                     || widgetLoader.item.categoryEntries.length !== 4
-                    || widgetLoader.item.categoryPanelWidth !== 445
+                    || widgetLoader.item.categoryPanelWidth !== 490
                     || widgetLoader.item.categoryPanelHeight !== 184
-                    || widgetLoader.item.searchPillWidth !== 445
+                    || widgetLoader.item.searchPillWidth !== 490
                     || widgetLoader.item.searchPillHeight !== 78
                     || widgetLoader.item.searchPillWidth >= widgetLoader.item.resultsPanelWidth
                     || widgetLoader.item.showResults
@@ -85,6 +87,16 @@ ShellRoot {
                     || clipboardImage.icon !== "image")
                 return root.fail("clipboard image presentation exposed raw binary data");
 
+            if (LauncherSearch.mathExpression("-23 + 12") !== "-23 + 12"
+                    || LauncherSearch.isApplicationQuery("-23 + 12"))
+                return root.fail("negative leading number was not classified as calculator input");
+
+            if (widgetLoader.item.retainedBackdropWidth < widgetLoader.item.resultsPanelWidth
+                    || widgetLoader.item.retainedBackdropHeight
+                        < widgetLoader.item.searchPillHeight + widgetLoader.item.searchPanelGap
+                            + widgetLoader.item.clipboardPanelHeight)
+                return root.fail("launcher backdrop was not preallocated for its largest mode");
+
             widgetLoader.item.showCategories = true;
             if (!widgetLoader.item.categoriesVisible)
                 return root.fail("launcher category panel did not expose its four-category state");
@@ -98,10 +110,6 @@ ShellRoot {
             root.searchStarted = true;
             GlobalStates.overviewOpen = true;
             widgetLoader.item.showResults = true;
-            if (widgetLoader.item.retainedBackdropWidth < widgetLoader.item.resultsPanelWidth
-                    || widgetLoader.item.retainedBackdropHeight
-                        < widgetLoader.item.searchPillHeight + widgetLoader.item.resultsPanelHeight)
-                return root.fail("launcher backdrop did not grow with the application grid");
             LauncherSearch.query = "her";
         }
     }

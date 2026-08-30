@@ -21,16 +21,22 @@ Item { // Wrapper
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 35
     readonly property int typingResultLimit: 7
-    readonly property int clipboardResultLimit: 8
+    readonly property int clipboardVisibleRowLimit: 8
+    readonly property real clipboardRowHeight: 58
+    readonly property real clipboardRowSpacing: 2
     readonly property int appGridColumns: 7
     readonly property int appGridRows: 4
     readonly property int appGridCapacity: appGridColumns * appGridRows
-    readonly property real appGridCellWidth: 100
+    readonly property real appGridCellWidth: 110
     readonly property real appGridCellHeight: 104
     readonly property real resultsViewportWidth: appGridColumns * appGridCellWidth
     readonly property real resultsViewportHeight: appGridRows * appGridCellHeight
     readonly property real resultsPanelWidth: resultsViewportWidth + 24
     readonly property real resultsPanelHeight: resultsViewportHeight + 24
+    readonly property real clipboardPanelHeight: clipboardVisibleRowLimit * clipboardRowHeight
+        + (clipboardVisibleRowLimit - 1) * clipboardRowSpacing + 40
+    readonly property real activeResultsPanelHeight: clipboardMode
+        ? clipboardPanelHeight : resultsPanelHeight
     readonly property real categoryPanelWidth: searchPillWidth
     readonly property real categoryRowHeight: 40
     readonly property real categoryPanelHeight: categoryRowHeight * categoryEntries.length + 24
@@ -40,7 +46,7 @@ Item { // Wrapper
         { label: "Actions", icon: "layers" },
         { label: "Clipboard", icon: "content_copy" }
     ]
-    readonly property real searchPillWidth: 445
+    readonly property real searchPillWidth: 490
     readonly property real searchPillHeight: 78
     readonly property real calculatorPanelHeight: 64
     readonly property real searchPanelGap: 8
@@ -70,10 +76,12 @@ Item { // Wrapper
         && !showResults
         && searchingText.trim().length === 0
     property real revealProgress: 1
+    property real visualScale: 1
     property bool backdropSettled: false
     property bool backdropCaptureTimedOut: false
-    property real retainedBackdropWidth: 1
-    property real retainedBackdropHeight: 1
+    property real retainedBackdropWidth: resultsPanelWidth + 4
+    property real retainedBackdropHeight: searchPillHeight + searchPanelGap
+        + Math.max(resultsPanelHeight, clipboardPanelHeight) + 4
     implicitWidth: searchWidgetContent.implicitWidth + Appearance.sizes.elevationMargin * 2
     implicitHeight: searchWidgetContent.implicitHeight + Appearance.sizes.elevationMargin * 2
     width: implicitWidth
@@ -143,7 +151,7 @@ Item { // Wrapper
         return root.nativeAppSearchActive ? NativeAppSearch.get(index) : resultModel.values[index];
     }
 
-    function backdropRectFor(item) {
+    function backdropRectFor(item, visualScale) {
         const pipeline = liquidGlassPipeline.item;
         if (!pipeline || !item)
             return Qt.rect(0, 0, 1, 1);
@@ -165,11 +173,15 @@ Item { // Wrapper
         const top = Math.min(topLeft.y, bottomRight.y);
         const width = Math.abs(bottomRight.x - topLeft.x);
         const height = Math.abs(bottomRight.y - topLeft.y);
+        const originX = searchWidgetContent.width / 2;
+        const originY = root.searchPillHeight / 2;
+        const leftScaled = originX + (left - originX) * visualScale;
+        const topScaled = originY + (top - originY) * visualScale;
         return Qt.rect(
-            (pipeline.targetOffsetX + left) / pipeline.sourceWidth,
-            (pipeline.targetOffsetY + top) / pipeline.sourceHeight,
-            width / pipeline.sourceWidth,
-            height / pipeline.sourceHeight
+            (pipeline.targetOffsetX + leftScaled) / pipeline.sourceWidth,
+            (pipeline.targetOffsetY + topScaled) / pipeline.sourceHeight,
+            width * visualScale / pipeline.sourceWidth,
+            height * visualScale / pipeline.sourceHeight
         );
     }
 
@@ -193,8 +205,9 @@ Item { // Wrapper
             return;
         }
         NativeAppSearch.clear();
-        resultModel.values = (values ?? []).slice(0,
-            root.clipboardMode ? root.clipboardResultLimit : root.typingResultLimit);
+        resultModel.values = root.clipboardMode
+            ? (values ?? [])
+            : (values ?? []).slice(0, root.typingResultLimit);
         Qt.callLater(root.focusFirstItem);
     }
 
@@ -393,6 +406,7 @@ Item { // Wrapper
             readonly property real sourceWidth: backdrop.width
             readonly property real sourceHeight: backdrop.height
             readonly property var source: backdrop
+            readonly property var environmentSource: crop
             readonly property bool ready: capture.hasContent
 
             width: 1
@@ -486,7 +500,7 @@ Item { // Wrapper
         implicitWidth: root.resultsPanelWidth
         implicitHeight: root.searchSurfaceHeight
             + (root.showResults
-                ? root.searchPanelGap + root.resultsPanelHeight
+                ? root.searchPanelGap + root.activeResultsPanelHeight
                 : root.categoriesVisible ? root.searchPanelGap + root.categoryPanelHeight : 0)
         readonly property real searchRadius: root.sharpMode ? 0 : root.searchPillHeight / 2
         readonly property real categoryRadius: root.sharpMode ? 0 : 36
@@ -548,6 +562,7 @@ Item { // Wrapper
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
+                environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
                 sourceFillsItem: true
                 enhancedOptics: true
@@ -555,13 +570,14 @@ Item { // Wrapper
                 interaction: Math.min(1, searchWidgetContent.opticalEnergy * 1.5)
                 interactionPoint: searchWidgetContent.interactionPointFor(searchPill)
                 thicknessOverride: 0.34
-                edgeLighting: 0.58
+                edgeLighting: 0.82
                 lowerGlow: 1
                 ambientDiffusion: 1
+                detailedEnvironment: true
                 refraction: 0
-                itemSourceRect: root.backdropRectFor(searchGlassSurface)
+                itemSourceRect: root.backdropRectFor(searchGlassSurface, root.visualScale)
                 screen: root.screen
-                tintColor: Qt.rgba(0, 0, 0, 0.68)
+                tintColor: Qt.rgba(0, 0, 0, 0.74)
                 radius: searchWidgetContent.searchRadius
             }
 
@@ -593,7 +609,7 @@ Item { // Wrapper
                 moveSelection: (delta, linear) => root.moveSelection(delta, linear)
                 autocompleteWallpaperSource: liquidGlassPipeline.item?.source ?? null
                 autocompleteSourceReady: liquidGlassPipeline.item?.ready ?? false
-                autocompleteSourceRectFor: item => root.backdropRectFor(item)
+                autocompleteSourceRectFor: item => root.backdropRectFor(item, root.visualScale)
                 autocompleteScreen: root.screen
 
                 Synchronizer on searchingText {
@@ -657,14 +673,26 @@ Item { // Wrapper
                     }
 
                     IconToolbarButton {
+                        id: calculatorCopyButton
+
                         enabled: root.calculatorResult.length > 0
                         opacity: enabled ? 1 : 0.45
-                        Layout.preferredWidth: 34
-                        Layout.preferredHeight: 34
+                        Layout.fillHeight: false
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        buttonRadius: 14
                         text: "content_copy"
                         colText: Qt.rgba(1, 1, 1, 0.82)
                         colBackground: Qt.rgba(1, 1, 1, 0.12)
                         onClicked: Quickshell.clipboardText = root.calculatorResult
+
+                        contentItem: MaterialSymbol {
+                            anchors.centerIn: parent
+                            iconSize: 17
+                            text: calculatorCopyButton.text
+                            color: calculatorCopyButton.colText
+                        }
 
                         StyledToolTip {
                             text: Translation.tr("Copy")
@@ -734,7 +762,7 @@ Item { // Wrapper
                 edgeLighting: 0.58
                 lowerGlow: 1
                 refraction: 0
-                itemSourceRect: root.backdropRectFor(categoryGlassSurface)
+                itemSourceRect: root.backdropRectFor(categoryGlassSurface, root.visualScale)
                 screen: root.screen
                 tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
                 radius: searchWidgetContent.categoryRadius
@@ -806,7 +834,7 @@ Item { // Wrapper
             anchors.topMargin: root.searchPanelGap
             anchors.horizontalCenter: parent.horizontalCenter
             width: root.clipboardMode ? root.searchPillWidth : root.resultsPanelWidth
-            height: root.resultsPanelHeight
+            height: root.activeResultsPanelHeight
             z: 1
 
             Behavior on opacity {
@@ -855,7 +883,7 @@ Item { // Wrapper
                 lowerGlow: root.deepGlassMode ? 0.12 : 1
                 ambientSpillStrength: root.deepGlassMode ? 0.82 : -1
                 refraction: root.deepGlassMode ? 4 : 0
-                itemSourceRect: root.backdropRectFor(liquidGlassSurface)
+                itemSourceRect: root.backdropRectFor(liquidGlassSurface, root.visualScale)
                 screen: root.screen
                 tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer,
                     root.deepGlassMode ? 0.44 : 0.62)

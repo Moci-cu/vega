@@ -22,9 +22,24 @@ layout(std140, binding = 0) uniform buf {
     float lowerGlow;
     float ambientSpillStrength;
     float ambientDiffusion;
+    bool detailedEnvironment;
 };
 
 layout(binding = 1) uniform sampler2D source;
+layout(binding = 2) uniform sampler2D environmentSource;
+
+vec3 srgbToLinear(vec3 value) {
+    vec3 low = value / 12.92;
+    vec3 high = pow((value + vec3(0.055)) / 1.055, vec3(2.4));
+    return mix(low, high, step(vec3(0.04045), value));
+}
+
+vec3 linearToSrgb(vec3 value) {
+    value = max(value, vec3(0.0));
+    vec3 low = value * 12.92;
+    vec3 high = 1.055 * pow(value, vec3(1.0 / 2.4)) - vec3(0.055);
+    return clamp(mix(low, high, step(vec3(0.0031308), value)), 0.0, 1.0);
+}
 
 float roundedBoxDistance(vec2 point, vec2 halfSize, vec4 radii) {
     float radius = point.x < 0.0
@@ -106,6 +121,8 @@ void main() {
     }
 
     float backdropLuminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
+    float backdropChroma = max(max(backdrop.r, backdrop.g), backdrop.b)
+        - min(min(backdrop.r, backdrop.g), backdrop.b);
     float lowerGlowAmount = clamp(lowerGlow, 0.0, 1.0);
     float ambientAmount = ambientSpillStrength >= 0.0
         ? clamp(ambientSpillStrength, 0.0, 1.0) : lowerGlowAmount;
@@ -134,9 +151,16 @@ void main() {
     }
     else if (responsive > 0.5)
         tintAlpha = clamp(tintAlpha + 0.065 + 0.05 * thickness + 0.015 * smoothstep(0.75, 0.95, backdropLuminance), 0.0, 0.58);
-    float lowerFade = lowerGlowAmount
-        * smoothstep(mix(0.20, 0.16, diffusionAmount), 1.0, qt_TexCoord0.y);
-    tintAlpha *= 1.0 - mix(0.56, 0.44, diffusionAmount) * lowerFade;
+    float lowerFade = lowerGlowAmount * (detailedEnvironment
+        ? qt_TexCoord0.y
+        : smoothstep(mix(0.20, 0.16, diffusionAmount), 1.0, qt_TexCoord0.y));
+    float lowerTintRelease = mix(0.56, 0.44, diffusionAmount);
+    if (detailedEnvironment) {
+        float neutralLight = smoothstep(0.24, 0.62, backdropLuminance)
+            * (1.0 - smoothstep(0.08, 0.34, backdropChroma));
+        lowerTintRelease = mix(0.28, 0.72, neutralLight);
+    }
+    tintAlpha *= 1.0 - lowerTintRelease * lowerFade;
     vec3 color = mix(backdrop, glassTint.rgb, tintAlpha);
 
     vec2 responsiveLight = normalize(lightDirection
@@ -205,17 +229,33 @@ void main() {
 
     if (ambientAmount > 0.0) {
         float interactionEnergy = 1.0 + 0.18 * interactionAmount * pointerFalloff;
-        vec2 environmentStep = edgeNormal * pixelUv;
+        vec2 environmentStep = detailedEnvironment ? vec2(0.0) : edgeNormal * pixelUv;
         vec2 environmentUv = clamp(backdropUv + environmentStep
             * (2.5 + 1.5 * interactionAmount * pointerFalloff), vec2(0.001), vec2(0.999));
         vec2 farEnvironmentUv = clamp(backdropUv + environmentStep
             * (7.0 + 2.0 * interactionAmount * pointerFalloff), vec2(0.001), vec2(0.999));
         vec2 environmentTangent = vec2(-edgeNormal.y * pixelUv.x, edgeNormal.x * pixelUv.y) * 2.4;
-        vec3 nearEnvironment = texture(source, environmentUv).rgb;
-        vec3 farEnvironment = texture(source, farEnvironmentUv).rgb;
-        vec3 environment = nearEnvironment * 0.35 + farEnvironment * 0.25
-            + texture(source, clamp(environmentUv + environmentTangent, vec2(0.001), vec2(0.999))).rgb * 0.20
-            + texture(source, clamp(environmentUv - environmentTangent, vec2(0.001), vec2(0.999))).rgb * 0.20;
+        vec2 tangentPlusUv = clamp(environmentUv + environmentTangent, vec2(0.001), vec2(0.999));
+        vec2 tangentMinusUv = clamp(environmentUv - environmentTangent, vec2(0.001), vec2(0.999));
+        vec3 nearEnvironment;
+        vec3 farEnvironment;
+        vec3 environment;
+        if (detailedEnvironment) {
+            vec3 nearLinear = srgbToLinear(texture(environmentSource, environmentUv).rgb);
+            vec3 farLinear = srgbToLinear(texture(environmentSource, farEnvironmentUv).rgb);
+            vec3 environmentLinear = nearLinear * 0.35 + farLinear * 0.25
+                + srgbToLinear(texture(environmentSource, tangentPlusUv).rgb) * 0.20
+                + srgbToLinear(texture(environmentSource, tangentMinusUv).rgb) * 0.20;
+            nearEnvironment = linearToSrgb(nearLinear);
+            farEnvironment = linearToSrgb(farLinear);
+            environment = linearToSrgb(environmentLinear);
+        } else {
+            nearEnvironment = texture(source, environmentUv).rgb;
+            farEnvironment = texture(source, farEnvironmentUv).rgb;
+            environment = nearEnvironment * 0.35 + farEnvironment * 0.25
+                + texture(source, tangentPlusUv).rgb * 0.20
+                + texture(source, tangentMinusUv).rgb * 0.20;
+        }
         float environmentLuminance = dot(environment, vec3(0.2126, 0.7152, 0.0722));
         float environmentLight = pow(smoothstep(0.03, 0.86, environmentLuminance), 0.65);
         float environmentPeak = max(max(environment.r, environment.g), environment.b);
@@ -255,6 +295,8 @@ void main() {
             * mix(1.0, 0.80, diffusionAmount);
         float localColorMix = mix(0.35 + 0.40 * sideCap,
             0.20 + 0.20 * sideCap, diffusionAmount);
+        if (detailedEnvironment)
+            localColorMix = max(localColorMix, 0.46);
         vec3 surfaceColor = mix(diffuseColor, environmentColor, localColorMix);
         color = mix(color, surfaceColor, clamp(surfaceStrength, 0.0, 0.46));
 
@@ -266,7 +308,8 @@ void main() {
         vec3 rimColor = mix(rimEnvironment,
             rimHue * mix(0.12, 0.92, rimLight), 0.80);
         rimColor = clamp(rimColor, 0.0, 1.0);
-        float outerRim = 1.0 - smoothstep(0.30, 1.20, edgeDistance);
+        float outerRimDepth = detailedEnvironment ? mix(1.20, 1.80, lowerFacing) : 1.20;
+        float outerRim = (1.0 - smoothstep(0.30, outerRimDepth, edgeDistance)) * coverage;
         float rimFacing = max(lowerFacing, 0.62 * sideFacing);
         float rimStrength = ambientAmount * outerRim * rimFacing
             * (0.30 + 1.0 * rimLight) * interactionEnergy;

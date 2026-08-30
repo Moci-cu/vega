@@ -45,7 +45,7 @@ RowLayout {
         || String(root.autocompleteEntry?.key ?? "").startsWith("app:")
     readonly property string autocompleteAction: {
         if (root.calculatorActive)
-            return Translation.tr("Copy");
+            return "";
         const entry = root.autocompleteEntry;
         if (!entry)
             return "";

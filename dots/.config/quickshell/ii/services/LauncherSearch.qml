@@ -45,9 +45,13 @@ Singleton {
         return root.matchedPrefixEntry(queryText)?.prefix ?? "";
     }
 
+    function isImplicitMathQuery(queryText = root.query) {
+        return /^[+-]?\d/.test(String(queryText ?? "").trim());
+    }
+
     function isApplicationQuery(queryText = root.query) {
         const queryString = String(queryText ?? "");
-        if (/^\d/.test(queryString))
+        if (root.isImplicitMathQuery(queryString))
             return false;
         const prefixName = root.matchedPrefixName(queryString);
         return prefixName === "app" || prefixName === "";
@@ -188,7 +192,7 @@ Singleton {
         if (prefixName === "math") {
             return query.slice(Config.options.search.prefix.math.length).trim();
         }
-        if (prefixName === "" && /^\d/.test(query)) {
+        if (prefixName === "" && root.isImplicitMathQuery(query)) {
             return query.trim();
         }
         return "";
@@ -566,7 +570,7 @@ Singleton {
 
         //////// Prioritized by prefix /////////
         let result = [];
-        const startsWithNumber = /^\d/.test(root.query);
+        const implicitMathQuery = root.isImplicitMathQuery(root.query);
         const startsWithActionPrefix = prefixName === "action";
         const startsWithAppPrefix = prefixName === "app";
         const startsWithFileSearchPrefix = prefixName === "fileSearch";
@@ -574,7 +578,7 @@ Singleton {
         const startsWithShellCommandPrefix = prefixName === "shellCommand";
         const startsWithWebSearchPrefix = prefixName === "webSearch";
         const startsWithWindowPrefix = prefixName === "window";
-        if (startsWithNumber || startsWithMathPrefix)
+        if (implicitMathQuery || startsWithMathPrefix)
             return root.mathResult.length > 0 ? [root.mathResultEntry()] : [];
         if (startsWithShellCommandPrefix) {
             result.push(root.commandResult());
@@ -588,7 +592,7 @@ Singleton {
         }
 
         //////////////// Apps //////////////////
-        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !startsWithNumber;
+        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !implicitMathQuery;
         if ((shouldSearchApps || startsWithAppPrefix) && !root.shouldUseNativeAppSearch(root.query)) {
             result = result.concat(AppSearch.fuzzyQuery(StringUtils.cleanPrefix(root.query, Config.options.search.prefix.app), root.resultLimit).map(entry => root.appResult(entry)));
         }
@@ -602,7 +606,7 @@ Singleton {
         if (Config.options.search.prefix.showDefaultActionsWithoutPrefix) {
             if (!startsWithShellCommandPrefix)
                 result.push(root.commandResult());
-            if (!startsWithNumber && !startsWithMathPrefix && root.mathResult.length > 0)
+            if (!implicitMathQuery && !startsWithMathPrefix && root.mathResult.length > 0)
                 result.push(root.mathResultEntry());
             if (!startsWithWebSearchPrefix)
                 result.push(root.webSearchResult());

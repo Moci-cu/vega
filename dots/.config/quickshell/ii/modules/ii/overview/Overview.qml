@@ -109,8 +109,8 @@ Scope {
         clipboardOpen = false
         workspaceMode = false
         applicationsOpen = true
-        applicationsPending = !GlobalStates.overviewOpen
-        dontAutoCancelSearch = GlobalStates.overviewOpen
+        applicationsPending = false
+        dontAutoCancelSearch = true
         setSearchingTextRequested(Config.options.search.prefix.app)
         GlobalStates.overviewOpen = true
     }
@@ -194,15 +194,12 @@ Scope {
                 }
                 onLauncherReadyChanged: {
                     launcherPopAnimation.stop();
-                    launcherCloseAnimation.stop();
                     if (launcherReady) {
                         launcherPopAnimation.restart();
                         if (overviewScope.applicationsPending) {
                             overviewScope.applicationsPending = false;
                             overviewScope.dontAutoCancelSearch = true;
                         }
-                    } else if (!GlobalStates.overviewOpen) {
-                        launcherCloseAnimation.restart();
                     }
                 }
 
@@ -261,15 +258,6 @@ Scope {
                     }
                 }
 
-                NumberAnimation {
-                    id: launcherCloseAnimation
-                    target: root
-                    property: "launcherScale"
-                    to: 0.9
-                    duration: 140
-                    easing.type: Easing.InCubic
-                }
-
                 anchors {
                     top: true
                     bottom: true
@@ -305,13 +293,13 @@ Scope {
                             workspaceContentDelayTimer.stop();
                             root.workspaceContentReady = false;
                             searchWidget.disableExpandAnimation();
+                            root.launcherScale = 1;
                             overviewScope.applicationsPending = false;
                             overviewScope.applicationsOpen = false;
                             overviewScope.categoriesOpen = false;
                             overviewScope.clipboardOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
-                            launcherCloseAnimation.stop();
                             root.launcherScale = 1.06;
                             root.launcherOpacity = 0.2;
                             root.launcherRevealProgress = 0.12;
@@ -405,6 +393,7 @@ Scope {
                             showCategories: overviewScope.categoriesOpen
                             showClipboard: overviewScope.clipboardOpen
                             revealProgress: root.launcherRevealProgress
+                            visualScale: root.launcherScale
                             anchors.centerIn: parent
 
                             transform: Scale {
