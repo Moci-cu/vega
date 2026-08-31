@@ -7,6 +7,7 @@ Item {
 
     property bool shown: false
     property bool backdropEnabled: true
+    property bool compositorBackdrop: false
     property bool accountForBarPosition: false
     property bool sourceFillsItem: false
     property bool enhancedOptics: false
@@ -63,17 +64,26 @@ Item {
             parallaxWorkspaceValue,
             parallaxSidebarBalance
         )
-    readonly property bool shaderReady: backdropEnabled
+    readonly property bool textureShaderReady: !compositorBackdrop
+        && backdropEnabled
         && !!wallpaperSource
         && sourceReady
         && width > 0
         && height > 0
+    readonly property bool compositorRimReady: compositorBackdrop
+        && backdropEnabled
+        && !!wallpaperSource
+        && sourceReady
+        && width > 0
+        && height > 0
+    readonly property bool shaderReady: textureShaderReady || compositorRimReady
 
     opacity: shown ? 1 : 0
     visible: opacity > 0
     clip: true
 
     Behavior on opacity {
+        enabled: !root.compositorBackdrop
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
     }
 
@@ -85,7 +95,7 @@ Item {
         bottomRightRadius: root.bottomRightRadius
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, 0.52 * root.edgeLighting)
-        opacity: root.shaderReady ? 0 : 1
+        opacity: !root.compositorBackdrop && !root.textureShaderReady ? 1 : 0
         gradient: Gradient {
             GradientStop {
                 position: 0
@@ -108,9 +118,41 @@ Item {
         }
     }
 
+    Rectangle {
+        anchors.fill: parent
+        topLeftRadius: root.topLeftRadius
+        topRightRadius: root.topRightRadius
+        bottomLeftRadius: root.bottomLeftRadius
+        bottomRightRadius: root.bottomRightRadius
+        antialiasing: true
+        opacity: root.compositorBackdrop ? 1 : 0
+        gradient: Gradient {
+            GradientStop {
+                position: 0
+                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
+                    Math.min(0.9, root.tintColor.a + 0.20 * root.lowerGlow))
+            }
+            GradientStop {
+                position: 0.38
+                color: root.tintColor
+            }
+            GradientStop {
+                position: 0.72
+                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
+                    Math.max(0.26, root.tintColor.a * (1 - 0.42 * root.lowerGlow)))
+            }
+            GradientStop {
+                position: 1
+                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
+                    Math.max(0.24, root.tintColor.a * (1 - 0.66 * root.lowerGlow)))
+            }
+        }
+    }
+
     ShaderEffect {
         anchors.fill: parent
-        opacity: root.shaderReady ? 1 : 0
+        visible: opacity > 0
+        opacity: root.textureShaderReady ? 1 : 0
 
         property var source: root.wallpaperSource
         property var environmentSource: root.environmentSource ?? root.wallpaperSource
@@ -154,6 +196,32 @@ Item {
         }
     }
 
+    ShaderEffect {
+        anchors.fill: parent
+        visible: opacity > 0
+        opacity: root.compositorRimReady ? 1 : 0
+
+        property var source: root.wallpaperSource
+        property var environmentSource: root.environmentSource ?? root.wallpaperSource
+        property vector2d itemSize: Qt.vector2d(width, height)
+        property vector4d sourceRect: Qt.vector4d(
+            root.sampleRect.x,
+            root.sampleRect.y,
+            root.sampleRect.width,
+            root.sampleRect.height
+        )
+        property vector4d cornerRadii: Qt.vector4d(
+            root.topLeftRadius,
+            root.topRightRadius,
+            root.bottomRightRadius,
+            root.bottomLeftRadius
+        )
+        property real edgeLighting: root.edgeLighting
+        property real lowerGlow: root.lowerGlow
+
+        fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-17")
+    }
+
     Rectangle {
         anchors {
             top: parent.top
@@ -166,7 +234,7 @@ Item {
         height: 1
         radius: 0.5
         color: Qt.rgba(1, 1, 1, 0.3 * root.edgeLighting)
-        opacity: root.shaderReady ? 0 : 1
+        opacity: !root.compositorBackdrop && !root.textureShaderReady ? 1 : 0
 
         Behavior on opacity {
             animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)

@@ -177,7 +177,6 @@ Scope {
                 readonly property bool launcherReady: GlobalStates.overviewOpen && searchWidget.backdropReady
                 property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1 
                 property real launcherScale: 1
-                property real launcherOpacity: 0.2
                 property real launcherRevealProgress: 0.12
                 property bool workspaceContentReady: false
                 readonly property bool contentShown: {
@@ -212,15 +211,6 @@ Scope {
 
                 ParallelAnimation {
                     id: launcherPopAnimation
-
-                    NumberAnimation {
-                        target: root
-                        property: "launcherOpacity"
-                        from: 0.2
-                        to: 1
-                        duration: 160
-                        easing.type: Easing.OutCubic
-                    }
 
                     NumberAnimation {
                         target: root
@@ -301,7 +291,6 @@ Scope {
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
                             root.launcherScale = 1.06;
-                            root.launcherOpacity = 0.2;
                             root.launcherRevealProgress = 0.12;
                             if (!overviewScope.dontAutoCancelSearch) {
                                 searchWidget.cancelSearch();
@@ -361,7 +350,7 @@ Scope {
                 Item {
                     id: contentItem
                     anchors.fill: parent
-                    opacity: root.contentShown && searchWidget.backdropReady ? root.launcherOpacity : 0
+                    opacity: root.contentShown && searchWidget.backdropReady ? 1 : 0
 
                     MouseArea { // We could have used PanelWindow.mask to detect this, but this is more stable
                         anchors.fill: parent

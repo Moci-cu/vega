@@ -444,7 +444,7 @@ Item { // Wrapper
                 autoPaddingEnabled: false
                 blurEnabled: true
                 blurMax: 40
-                blur: Math.max(0.12, root.revealProgress)
+                blur: 1
             }
 
             ShaderEffectSource {
@@ -546,38 +546,25 @@ Item { // Wrapper
             height: root.searchSurfaceHeight
             z: 2
 
-            RectangularShadow {
-                anchors.fill: parent
-                radius: searchWidgetContent.searchRadius
-                blur: 8
-                offset: Qt.vector2d(0, 1)
-                spread: -1
-                color: Qt.rgba(0, 0, 0, 0.34)
-                cached: true
-            }
-
             LiquidGlassSurface {
                 id: searchGlassSurface
 
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen
+                compositorBackdrop: true
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
                 environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
                 sourceFillsItem: true
-                enhancedOptics: true
                 interactiveOptics: true
                 interaction: Math.min(1, searchWidgetContent.opticalEnergy * 1.5)
                 interactionPoint: searchWidgetContent.interactionPointFor(searchPill)
                 thicknessOverride: 0.34
                 edgeLighting: 0.82
                 lowerGlow: 1
-                ambientDiffusion: 1
-                detailedEnvironment: true
-                refraction: 0
                 itemSourceRect: root.backdropRectFor(searchGlassSurface, root.visualScale)
                 screen: root.screen
-                tintColor: Qt.rgba(0, 0, 0, 0.74)
+                tintColor: Qt.rgba(0, 0, 0, 0.66)
                 radius: searchWidgetContent.searchRadius
             }
 
@@ -607,9 +594,6 @@ Item { // Wrapper
                 resultAt: root.resultAt
                 executeResult: entry => LauncherSearch.executeResult(entry)
                 moveSelection: (delta, linear) => root.moveSelection(delta, linear)
-                autocompleteWallpaperSource: liquidGlassPipeline.item?.source ?? null
-                autocompleteSourceReady: liquidGlassPipeline.item?.ready ?? false
-                autocompleteSourceRectFor: item => root.backdropRectFor(item, root.visualScale)
                 autocompleteScreen: root.screen
 
                 Synchronizer on searchingText {
@@ -736,32 +720,22 @@ Item { // Wrapper
                 }
             }
 
-            RectangularShadow {
-                anchors.fill: parent
-                radius: searchWidgetContent.categoryRadius
-                blur: 16
-                offset: Qt.vector2d(0, 3)
-                spread: -2
-                color: Qt.rgba(0, 0, 0, 0.3)
-                cached: true
-            }
-
             LiquidGlassSurface {
                 id: categoryGlassSurface
 
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen && root.categoriesVisible
+                compositorBackdrop: true
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
+                environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
                 sourceFillsItem: true
-                enhancedOptics: true
                 interactiveOptics: true
                 interaction: searchWidgetContent.opticalEnergy
                 interactionPoint: searchWidgetContent.interactionPointFor(categoryPanel)
                 thicknessOverride: 0.18
                 edgeLighting: 0.58
                 lowerGlow: 1
-                refraction: 0
                 itemSourceRect: root.backdropRectFor(categoryGlassSurface, root.visualScale)
                 screen: root.screen
                 tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
@@ -856,33 +830,22 @@ Item { // Wrapper
                 }
             }
 
-            RectangularShadow {
-                anchors.fill: parent
-                radius: searchWidgetContent.panelRadius
-                blur: root.deepGlassMode ? 24 : 16
-                offset: Qt.vector2d(0, root.deepGlassMode ? 6 : 3)
-                spread: root.deepGlassMode ? -3 : -2
-                color: Qt.rgba(0, 0, 0, root.deepGlassMode ? 0.38 : 0.32)
-                cached: true
-            }
-
             LiquidGlassSurface {
                 id: liquidGlassSurface
 
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen
+                compositorBackdrop: true
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
+                environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
                 sourceFillsItem: true
-                enhancedOptics: true
                 interactiveOptics: !root.deepGlassMode
                 interaction: searchWidgetContent.opticalEnergy
                 interactionPoint: searchWidgetContent.interactionPointFor(resultsPanel)
                 thicknessOverride: root.deepGlassMode ? 0.32 : 0.18
                 edgeLighting: root.deepGlassMode ? 0.48 : 0.58
                 lowerGlow: root.deepGlassMode ? 0.12 : 1
-                ambientSpillStrength: root.deepGlassMode ? 0.82 : -1
-                refraction: root.deepGlassMode ? 4 : 0
                 itemSourceRect: root.backdropRectFor(liquidGlassSurface, root.visualScale)
                 screen: root.screen
                 tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer,

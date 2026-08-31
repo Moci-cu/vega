@@ -29,9 +29,6 @@ RowLayout {
     property var resultAt: index => LauncherSearch.results[index]
     property var executeResult: entry => LauncherSearch.executeResult(entry)
     property var moveSelection: (delta, linear) => {}
-    property var autocompleteWallpaperSource
-    property bool autocompleteSourceReady: false
-    property var autocompleteSourceRectFor: item => Qt.rect(0, 0, 1, 1)
     property var autocompleteScreen
     property bool caretBlinkOn: true
     readonly property var autocompleteEntry: {
@@ -196,14 +193,9 @@ RowLayout {
 
                 anchors.fill: parent
                 shown: autocompleteChip.visible
-                wallpaperSource: root.autocompleteWallpaperSource
-                sourceReady: root.autocompleteSourceReady
-                sourceFillsItem: true
-                enhancedOptics: true
+                compositorBackdrop: true
                 thicknessOverride: 0.06
                 edgeLighting: 0.34
-                refraction: 0
-                itemSourceRect: root.autocompleteSourceRectFor(autocompleteGlass)
                 screen: root.autocompleteScreen
                 tintColor: Qt.rgba(0.86, 0.9, 0.94, 0.12)
                 radius: 10
