@@ -56,7 +56,11 @@ void main() {
         + texture(source, clamp(nearUv + tangentUv, vec2(0.001), vec2(0.999))).rgb * 0.25
         + texture(source, clamp(nearUv - tangentUv, vec2(0.001), vec2(0.999))).rgb * 0.25;
 
-    vec3 positiveRefraction = max(softScene - localSoftScene, vec3(0.0));
+    float localSoftLuminance = dot(localSoftScene, vec3(0.2126, 0.7152, 0.0722));
+    float softLuminance = dot(softScene, vec3(0.2126, 0.7152, 0.0722));
+    float positiveLuminance = max(softLuminance - localSoftLuminance, 0.0);
+    vec3 positiveRefraction = softScene
+        * (positiveLuminance / max(softLuminance, 0.001));
     float localLuminance = dot(localScene, vec3(0.2126, 0.7152, 0.0722));
     float refractedLuminance = dot(refractedScene, vec3(0.2126, 0.7152, 0.0722));
     float contrast = clamp(abs(refractedLuminance - localLuminance) * 3.0, 0.0, 1.0);
@@ -86,8 +90,6 @@ void main() {
     vec3 bloomColor = clamp(tangentSoftScene, 0.0, 1.0);
     vec3 causticColor = mix(lightColor, vec3(1.0), 0.14 * caustic);
     vec3 refractedLight = positiveRefraction * depth * (0.90 + 1.45 * contrast);
-    float localSoftLuminance = dot(localSoftScene, vec3(0.2126, 0.7152, 0.0722));
-    float softLuminance = dot(softScene, vec3(0.2126, 0.7152, 0.0722));
     vec3 bodyRefraction = positiveRefraction * bodyDiffusion
         * (0.30 + 1.0 * contrast);
     float materialEnergy = pow(smoothstep(0.06, 0.86, refractedLuminance), 1.1);

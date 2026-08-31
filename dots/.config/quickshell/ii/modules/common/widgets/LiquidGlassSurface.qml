@@ -219,7 +219,7 @@ Item {
         property real edgeLighting: root.edgeLighting
         property real lowerGlow: root.lowerGlow
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-17")
+        fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-18")
     }
 
     Rectangle {
