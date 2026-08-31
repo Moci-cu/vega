@@ -11,6 +11,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 cornerRadii;
     float edgeLighting;
     float lowerGlow;
+    float effectPadding;
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -27,15 +28,16 @@ float roundedBoxDistance(vec2 point, vec2 halfSize, vec4 radii) {
 
 void main() {
     vec2 size = max(itemSize, vec2(1.0));
-    vec2 point = qt_TexCoord0 * size - size * 0.5;
+    vec2 renderSize = size + vec2(effectPadding * 2.0);
+    vec2 point = qt_TexCoord0 * renderSize - renderSize * 0.5;
     float distance = roundedBoxDistance(point, size * 0.5, cornerRadii);
-    float antialias = max(fwidth(distance) * 1.8, 1.6);
+    float antialias = max(fwidth(distance), 1.0);
     float coverage = 1.0 - smoothstep(-antialias, antialias, distance);
     float edgeDistance = max(-distance, 0.0);
     vec2 edgeNormal = normalize(vec2(dFdx(distance), dFdy(distance)) + vec2(0.0001));
 
     vec2 pixelUv = sourceRect.zw / size;
-    vec2 backdropUv = sourceRect.xy + qt_TexCoord0 * sourceRect.zw;
+    vec2 backdropUv = sourceRect.xy + (point + size * 0.5) * pixelUv;
     float opticalFacing = pow(clamp(-edgeNormal.y, 0.0, 1.0), 1.8);
     float lens = (1.0 - smoothstep(0.0, 9.0, edgeDistance))
         * opticalFacing * coverage;

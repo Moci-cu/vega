@@ -140,6 +140,7 @@ hl.layer_rule({ match = { namespace = "osk[0-9]*" }, ignore_alpha = 0.6})
 
 -- Quickshell
 -- Quickshell: illogical-impulse
+local overviewUsesHyprlandBlur = false
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.2})
 hl.layer_rule({ match = { namespace = "quickshell:bar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:actionCenter" }, no_anim = true})
@@ -153,9 +154,11 @@ hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, ignore_a
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "quickshell:overview" }, no_anim = true})
-hl.layer_rule({ match = { namespace = "quickshell:overview" }, blur = true})
+if overviewUsesHyprlandBlur then
+    hl.layer_rule({ match = { namespace = "quickshell:overview" }, blur = true})
+end
 hl.layer_rule({ match = { namespace = "quickshell:overview" }, xray = false})
-hl.layer_rule({ match = { namespace = "quickshell:overview" }, ignore_alpha = 0.2})
+hl.layer_rule({ match = { namespace = "quickshell:overview" }, ignore_alpha = overviewUsesHyprlandBlur and 0.2 or 1})
 hl.layer_rule({ match = { namespace = "quickshell:onScreenDisplay" }, xray = false})
 hl.layer_rule({ match = { namespace = "quickshell:onScreenDisplay" }, ignore_alpha = 0.5})
 hl.layer_rule({ match = { namespace = "quickshell:osk" }, animation = "slide bottom"})

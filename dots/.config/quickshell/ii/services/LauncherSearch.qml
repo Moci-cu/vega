@@ -556,6 +556,8 @@ Singleton {
         ///////////// Special cases ///////////////
         const prefixName = root.matchedPrefixName();
         if (prefixName === "clipboard") {
+            if (Config.options.panelFamily === "ii")
+                return [];
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.clipboard);
             return Cliphist.fuzzyQuery(searchString).map((entry, index, array) => root.clipboardResult(entry, index, array));

@@ -53,12 +53,14 @@ Item { // Wrapper
     readonly property var screen: root.QsWindow.window?.screen ?? null
 
     readonly property bool sharpMode: Config.options.appearance.sharpMode
+    readonly property bool useCompositorBackdrop: true
     readonly property bool backdropReady: backdropSettled || backdropCaptureTimedOut
     readonly property bool appMode: LauncherSearch.isApplicationQuery(root.searchingText)
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
     readonly property int activeResultCount: appMode ? appGrid.count : listResults.count
     readonly property int activeCurrentIndex: appMode ? appGrid.currentIndex : listResults.currentIndex
     property string searchingText: LauncherSearch.query
+    property var clipboardEntries: []
     property bool showResults: false
     property bool applicationGridMode: false
     property bool showCategories: false
@@ -148,7 +150,13 @@ Item { // Wrapper
     }
 
     function resultAt(index) {
-        return root.nativeAppSearchActive ? NativeAppSearch.get(index) : resultModel.values[index];
+        if (root.nativeAppSearchActive)
+            return NativeAppSearch.get(index);
+        const values = root.clipboardMode ? root.clipboardEntries : resultModel.values;
+        const value = values[index];
+        if (!root.clipboardMode || value === undefined)
+            return value;
+        return LauncherSearch.clipboardResult(value, index, values);
     }
 
     function backdropRectFor(item, visualScale) {
@@ -186,6 +194,19 @@ Item { // Wrapper
     }
 
     function refreshResults() {
+        if (root.clipboardMode) {
+            NativeAppSearch.clear();
+            const searchString = StringUtils.cleanPrefix(
+                root.searchingText,
+                Config.options.search.prefix.clipboard
+            );
+            root.clipboardEntries = Cliphist.fuzzyQuery(searchString);
+            resultModel.values = [];
+            Qt.callLater(root.focusFirstItem);
+            return;
+        }
+
+        root.clipboardEntries = [];
         const values = LauncherSearch.results;
         if (root.appMode) {
             const query = LauncherSearch.nativeAppQuery(root.searchingText);
@@ -205,9 +226,7 @@ Item { // Wrapper
             return;
         }
         NativeAppSearch.clear();
-        resultModel.values = root.clipboardMode
-            ? (values ?? [])
-            : (values ?? []).slice(0, root.typingResultLimit);
+        resultModel.values = (values ?? []).slice(0, root.typingResultLimit);
         Qt.callLater(root.focusFirstItem);
     }
 
@@ -551,7 +570,7 @@ Item { // Wrapper
 
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen
-                compositorBackdrop: true
+                compositorBackdrop: root.useCompositorBackdrop
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
                 environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
@@ -562,9 +581,13 @@ Item { // Wrapper
                 thicknessOverride: 0.34
                 edgeLighting: 0.82
                 lowerGlow: 1
+                enhancedOptics: true
+                ambientDiffusion: 1
+                detailedEnvironment: true
+                refraction: 0
                 itemSourceRect: root.backdropRectFor(searchGlassSurface, root.visualScale)
                 screen: root.screen
-                tintColor: Qt.rgba(0, 0, 0, 0.66)
+                tintColor: Qt.rgba(0, 0, 0, root.useCompositorBackdrop ? 0.85 : 0.74)
                 radius: searchWidgetContent.searchRadius
             }
 
@@ -725,7 +748,7 @@ Item { // Wrapper
 
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen && root.categoriesVisible
-                compositorBackdrop: true
+                compositorBackdrop: root.useCompositorBackdrop
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
                 environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
@@ -736,9 +759,12 @@ Item { // Wrapper
                 thicknessOverride: 0.18
                 edgeLighting: 0.58
                 lowerGlow: 1
+                enhancedOptics: true
+                refraction: 0
                 itemSourceRect: root.backdropRectFor(categoryGlassSurface, root.visualScale)
                 screen: root.screen
-                tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
+                tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer,
+                    root.useCompositorBackdrop ? 0.56 : 0.62)
                 radius: searchWidgetContent.categoryRadius
             }
 
@@ -835,7 +861,7 @@ Item { // Wrapper
 
                 anchors.fill: parent
                 shown: GlobalStates.overviewOpen
-                compositorBackdrop: true
+                compositorBackdrop: root.useCompositorBackdrop
                 wallpaperSource: liquidGlassPipeline.item?.source ?? null
                 environmentSource: liquidGlassPipeline.item?.environmentSource ?? null
                 sourceReady: liquidGlassPipeline.item?.ready ?? false
@@ -846,10 +872,15 @@ Item { // Wrapper
                 thicknessOverride: root.deepGlassMode ? 0.32 : 0.18
                 edgeLighting: root.deepGlassMode ? 0.48 : 0.58
                 lowerGlow: root.deepGlassMode ? 0.12 : 1
+                enhancedOptics: true
+                ambientSpillStrength: root.deepGlassMode ? 0.82 : -1
+                refraction: root.deepGlassMode ? 4 : 0
                 itemSourceRect: root.backdropRectFor(liquidGlassSurface, root.visualScale)
                 screen: root.screen
                 tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer,
-                    root.deepGlassMode ? 0.44 : 0.62)
+                    root.deepGlassMode
+                        ? (root.useCompositorBackdrop ? 0.38 : 0.44)
+                        : (root.useCompositorBackdrop ? 0.56 : 0.62))
                 radius: searchWidgetContent.panelRadius
             }
 
@@ -889,41 +920,17 @@ Item { // Wrapper
                     }
                 }
 
-                ListView {
-                    id: listResults
+                Component {
+                    id: searchResultDelegate
 
-                    visible: !root.appMode
-                    anchors.fill: parent
-                    clip: true
-                    topMargin: 8
-                    bottomMargin: 8
-                    spacing: 2
-                    model: resultModel
-                    boundsBehavior: Flickable.StopAtBounds
-                    reuseItems: true
-                    KeyNavigation.up: searchBar
-                    highlightMoveDuration: 100
-                    ScrollBar.vertical: StyledScrollBar {}
-
-                    onCountChanged: {
-                        if (count <= 0)
-                            currentIndex = -1;
-                        else if (currentIndex < 0 || currentIndex >= count)
-                            currentIndex = 0;
-                    }
-                    onFocusChanged: {
-                        if (focus)
-                            root.focusFirstItem();
-                    }
-
-                    delegate: SearchItem {
+                    SearchItem {
                         id: searchItem
 
                         required property int index
                         required property var modelData
                         anchors.left: parent?.left
                         anchors.right: parent?.right
-                        entry: modelData
+                        entry: root.resultAt(index)
                         query: {
                             const prefix = LauncherSearch.matchedPrefix(root.searchingText)
                             return prefix ? StringUtils.cleanPrefix(root.searchingText, prefix) : root.searchingText
@@ -947,6 +954,56 @@ Item { // Wrapper
                             }
                         }
                     }
+                }
+
+                Component {
+                    id: clipboardResultDelegate
+
+                    ClipboardItem {
+                        required property int index
+                        required property var modelData
+                        anchors.left: parent?.left
+                        anchors.right: parent?.right
+                        entry: root.resultAt(index)
+                        current: listResults.currentIndex === index
+                        containerRadius: searchWidgetContent.panelRadius
+
+                        onHoveredChanged: {
+                            if (hovered && listResults.currentIndex !== index)
+                                listResults.currentIndex = index;
+                        }
+                    }
+                }
+
+                ListView {
+                    id: listResults
+
+                    visible: !root.appMode
+                    anchors.fill: parent
+                    clip: true
+                    topMargin: 8
+                    bottomMargin: 8
+                    spacing: 2
+                    model: root.clipboardMode ? root.clipboardEntries.length : resultModel
+                    cacheBuffer: 0
+                    boundsBehavior: Flickable.StopAtBounds
+                    reuseItems: true
+                    KeyNavigation.up: searchBar
+                    highlightMoveDuration: 100
+                    ScrollBar.vertical: StyledScrollBar {}
+
+                    onCountChanged: {
+                        if (count <= 0)
+                            currentIndex = -1;
+                        else if (currentIndex < 0 || currentIndex >= count)
+                            currentIndex = 0;
+                    }
+                    onFocusChanged: {
+                        if (focus)
+                            root.focusFirstItem();
+                    }
+
+                    delegate: root.clipboardMode ? clipboardResultDelegate : searchResultDelegate
                 }
             }
 

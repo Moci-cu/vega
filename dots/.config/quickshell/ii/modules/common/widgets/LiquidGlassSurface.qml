@@ -80,7 +80,7 @@ Item {
 
     opacity: shown ? 1 : 0
     visible: opacity > 0
-    clip: true
+    clip: false
 
     Behavior on opacity {
         enabled: !root.compositorBackdrop
@@ -139,12 +139,12 @@ Item {
             GradientStop {
                 position: 0.72
                 color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
-                    Math.max(0.26, root.tintColor.a * (1 - 0.42 * root.lowerGlow)))
+                    Math.max(0.26, root.tintColor.a * (1 - 0.10 * root.lowerGlow)))
             }
             GradientStop {
                 position: 1
                 color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
-                    Math.max(0.24, root.tintColor.a * (1 - 0.66 * root.lowerGlow)))
+                    Math.max(0.24, root.tintColor.a * (1 - 0.18 * root.lowerGlow)))
             }
         }
     }
@@ -152,7 +152,7 @@ Item {
     ShaderEffect {
         anchors.fill: parent
         visible: opacity > 0
-        opacity: root.textureShaderReady ? 1 : 0
+        opacity: root.textureShaderReady ? 1 : (root.compositorRimReady ? 0.02 : 0)
 
         property var source: root.wallpaperSource
         property var environmentSource: root.environmentSource ?? root.wallpaperSource
@@ -198,12 +198,13 @@ Item {
 
     ShaderEffect {
         anchors.fill: parent
+        anchors.margins: -2
         visible: opacity > 0
         opacity: root.compositorRimReady ? 1 : 0
 
         property var source: root.wallpaperSource
         property var environmentSource: root.environmentSource ?? root.wallpaperSource
-        property vector2d itemSize: Qt.vector2d(width, height)
+        property vector2d itemSize: Qt.vector2d(root.width, root.height)
         property vector4d sourceRect: Qt.vector4d(
             root.sampleRect.x,
             root.sampleRect.y,
@@ -218,8 +219,9 @@ Item {
         )
         property real edgeLighting: root.edgeLighting
         property real lowerGlow: root.lowerGlow
+        property real effectPadding: 2
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-18")
+        fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-24")
     }
 
     Rectangle {

@@ -1,6 +1,7 @@
 pragma Singleton
 pragma ComponentBehavior: Bound
 
+import qs
 import qs.modules.common
 import qs.modules.common.functions
 import QtQuick
@@ -16,6 +17,7 @@ Singleton {
     property bool sloppySearch: Config.options?.search.sloppy ?? false
     property real scoreThreshold: 0.2
     property list<string> entries: []
+    property bool refreshPending: false
     readonly property var preparedEntries: entries.map(a => ({
         name: Fuzzy.prepare(`${a.replace(/^\s*\S+\s+/, "")}`),
         entry: a
@@ -146,7 +148,16 @@ Singleton {
     Connections {
         target: Quickshell
         function onClipboardTextChanged() {
+            root.refreshPending = true
             delayedUpdateTimer.restart()
+        }
+    }
+
+    Connections {
+        target: GlobalStates
+        function onOverviewOpenChanged() {
+            if (!GlobalStates.overviewOpen && root.refreshPending)
+                delayedUpdateTimer.restart()
         }
     }
 
@@ -155,6 +166,9 @@ Singleton {
         interval: Config.options.hacks.arbitraryRaceConditionDelay
         repeat: false
         onTriggered: {
+            if (GlobalStates.overviewOpen)
+                return
+            root.refreshPending = false
             root.refresh()
         }
     }

@@ -210,7 +210,8 @@ RippleButton {
             }
             RowLayout {
                 Loader { // Checkmark for copied clipboard entry
-                    visible: !root.isClipboardResult && itemName == Quickshell.clipboardText && root.cliphistRawString
+                    visible: root.isClipboardResult && root.itemName === Quickshell.clipboardText
+                        && root.cliphistRawString.length > 0
                     active: visible
                     sourceComponent: Rectangle {
                         implicitWidth: activeText.implicitHeight

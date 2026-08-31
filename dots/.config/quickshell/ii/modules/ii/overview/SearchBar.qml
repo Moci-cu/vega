@@ -115,13 +115,6 @@ RowLayout {
             height: searchInput.font.pixelSize + 4
             opacity: searchInput.activeFocus && !autocompleteChip.visible && root.caretBlinkOn ? 1 : 0
 
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 180
-                    easing.type: Easing.InOutSine
-                }
-            }
-
             RectangularShadow {
                 anchors.top: parent.top
                 anchors.horizontalCenter: parent.horizontalCenter
