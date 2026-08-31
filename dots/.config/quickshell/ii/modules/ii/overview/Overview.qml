@@ -221,30 +221,14 @@ Scope {
                         easing.type: Easing.OutCubic
                     }
 
-                    SequentialAnimation {
-                        PropertyAction {
-                            target: root
-                            property: "launcherScale"
-                            value: 1.06
-                        }
-                        NumberAnimation {
-                            target: root
-                            property: "launcherScale"
-                            from: 1.06
-                            to: 0.992
-                            duration: 300
-                            easing.type: Easing.BezierSpline
-                            easing.bezierCurve: Appearance.animationCurves.emphasizedDecel
-                        }
-                        NumberAnimation {
-                            target: root
-                            property: "launcherScale"
-                            from: 0.992
-                            to: 1
-                            duration: 170
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 0.1
-                        }
+                    NumberAnimation {
+                        target: root
+                        property: "launcherScale"
+                        from: 0.965
+                        to: 1
+                        duration: 420
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
                     }
                 }
 
@@ -290,7 +274,7 @@ Scope {
                             overviewScope.clipboardOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
-                            root.launcherScale = 1.06;
+                            root.launcherScale = 0.965;
                             root.launcherRevealProgress = 0.12;
                             if (!overviewScope.dontAutoCancelSearch) {
                                 searchWidget.cancelSearch();
