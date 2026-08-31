@@ -47,7 +47,7 @@ Item { // Wrapper
         { label: "Clipboard", icon: "content_copy" }
     ]
     readonly property real searchPillWidth: 490
-    readonly property real searchPillHeight: 78
+    readonly property real searchPillHeight: 90
     readonly property real calculatorPanelHeight: 64
     readonly property real searchPanelGap: 8
     readonly property var screen: root.QsWindow.window?.screen ?? null

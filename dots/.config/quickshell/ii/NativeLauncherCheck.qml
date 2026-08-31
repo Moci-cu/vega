@@ -70,7 +70,7 @@ ShellRoot {
                     || widgetLoader.item.categoryPanelWidth !== 490
                     || widgetLoader.item.categoryPanelHeight !== 184
                     || widgetLoader.item.searchPillWidth !== 490
-                    || widgetLoader.item.searchPillHeight !== 78
+                    || widgetLoader.item.searchPillHeight !== 90
                     || widgetLoader.item.searchPillWidth >= widgetLoader.item.resultsPanelWidth
                     || widgetLoader.item.showResults
                     || widgetLoader.item.showCategories
