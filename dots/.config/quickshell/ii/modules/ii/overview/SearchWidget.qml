@@ -587,7 +587,7 @@ Item { // Wrapper
                 refraction: 0
                 itemSourceRect: root.backdropRectFor(searchGlassSurface, root.visualScale)
                 screen: root.screen
-                tintColor: Qt.rgba(0, 0, 0, root.useCompositorBackdrop ? 0.85 : 0.74)
+                tintColor: Qt.rgba(0, 0, 0, root.useCompositorBackdrop ? 0.595 : 0.74)
                 radius: searchWidgetContent.searchRadius
             }
 

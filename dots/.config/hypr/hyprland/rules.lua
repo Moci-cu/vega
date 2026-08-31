@@ -140,7 +140,7 @@ hl.layer_rule({ match = { namespace = "osk[0-9]*" }, ignore_alpha = 0.6})
 
 -- Quickshell
 -- Quickshell: illogical-impulse
-local overviewUsesHyprlandBlur = false
+local overviewUsesHyprlandBlur = true
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.2})
 hl.layer_rule({ match = { namespace = "quickshell:bar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:actionCenter" }, no_anim = true})
