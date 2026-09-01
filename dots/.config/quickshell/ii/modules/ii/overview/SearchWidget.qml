@@ -608,8 +608,9 @@ Item { // Wrapper
                 calculatorActive: root.calculatorActive
                 queryPrefix: root.applicationGridMode ? Config.options.search.prefix.app
                     : root.clipboardMode ? Config.options.search.prefix.clipboard : ""
-                inputPlaceholder: root.clipboardMode ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
-                leadingIcon: root.clipboardMode ? "content_copy" : ""
+                inputPlaceholder: root.clipboardMode && root.showResults
+                    ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
+                leadingIcon: root.clipboardMode && root.showResults ? "content_copy" : ""
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
                 navigationColumns: root.appMode ? root.appGridColumns : 1
