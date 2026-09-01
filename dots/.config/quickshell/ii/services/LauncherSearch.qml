@@ -15,6 +15,8 @@ Singleton {
     property string query: ""
     property int resultLimit: 15
 
+    signal wifiPanelRequested()
+
     readonly property list<var> searchPrefixEntries: [
         { name: "action", prefix: Config.options.search.prefix.action },
         { name: "app", prefix: Config.options.search.prefix.app },
@@ -53,8 +55,30 @@ Singleton {
         const queryString = String(queryText ?? "");
         if (root.isImplicitMathQuery(queryString))
             return false;
+        if (root.isWifiCommandQuery(queryString))
+            return false;
         const prefixName = root.matchedPrefixName(queryString);
         return prefixName === "app" || prefixName === "";
+    }
+
+    function isWifiCommandQuery(queryText = root.query) {
+        return /^wi-?fi$/i.test(String(queryText ?? "").trim());
+    }
+
+    function wifiKeywordResult(queryText = root.query) {
+        const queryString = String(queryText ?? "").trim().toLowerCase();
+        if (!queryString || queryString === "wifi" || !"wifi".startsWith(queryString))
+            return null;
+        return {
+            key: "command-keyword:wifi",
+            name: "wifi",
+            verb: Translation.tr("Commands"),
+            type: Translation.tr("Action"),
+            iconName: "wifi",
+            iconType: LauncherSearchResult.IconType.Material,
+            keepLauncherOpen: true,
+            execute: () => root.query = "wifi"
+        };
     }
 
     function shouldUseNativeAppSearch(queryText = root.query) {
@@ -177,6 +201,36 @@ Singleton {
         },
     ]
 
+    readonly property list<var> wifiCommandActions: [
+        {
+            name: Translation.tr("Scan Wi-Fi Networks"),
+            iconName: "wifi_find",
+            verb: Translation.tr("Open"),
+            keepLauncherOpen: true,
+            execute: () => root.wifiPanelRequested()
+        },
+        {
+            name: Translation.tr("Turn Wi-Fi Off"),
+            iconName: "signal_wifi_off",
+            verb: Translation.tr("Run"),
+            execute: () => Quickshell.execDetached(["nmcli", "radio", "wifi", "off"])
+        },
+        {
+            name: Translation.tr("Turn Wi-Fi On"),
+            iconName: "wifi",
+            verb: Translation.tr("Run"),
+            execute: () => Quickshell.execDetached(["nmcli", "radio", "wifi", "on"])
+        },
+        {
+            name: Translation.tr("Restart Wi-Fi"),
+            iconName: "restart_alt",
+            verb: Translation.tr("Run"),
+            execute: () => Quickshell.execDetached([
+                "sh", "-c", "nmcli radio wifi off && nmcli radio wifi on"
+            ])
+        }
+    ]
+
     // Combined built-in and user actions
     property var allActions: searchActions.concat(userActionScripts)
 
@@ -252,6 +306,10 @@ Singleton {
         const resolved = root.resolvedResult(entry);
         if (resolved?.execute)
             resolved.execute();
+    }
+
+    function keepsOverviewOpen(entry) {
+        return root.resolvedResult(entry)?.keepLauncherOpen === true;
     }
 
     function resultActions(entry, limit) {
@@ -487,6 +545,19 @@ Singleton {
         };
     }
 
+    function wifiCommandResult(action, index) {
+        return {
+            key: `wifi-command:${index}`,
+            name: action.name,
+            verb: action.verb,
+            type: Translation.tr("Wi-Fi Command"),
+            iconName: action.iconName,
+            iconType: LauncherSearchResult.IconType.Material,
+            keepLauncherOpen: action.keepLauncherOpen === true,
+            execute: action.execute
+        };
+    }
+
     Timer {
         id: nonAppResultsTimer
         interval: Config.options.search.nonAppResultDelay
@@ -552,6 +623,9 @@ Singleton {
         ////////////////// Skip? //////////////////
         if (root.query == "")
             return [];
+
+        if (root.isWifiCommandQuery())
+            return root.wifiCommandActions.map((action, index) => root.wifiCommandResult(action, index));
 
         ///////////// Special cases ///////////////
         const prefixName = root.matchedPrefixName();

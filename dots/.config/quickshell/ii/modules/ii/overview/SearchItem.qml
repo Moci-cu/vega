@@ -120,7 +120,8 @@ RippleButton {
     }
 
     onClicked: {
-        GlobalStates.overviewOpen = false
+        if (!LauncherSearch.keepsOverviewOpen(root.entry))
+            GlobalStates.overviewOpen = false
         LauncherSearch.executeResult(root.entry)
     }
     Keys.onPressed: (event) => {

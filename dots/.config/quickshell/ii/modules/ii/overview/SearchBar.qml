@@ -42,6 +42,13 @@ RowLayout {
     }
     readonly property bool autocompleteIsApp: root.autocompleteEntry?.nativeApp
         || String(root.autocompleteEntry?.key ?? "").startsWith("app:")
+    readonly property bool autocompleteIsKeyword: String(root.autocompleteEntry?.key ?? "")
+        .startsWith("command-keyword:")
+    readonly property bool autocompleteIsAction: {
+        const key = String(root.autocompleteEntry?.key ?? "");
+        return root.autocompleteIsKeyword || key.startsWith("wifi-command:")
+            || key.startsWith("action:");
+    }
     readonly property string autocompleteAction: {
         if (root.calculatorActive)
             return "";
@@ -54,12 +61,16 @@ RowLayout {
     }
     readonly property string autocompleteInputQuery: LauncherSearch.nativeAppQuery(searchInput.text).trim()
     readonly property string autocompleteName: String(root.autocompleteEntry?.name ?? "")
-    readonly property bool autocompleteMatchesInput: root.calculatorActive
+    readonly property bool autocompleteMatchesInput: root.calculatorActive || root.autocompleteIsAction
         || (root.autocompleteInputQuery.length > 0
             && root.autocompleteName.toLowerCase().startsWith(root.autocompleteInputQuery.toLowerCase()))
     readonly property string autocompleteCompletion: {
         if (root.calculatorActive)
             return "";
+        if (root.autocompleteIsKeyword)
+            return root.autocompleteName.slice(root.autocompleteInputQuery.length);
+        if (root.autocompleteIsAction)
+            return root.autocompleteName;
         return root.autocompleteMatchesInput
             ? root.autocompleteName.slice(root.autocompleteInputQuery.length) : "";
     }
@@ -85,7 +96,7 @@ RowLayout {
 
     function selectedEntry() {
         const selectedIndex = Math.max(0, root.currentIndex);
-        return root.resultAt(selectedIndex) ?? root.selectedResult;
+        return root.selectedResult ?? root.resultAt(selectedIndex);
     }
 
     function forceFocus() {
@@ -233,7 +244,12 @@ RowLayout {
                     return;
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
-                GlobalStates.overviewOpen = false;
+                if (root.autocompleteIsKeyword) {
+                    root.setQueryImmediately(selectedEntry.name);
+                    return;
+                }
+                if (!LauncherSearch.keepsOverviewOpen(selectedEntry))
+                    GlobalStates.overviewOpen = false;
                 root.executeResult(selectedEntry);
             });
         }
@@ -269,7 +285,10 @@ RowLayout {
                 root.runAfterPendingQuery(() => {
                     if (root.resultCount === 0)
                         return;
-                    const tabbedText = root.selectedEntry()?.name ?? "";
+                    const tabbedText = root.autocompleteIsKeyword
+                        ? root.selectedEntry()?.name ?? ""
+                        : root.autocompleteIsAction ? root.searchingText
+                        : root.selectedEntry()?.name ?? "";
                     root.setQueryImmediately(tabbedText);
                 });
             }
@@ -284,6 +303,16 @@ RowLayout {
             && root.autocompleteMatchesInput
         source: AppSearch.iconPath(root.autocompleteEntry?.iconName ?? "", "image-missing")
         asynchronous: true
+    }
+
+    MaterialSymbol {
+        visible: root.autocompleteIsAction && root.autocompleteAction.length > 0
+        Layout.alignment: Qt.AlignVCenter
+        Layout.preferredWidth: 34
+        Layout.preferredHeight: 34
+        text: root.autocompleteEntry?.iconName ?? "settings_suggest"
+        iconSize: 25
+        color: Qt.rgba(1, 1, 1, 0.72)
     }
 
     Timer {
@@ -304,7 +333,7 @@ RowLayout {
     IconToolbarButton {
         id: moreActionsButton
 
-        visible: !root.calculatorActive
+        visible: !root.calculatorActive && !root.autocompleteIsAction
         Layout.preferredWidth: 42
         Layout.preferredHeight: 42
         Layout.rightMargin: 2

@@ -117,10 +117,11 @@ ShellRoot {
             root.attempts = 0;
             root.searchStarted = true;
             GlobalStates.overviewOpen = true;
-            widgetLoader.item.showResults = true;
             widgetLoader.item.runAfterResultsRefresh("her", function() {
                 if (!root.searchFinished)
                     return root.fail("query action ran before the latest results were ready");
+                if (widgetLoader.item.nativeAutocompleteResult?.id !== root.expectedId)
+                    return root.fail("compact searchbar did not refresh its native autocomplete result");
                 root.actionReady = true;
             });
         }

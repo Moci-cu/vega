@@ -37,8 +37,7 @@ Item { // Wrapper
     readonly property real resultsPanelHeight: resultsViewportHeight + 24
     readonly property real clipboardPanelHeight: clipboardVisibleRowLimit * clipboardRowHeight
         + (clipboardVisibleRowLimit - 1) * clipboardRowSpacing + 40
-    readonly property real activeResultsPanelHeight: clipboardMode
-        ? clipboardPanelHeight : resultsPanelHeight
+    readonly property real activeResultsPanelHeight: clipboardMode ? clipboardPanelHeight : resultsPanelHeight
     readonly property real categoryPanelWidth: searchPillWidth
     readonly property real categoryRowHeight: 40
     readonly property real categoryPanelHeight: categoryRowHeight * categoryEntries.length + 24
@@ -51,6 +50,9 @@ Item { // Wrapper
     readonly property real searchPillWidth: 490
     readonly property real searchPillHeight: 90
     readonly property real calculatorPanelHeight: 64
+    readonly property real wifiCommandRowHeight: 52
+    readonly property real wifiCommandInlineHeight: LauncherSearch.wifiCommandActions.length
+        * wifiCommandRowHeight + 16
     readonly property real searchPanelGap: 8
     readonly property var screen: root.QsWindow.window?.screen ?? null
 
@@ -59,23 +61,42 @@ Item { // Wrapper
     readonly property bool backdropReady: backdropSettled || backdropCaptureTimedOut
     readonly property bool appMode: LauncherSearch.isApplicationQuery(root.searchingText)
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
-    readonly property int activeResultCount: appMode ? appGrid.count : listResults.count
-    readonly property int activeCurrentIndex: appMode ? appGrid.currentIndex : listResults.currentIndex
+    readonly property bool wifiCommandMode: LauncherSearch.isWifiCommandQuery(root.searchingText)
+    readonly property bool resultsVisible: showResults || wifiPanelOpen
+    readonly property bool appResultsReady: !appMode || (nativeAppSearchActive
+        ? nativeResultQuery === searchingText && !(NativeAppSearch.model?.busy ?? false)
+        : fallbackAppQuery === searchingText)
+    readonly property int activeResultCount: wifiPanelOpen
+        ? (wifiPanelLoader.item?.networkCount ?? 0) : wifiCommandMode
+            ? wifiCommandList.count : appMode
+                ? (!showResults && nativeAutocompleteResult
+                    ? Math.max(1, appGrid.count) : appGrid.count)
+                : listResults.count
+    readonly property int activeCurrentIndex: wifiPanelOpen
+        ? (wifiPanelLoader.item?.currentIndex ?? -1) : wifiCommandMode
+            ? wifiCommandList.currentIndex : appMode
+                ? (!showResults && nativeAutocompleteResult
+                    ? Math.max(0, appGrid.currentIndex) : appGrid.currentIndex)
+                : listResults.currentIndex
     property string searchingText: LauncherSearch.query
     property var clipboardEntries: []
+    property var fallbackAppEntries: []
+    property string fallbackAppQuery: ""
     property bool showResults: false
     property bool applicationGridMode: false
     property bool showCategories: false
     property bool showClipboard: false
+    property bool wifiPanelOpen: false
     readonly property bool clipboardMode: showClipboard
-    readonly property string calculatorExpression: applicationGridMode || clipboardMode
+    readonly property string calculatorExpression: applicationGridMode || clipboardMode || wifiPanelOpen
         ? "" : LauncherSearch.mathExpression(searchingText)
     readonly property string calculatorResult: LauncherSearch.mathResult.trim()
     readonly property bool calculatorActive: calculatorExpression.length > 0
     readonly property bool calculatorVisible: calculatorActive
     property real searchSurfaceHeight: searchPillHeight
-        + (calculatorActive ? calculatorPanelHeight : 0)
-    readonly property bool deepGlassMode: appMode || clipboardMode
+        + (calculatorActive ? calculatorPanelHeight
+            : wifiCommandMode ? wifiCommandInlineHeight : 0)
+    readonly property bool deepGlassMode: appMode || clipboardMode || wifiPanelOpen
     readonly property bool categoriesVisible: showCategories
         && !showResults
         && searchingText.trim().length === 0
@@ -86,6 +107,7 @@ Item { // Wrapper
     property string pendingResultQuery: ""
     property var pendingResultAction: null
     property string nativeResultQuery: ""
+    property var nativeAutocompleteResult: null
     property real retainedBackdropWidth: resultsPanelWidth + 4
     property real retainedBackdropHeight: searchPillHeight + searchPanelGap
         + Math.max(resultsPanelHeight, clipboardPanelHeight) + 4
@@ -95,6 +117,8 @@ Item { // Wrapper
     height: implicitHeight
 
     Behavior on searchSurfaceHeight {
+        enabled: GlobalStates.overviewOpen
+
         NumberAnimation {
             duration: 280
             easing.type: Easing.OutBack
@@ -110,6 +134,15 @@ Item { // Wrapper
     }
 
     function focusFirstItem() {
+        if (root.wifiPanelOpen) {
+            wifiPanelLoader.item?.moveSelection(0);
+            return;
+        }
+        if (root.wifiCommandMode) {
+            if (wifiCommandList.count > 0)
+                wifiCommandList.currentIndex = 0;
+            return;
+        }
         const view = root.appMode ? appGrid : listResults;
         if (view.count <= 0)
             return;
@@ -119,6 +152,17 @@ Item { // Wrapper
     }
 
     function moveSelection(delta, linear = false) {
+        if (root.wifiPanelOpen) {
+            wifiPanelLoader.item?.moveSelection(delta);
+            return;
+        }
+        if (root.wifiCommandMode) {
+            if (wifiCommandList.count <= 0) return;
+            wifiCommandList.currentIndex = Math.max(0,
+                Math.min(wifiCommandList.count - 1,
+                    Math.max(0, wifiCommandList.currentIndex) + delta));
+            return;
+        }
         const view = root.appMode ? appGrid : listResults;
         if (view.count <= 0)
             return;
@@ -155,6 +199,8 @@ Item { // Wrapper
     }
 
     function resultAt(index) {
+        if (root.wifiPanelOpen)
+            return null;
         if (root.nativeAppSearchActive)
             return NativeAppSearch.get(index);
         const values = root.clipboardMode ? root.clipboardEntries : resultModel.values;
@@ -225,8 +271,18 @@ Item { // Wrapper
 
     function refreshResults() {
         const refreshedQuery = root.searchingText;
+        if (root.wifiPanelOpen) {
+            NativeAppSearch.clear();
+            root.fallbackAppEntries = [];
+            root.fallbackAppQuery = "";
+            resultModel.values = [];
+            root.finishResultsRefresh(refreshedQuery);
+            return;
+        }
         if (root.clipboardMode) {
             NativeAppSearch.clear();
+            root.fallbackAppEntries = [];
+            root.fallbackAppQuery = "";
             const searchString = StringUtils.cleanPrefix(
                 root.searchingText,
                 Config.options.search.prefix.clipboard
@@ -238,26 +294,41 @@ Item { // Wrapper
         }
 
         root.clipboardEntries = [];
-        const values = LauncherSearch.results;
         if (root.appMode) {
             const query = LauncherSearch.nativeAppQuery(root.searchingText);
             const blankQuery = query.trim().length === 0;
-            const limit = blankQuery ? Math.max(root.appGridCapacity, AppSearch.list.length) : root.appGridCapacity;
+            const limit = root.showResults
+                ? (blankQuery ? Math.max(root.appGridCapacity, AppSearch.list.length) : root.appGridCapacity)
+                : (blankQuery ? 0 : 1);
             if (root.nativeAppSearchActive) {
+                root.fallbackAppEntries = [];
+                root.fallbackAppQuery = "";
                 root.nativeResultQuery = refreshedQuery;
+                root.nativeAutocompleteResult = null;
                 NativeAppSearch.search(query, limit);
                 return;
             }
             NativeAppSearch.clear();
-            resultModel.values = blankQuery
-                ? Array.from(AppSearch.list)
+            const values = LauncherSearch.results;
+            const appValues = blankQuery
+                ? (limit === 0 ? [] : Array.from(AppSearch.list)
                     .sort((left, right) => String(left.name).localeCompare(String(right.name)))
-                    .map(entry => LauncherSearch.appResult(entry))
+                    .map(entry => LauncherSearch.appResult(entry)))
                 : (values ?? []).filter(entry => String(entry?.key ?? "").startsWith("app:")).slice(0, limit);
+            const firstStartsWithQuery = appValues.length > 0
+                && String(appValues[0].name ?? "").toLowerCase().startsWith(query.trim().toLowerCase());
+            const keywordFallback = !root.showResults && !firstStartsWithQuery
+                ? LauncherSearch.wifiKeywordResult(query) : null;
+            root.fallbackAppEntries = keywordFallback ? [keywordFallback] : appValues;
+            root.fallbackAppQuery = refreshedQuery;
+            resultModel.values = [];
             root.finishResultsRefresh(refreshedQuery);
             return;
         }
         NativeAppSearch.clear();
+        root.fallbackAppEntries = [];
+        root.fallbackAppQuery = "";
+        const values = LauncherSearch.results;
         resultModel.values = (values ?? []).slice(0, root.typingResultLimit);
         root.finishResultsRefresh(refreshedQuery);
     }
@@ -273,6 +344,7 @@ Item { // Wrapper
     }
     onAppModeChanged: root.scheduleResultsRefresh()
     onNativeAppSearchActiveChanged: root.scheduleResultsRefresh()
+    onShowResultsChanged: root.scheduleResultsRefresh()
     Component.onCompleted: root.scheduleResultsRefresh()
 
     Timer {
@@ -294,6 +366,12 @@ Item { // Wrapper
         ignoreUnknownSignals: true
 
         function onSearchFinished() {
+            const firstResult = NativeAppSearch.get(0);
+            const query = LauncherSearch.nativeAppQuery(root.nativeResultQuery).trim().toLowerCase();
+            const firstStartsWithQuery = firstResult
+                && String(firstResult.name ?? "").toLowerCase().startsWith(query);
+            root.nativeAutocompleteResult = firstStartsWithQuery ? firstResult
+                : (LauncherSearch.wifiKeywordResult(query) ?? firstResult);
             root.finishResultsRefresh(root.nativeResultQuery);
         }
     }
@@ -303,6 +381,21 @@ Item { // Wrapper
 
         function onResultsChanged() {
             root.scheduleResultsRefresh();
+        }
+
+        function onWifiPanelRequested() {
+            root.wifiPanelOpen = true;
+            root.setSearchingText("");
+            Qt.callLater(root.focusSearchInput);
+        }
+    }
+
+    Connections {
+        target: GlobalStates
+
+        function onOverviewOpenChanged() {
+            if (!GlobalStates.overviewOpen)
+                root.wifiPanelOpen = false;
         }
     }
 
@@ -363,7 +456,10 @@ Item { // Wrapper
         required property var modelData
         readonly property var entry: {
             const modelEntry = gridItem.modelData;
-            return root.resultAt(gridItem.index) ?? modelEntry;
+            if (!root.nativeAppSearchActive)
+                return modelEntry;
+            const nativeEntry = NativeAppSearch.get(gridItem.index);
+            return nativeEntry?.key ? nativeEntry : modelEntry;
         }
 
         width: root.appGridCellWidth
@@ -382,7 +478,7 @@ Item { // Wrapper
         }
 
         onHoveredChanged: {
-            if (hovered && appGrid.currentIndex !== index)
+            if (hovered && !appGrid.moving && appGrid.currentIndex !== index)
                 appGrid.currentIndex = index;
         }
         onClicked: {
@@ -554,7 +650,7 @@ Item { // Wrapper
         height: implicitHeight
         implicitWidth: root.resultsPanelWidth
         implicitHeight: root.searchSurfaceHeight
-            + (root.showResults
+            + (root.resultsVisible
                 ? root.searchPanelGap + root.activeResultsPanelHeight
                 : root.categoriesVisible ? root.searchPanelGap + root.categoryPanelHeight : 0)
         readonly property real searchRadius: root.sharpMode ? 0 : root.searchPillHeight / 2
@@ -642,14 +738,18 @@ Item { // Wrapper
                 calculatorActive: root.calculatorActive
                 queryPrefix: root.applicationGridMode ? Config.options.search.prefix.app
                     : root.clipboardMode ? Config.options.search.prefix.clipboard : ""
-                inputPlaceholder: root.clipboardMode && root.showResults
-                    ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
-                leadingIcon: root.clipboardMode && root.showResults ? "content_copy" : ""
+                inputPlaceholder: root.wifiPanelOpen ? Translation.tr("Search Wi-Fi networks…")
+                    : root.clipboardMode && root.showResults
+                        ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
+                leadingIcon: root.wifiPanelOpen ? "wifi"
+                    : root.clipboardMode && root.showResults ? "content_copy" : ""
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
-                navigationColumns: root.appMode ? root.appGridColumns : 1
-                selectedResult: root.appMode
-                    ? (appGrid.currentItem?.entry ?? null)
+                navigationColumns: root.wifiPanelOpen ? 1 : root.appMode ? root.appGridColumns : 1
+                selectedResult: root.wifiPanelOpen ? null
+                    : root.wifiCommandMode ? (wifiCommandList.currentItem?.entry ?? null)
+                    : root.appMode ? (!root.showResults && root.nativeAppSearchActive
+                        ? root.nativeAutocompleteResult : (appGrid.currentItem?.entry ?? null))
                     : (listResults.currentItem?.entry ?? null)
                 resultAt: root.resultAt
                 executeResult: entry => LauncherSearch.executeResult(entry)
@@ -742,6 +842,72 @@ Item { // Wrapper
 
                         StyledToolTip {
                             text: Translation.tr("Copy")
+                        }
+                    }
+                }
+            }
+
+            Item {
+                id: wifiCommandPanel
+
+                visible: opacity > 0
+                opacity: root.wifiCommandMode
+                    ? Math.max(0, Math.min(1, (root.searchSurfaceHeight
+                        - root.searchPillHeight - 12) / (root.wifiCommandInlineHeight - 12)))
+                    : 0
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                anchors.topMargin: root.searchPillHeight - 2
+                height: root.wifiCommandInlineHeight - 8
+                clip: true
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.14)
+                }
+
+                ListView {
+                    id: wifiCommandList
+
+                    anchors.fill: parent
+                    anchors.topMargin: 8
+                    clip: true
+                    spacing: 0
+                    model: root.wifiCommandMode ? resultModel : null
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: false
+
+                    onCountChanged: {
+                        if (count <= 0)
+                            currentIndex = -1;
+                        else if (currentIndex < 0 || currentIndex >= count)
+                            currentIndex = 0;
+                    }
+
+                    delegate: SearchItem {
+                        id: wifiCommandItem
+
+                        required property int index
+                        required property var modelData
+                        width: ListView.view.width
+                        height: root.wifiCommandRowHeight
+                        entry: root.resultAt(index)
+                        query: root.searchingText
+                        current: wifiCommandList.currentIndex === index
+                        horizontalMargin: 4
+                        containerRadius: searchWidgetContent.searchRadius
+
+                        onHoveredChanged: {
+                            if (hovered && wifiCommandList.currentIndex !== index)
+                                wifiCommandList.currentIndex = index;
                         }
                     }
                 }
@@ -866,8 +1032,8 @@ Item { // Wrapper
             id: resultsPanel
 
             visible: opacity > 0
-            opacity: root.showResults ? 1 : 0
-            scale: root.showResults ? 1 : 0.94
+            opacity: root.resultsVisible ? 1 : 0
+            scale: root.resultsVisible ? 1 : 0.94
             transformOrigin: Item.Top
             anchors.top: searchPill.bottom
             anchors.topMargin: root.searchPanelGap
@@ -943,12 +1109,12 @@ Item { // Wrapper
                 GridView {
                     id: appGrid
 
-                    visible: root.appMode
+                    visible: !root.wifiPanelOpen && root.appMode && root.appResultsReady
                     anchors.fill: parent
                     clip: true
                     cellWidth: root.appGridCellWidth
                     cellHeight: root.appGridCellHeight
-                    model: root.nativeAppSearchActive ? NativeAppSearch.model : resultModel
+                    model: root.nativeAppSearchActive ? NativeAppSearch.model : root.fallbackAppEntries
                     delegate: AppGridItem {}
                     boundsBehavior: Flickable.StopAtBounds
                     reuseItems: true
@@ -983,7 +1149,7 @@ Item { // Wrapper
                         containerRadius: searchWidgetContent.panelRadius
 
                         onHoveredChanged: {
-                            if (hovered && listResults.currentIndex !== index)
+                            if (hovered && !listResults.moving && listResults.currentIndex !== index)
                                 listResults.currentIndex = index;
                         }
 
@@ -1013,7 +1179,7 @@ Item { // Wrapper
                         containerRadius: searchWidgetContent.panelRadius
 
                         onHoveredChanged: {
-                            if (hovered && listResults.currentIndex !== index)
+                            if (hovered && !listResults.moving && listResults.currentIndex !== index)
                                 listResults.currentIndex = index;
                         }
                     }
@@ -1022,7 +1188,7 @@ Item { // Wrapper
                 ListView {
                     id: listResults
 
-                    visible: !root.appMode
+                    visible: !root.wifiPanelOpen && !root.appMode
                     anchors.fill: parent
                     clip: true
                     topMargin: 8
@@ -1048,6 +1214,17 @@ Item { // Wrapper
                     }
 
                     delegate: root.clipboardMode ? clipboardResultDelegate : searchResultDelegate
+                }
+
+                Loader {
+                    id: wifiPanelLoader
+
+                    active: root.wifiPanelOpen
+                    visible: active
+                    anchors.fill: parent
+                    sourceComponent: WifiPanel {
+                        filterText: root.searchingText
+                    }
                 }
             }
 
