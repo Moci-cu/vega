@@ -53,6 +53,10 @@ Scope {
     }
 
     function toggleSearch() {
+        if (GlobalStates.overviewOpen && clipboardOpen) {
+            dontAutoCancelSearch = false
+            return
+        }
         if (GlobalStates.overviewOpen && !workspaceMode && !categoriesOpen && !clipboardOpen
                 && !dontAutoCancelSearch && !applicationsPending) {
             GlobalStates.overviewOpen = false
@@ -367,6 +371,14 @@ Scope {
                             revealProgress: root.launcherRevealProgress
                             visualScale: root.launcherScale
                             anchors.centerIn: parent
+
+                            onResultsPanelHidden: {
+                                if (!GlobalStates.overviewOpen || !overviewScope.clipboardOpen
+                                        || overviewScope.dontAutoCancelSearch)
+                                    return;
+                                overviewScope.clipboardOpen = false;
+                                overviewScope.setSearchingTextRequested("");
+                            }
 
                             transform: Scale {
                                 origin.x: searchWidget.width / 2

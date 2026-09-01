@@ -18,6 +18,8 @@ import qs.modules.common.functions
 Item { // Wrapper
     id: root
 
+    signal resultsPanelHidden()
+
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 35
     readonly property int typingResultLimit: 7
@@ -836,6 +838,11 @@ Item { // Wrapper
             width: root.clipboardMode ? root.searchPillWidth : root.resultsPanelWidth
             height: root.activeResultsPanelHeight
             z: 1
+
+            onVisibleChanged: {
+                if (!visible)
+                    root.resultsPanelHidden();
+            }
 
             Behavior on opacity {
                 enabled: root.revealProgress >= 0.999

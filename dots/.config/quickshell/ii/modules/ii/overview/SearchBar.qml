@@ -31,6 +31,10 @@ RowLayout {
     property var moveSelection: (delta, linear) => {}
     property var autocompleteScreen
     property bool caretBlinkOn: true
+    property bool placeholderReady: false
+    property string displayedInputPlaceholder: ""
+    property real inputPlaceholderOpacity: 1
+    property real modeTransitionOffset: 0
     readonly property var autocompleteEntry: {
         const query = root.searchingText.trim();
         const count = root.resultCount;
@@ -60,6 +64,63 @@ RowLayout {
             return "";
         return root.autocompleteMatchesInput
             ? root.autocompleteName.slice(root.autocompleteInputQuery.length) : "";
+    }
+
+    onInputPlaceholderChanged: {
+        if (!placeholderReady || inputPlaceholder === Translation.tr("Clipboard")) {
+            placeholderTransition.stop();
+            inputPlaceholderOpacity = 1;
+            displayedInputPlaceholder = inputPlaceholder;
+            return;
+        }
+        if (displayedInputPlaceholder !== inputPlaceholder)
+            placeholderTransition.restart();
+    }
+    onLeadingIconChanged: {
+        modeTransitionSlide.stop();
+        if (leadingIcon.length > 0) {
+            modeTransitionOffset = 0;
+            return;
+        }
+        modeTransitionOffset = 34;
+        modeTransitionSlide.restart();
+    }
+    Component.onCompleted: {
+        displayedInputPlaceholder = inputPlaceholder;
+        placeholderReady = true;
+    }
+
+    SequentialAnimation {
+        id: placeholderTransition
+
+        NumberAnimation {
+            target: root
+            property: "inputPlaceholderOpacity"
+            to: 0
+            duration: 70
+            easing.type: Easing.InCubic
+        }
+        ScriptAction {
+            script: root.displayedInputPlaceholder = root.inputPlaceholder
+        }
+        NumberAnimation {
+            target: root
+            property: "inputPlaceholderOpacity"
+            to: 1
+            duration: 130
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    NumberAnimation {
+        id: modeTransitionSlide
+
+        target: root
+        property: "modeTransitionOffset"
+        to: 0
+        duration: Appearance.animation.elementMoveFast.duration
+        easing.type: Appearance.animation.elementMoveFast.type
+        easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
     }
 
     function cancelPendingQuery() {
@@ -100,13 +161,14 @@ RowLayout {
     ToolbarTextField { // Search box
         id: searchInput
         Layout.fillWidth: true
+        Layout.leftMargin: root.modeTransitionOffset
         implicitHeight: 46
         focus: GlobalStates.overviewOpen
         padding: 0
         font.pixelSize: Appearance.font.pixelSize.larger
         color: Qt.rgba(1, 1, 1, 0.9)
-        placeholderTextColor: Qt.rgba(1, 1, 1, 0.58)
-        placeholderText: root.inputPlaceholder
+        placeholderTextColor: Qt.rgba(1, 1, 1, 0.58 * root.inputPlaceholderOpacity)
+        placeholderText: root.displayedInputPlaceholder
         colBackground: "transparent"
         renderType: Text.QtRendering
 
