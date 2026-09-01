@@ -275,6 +275,7 @@ Scope {
                             overviewScope.applicationsPending = false;
                             overviewScope.applicationsOpen = false;
                             overviewScope.categoriesOpen = false;
+                            overviewScope.clipboardOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
                             root.launcherScale = 0.965;

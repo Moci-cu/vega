@@ -83,6 +83,9 @@ Item { // Wrapper
     property real visualScale: 1
     property bool backdropSettled: false
     property bool backdropCaptureTimedOut: false
+    property string pendingResultQuery: ""
+    property var pendingResultAction: null
+    property string nativeResultQuery: ""
     property real retainedBackdropWidth: resultsPanelWidth + 4
     property real retainedBackdropHeight: searchPillHeight + searchPanelGap
         + Math.max(resultsPanelHeight, clipboardPanelHeight) + 4
@@ -161,6 +164,31 @@ Item { // Wrapper
         return LauncherSearch.clipboardResult(value, index, values);
     }
 
+    function cancelPendingResultAction() {
+        root.pendingResultQuery = "";
+        root.pendingResultAction = null;
+    }
+
+    function runAfterResultsRefresh(query, action) {
+        root.pendingResultQuery = query;
+        root.pendingResultAction = action;
+        LauncherSearch.query = query;
+        root.scheduleResultsRefresh();
+    }
+
+    function finishResultsRefresh(query) {
+        Qt.callLater(() => {
+            if (query !== root.searchingText)
+                return;
+            root.focusFirstItem();
+            if (query !== root.pendingResultQuery || !root.pendingResultAction)
+                return;
+            const action = root.pendingResultAction;
+            root.cancelPendingResultAction();
+            action();
+        });
+    }
+
     function backdropRectFor(item, visualScale) {
         const pipeline = liquidGlassPipeline.item;
         if (!pipeline || !item)
@@ -196,6 +224,7 @@ Item { // Wrapper
     }
 
     function refreshResults() {
+        const refreshedQuery = root.searchingText;
         if (root.clipboardMode) {
             NativeAppSearch.clear();
             const searchString = StringUtils.cleanPrefix(
@@ -204,7 +233,7 @@ Item { // Wrapper
             );
             root.clipboardEntries = Cliphist.fuzzyQuery(searchString);
             resultModel.values = [];
-            Qt.callLater(root.focusFirstItem);
+            root.finishResultsRefresh(refreshedQuery);
             return;
         }
 
@@ -215,6 +244,7 @@ Item { // Wrapper
             const blankQuery = query.trim().length === 0;
             const limit = blankQuery ? Math.max(root.appGridCapacity, AppSearch.list.length) : root.appGridCapacity;
             if (root.nativeAppSearchActive) {
+                root.nativeResultQuery = refreshedQuery;
                 NativeAppSearch.search(query, limit);
                 return;
             }
@@ -224,19 +254,23 @@ Item { // Wrapper
                     .sort((left, right) => String(left.name).localeCompare(String(right.name)))
                     .map(entry => LauncherSearch.appResult(entry))
                 : (values ?? []).filter(entry => String(entry?.key ?? "").startsWith("app:")).slice(0, limit);
-            Qt.callLater(root.focusFirstItem);
+            root.finishResultsRefresh(refreshedQuery);
             return;
         }
         NativeAppSearch.clear();
         resultModel.values = (values ?? []).slice(0, root.typingResultLimit);
-        Qt.callLater(root.focusFirstItem);
+        root.finishResultsRefresh(refreshedQuery);
     }
 
     function scheduleResultsRefresh() {
         resultsRefreshTimer.restart();
     }
 
-    onSearchingTextChanged: root.scheduleResultsRefresh()
+    onSearchingTextChanged: {
+        if (root.pendingResultAction && root.searchingText !== root.pendingResultQuery)
+            root.cancelPendingResultAction();
+        root.scheduleResultsRefresh();
+    }
     onAppModeChanged: root.scheduleResultsRefresh()
     onNativeAppSearchActiveChanged: root.scheduleResultsRefresh()
     Component.onCompleted: root.scheduleResultsRefresh()
@@ -260,7 +294,7 @@ Item { // Wrapper
         ignoreUnknownSignals: true
 
         function onSearchFinished() {
-            Qt.callLater(root.focusFirstItem);
+            root.finishResultsRefresh(root.nativeResultQuery);
         }
     }
 
@@ -454,7 +488,7 @@ Item { // Wrapper
                     Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
                 )
                 hideSource: true
-                live: capture.hasContent
+                live: capture.hasContent && (!root.backdropSettled || root.visualScale !== 1)
             }
 
             MultiEffect {
@@ -480,7 +514,7 @@ Item { // Wrapper
                     Math.ceil(height * (root.screen?.devicePixelRatio ?? 1))
                 )
                 hideSource: true
-                live: capture.hasContent
+                live: capture.hasContent && (!root.backdropSettled || root.visualScale !== 1)
             }
         }
     }
@@ -620,6 +654,8 @@ Item { // Wrapper
                 resultAt: root.resultAt
                 executeResult: entry => LauncherSearch.executeResult(entry)
                 moveSelection: (delta, linear) => root.moveSelection(delta, linear)
+                runAfterQueryCommitted: (query, action) => root.runAfterResultsRefresh(query, action)
+                cancelPendingQueryAction: () => root.cancelPendingResultAction()
                 autocompleteScreen: root.screen
 
                 Synchronizer on searchingText {

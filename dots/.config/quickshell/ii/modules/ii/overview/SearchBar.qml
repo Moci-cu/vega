@@ -29,6 +29,8 @@ RowLayout {
     property var resultAt: index => LauncherSearch.results[index]
     property var executeResult: entry => LauncherSearch.executeResult(entry)
     property var moveSelection: (delta, linear) => {}
+    required property var runAfterQueryCommitted
+    required property var cancelPendingQueryAction
     property var autocompleteScreen
     property bool caretBlinkOn: true
     readonly property var autocompleteEntry: {
@@ -64,15 +66,17 @@ RowLayout {
 
     function cancelPendingQuery() {
         queryCommitTimer.stop();
+        root.cancelPendingQueryAction();
     }
 
-    function flushPendingQuery() {
+    function runAfterPendingQuery(action) {
         queryCommitTimer.stop();
-        LauncherSearch.query = root.queryPrefix + searchInput.text;
+        root.runAfterQueryCommitted(root.queryPrefix + searchInput.text, action);
     }
 
     function setQueryImmediately(text) {
         const query = String(text ?? "");
+        root.cancelPendingQueryAction();
         searchInput.text = root.queryPrefix && query.startsWith(root.queryPrefix)
             ? query.slice(root.queryPrefix.length) : query;
         queryCommitTimer.stop();
@@ -81,7 +85,7 @@ RowLayout {
 
     function selectedEntry() {
         const selectedIndex = Math.max(0, root.currentIndex);
-        return root.selectedResult ?? root.resultAt(selectedIndex);
+        return root.resultAt(selectedIndex) ?? root.selectedResult;
     }
 
     function forceFocus() {
@@ -218,18 +222,20 @@ RowLayout {
 
         onTextChanged: {
             root.caretBlinkOn = true;
+            root.cancelPendingQueryAction();
             queryCommitTimer.pendingQuery = root.queryPrefix + text;
             queryCommitTimer.restart();
         }
 
         onAccepted: {
-            root.flushPendingQuery();
-            if (root.resultCount > 0) {
+            root.runAfterPendingQuery(() => {
+                if (root.resultCount <= 0)
+                    return;
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
                 GlobalStates.overviewOpen = false;
                 root.executeResult(selectedEntry);
-            }
+            });
         }
 
         Keys.onPressed: event => {
@@ -259,11 +265,13 @@ RowLayout {
                 return;
             }
             if (event.key === Qt.Key_Tab) {
-                root.flushPendingQuery();
-                if (root.resultCount === 0) return;
-                const tabbedText = root.selectedEntry()?.name ?? "";
-                root.setQueryImmediately(tabbedText);
                 event.accepted = true;
+                root.runAfterPendingQuery(() => {
+                    if (root.resultCount === 0)
+                        return;
+                    const tabbedText = root.selectedEntry()?.name ?? "";
+                    root.setQueryImmediately(tabbedText);
+                });
             }
         }
     }

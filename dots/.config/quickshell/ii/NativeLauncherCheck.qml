@@ -9,6 +9,8 @@ ShellRoot {
 
     property int attempts: 0
     property bool searchStarted: false
+    property bool searchFinished: false
+    property bool actionReady: false
     property string expectedId: ""
 
     function fail(message) {
@@ -29,7 +31,7 @@ ShellRoot {
                     || NativeAppSearch.model.count < 1)
                 return root.fail("'her' did not return Heroic Games Launcher with an icon");
             console.log(`[NativeLauncherCheck] first=${first.name} count=${NativeAppSearch.model.count}`);
-            Qt.exit(0);
+            root.searchFinished = true;
         }
     }
 
@@ -48,6 +50,11 @@ ShellRoot {
             if (widgetLoader.status === Loader.Error)
                 return root.fail("launcher widget failed to load");
             if (root.searchStarted) {
+                if (root.searchFinished && root.actionReady) {
+                    checkTimer.stop();
+                    Qt.exit(0);
+                    return;
+                }
                 if (++root.attempts >= 300)
                     return root.fail("search did not finish in time");
                 return;
@@ -107,10 +114,15 @@ ShellRoot {
             if (!entry)
                 return root.fail("Heroic Games Launcher is not installed");
             root.expectedId = entry.id || entry.name;
+            root.attempts = 0;
             root.searchStarted = true;
             GlobalStates.overviewOpen = true;
             widgetLoader.item.showResults = true;
-            LauncherSearch.query = "her";
+            widgetLoader.item.runAfterResultsRefresh("her", function() {
+                if (!root.searchFinished)
+                    return root.fail("query action ran before the latest results were ready");
+                root.actionReady = true;
+            });
         }
     }
 }

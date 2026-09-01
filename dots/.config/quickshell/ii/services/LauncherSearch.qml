@@ -580,8 +580,12 @@ Singleton {
         const startsWithShellCommandPrefix = prefixName === "shellCommand";
         const startsWithWebSearchPrefix = prefixName === "webSearch";
         const startsWithWindowPrefix = prefixName === "window";
-        if (implicitMathQuery || startsWithMathPrefix)
-            return root.mathResult.length > 0 ? [root.mathResultEntry()] : [];
+        if (implicitMathQuery || startsWithMathPrefix) {
+            if (Config.options.panelFamily === "ii")
+                return root.mathResult.length > 0 ? [root.mathResultEntry()] : [];
+            if (root.mathResult.length > 0)
+                result.push(root.mathResultEntry());
+        }
         if (startsWithShellCommandPrefix) {
             result.push(root.commandResult());
         } else if (startsWithWebSearchPrefix) {
