@@ -66,15 +66,12 @@ void main() {
     float localLuminance = dot(localScene, vec3(0.2126, 0.7152, 0.0722));
     float refractedLuminance = dot(refractedScene, vec3(0.2126, 0.7152, 0.0722));
     float contrast = clamp(abs(refractedLuminance - localLuminance) * 3.0, 0.0, 1.0);
-    float lightEnergy = clamp(smoothstep(0.025, 0.86, refractedLuminance)
-        + contrast * 0.36, 0.0, 1.0);
-    float caustic = pow(smoothstep(0.10, 0.92, lightEnergy), 1.35);
     float bloomLuminance = dot(tangentSoftScene, vec3(0.2126, 0.7152, 0.0722));
     float bloomCaustic = pow(smoothstep(0.08, 0.82, bloomLuminance), 1.2);
     float strength = clamp(edgeLighting, 0.0, 1.0)
         * mix(0.58, 1.0, clamp(lowerGlow, 0.0, 1.0));
 
-    float core = (1.0 - smoothstep(0.0, 1.75, abs(distance + 0.65)))
+    float softRim = (1.0 - smoothstep(0.0, 4.0, abs(distance + 0.75)))
         * opticalFacing * coverage * strength;
     float bloom = smoothstep(0.45, 1.4, edgeDistance)
         * (1.0 - smoothstep(1.4, 5.5, edgeDistance))
@@ -90,14 +87,13 @@ void main() {
 
     vec3 lightColor = clamp(softScene, 0.0, 1.0);
     vec3 bloomColor = clamp(tangentSoftScene, 0.0, 1.0);
-    vec3 causticColor = mix(lightColor, vec3(1.0), 0.14 * caustic);
     vec3 refractedLight = positiveRefraction * depth * (0.90 + 1.45 * contrast);
     vec3 bodyRefraction = positiveRefraction * bodyDiffusion
         * (0.30 + 1.0 * contrast);
     float materialEnergy = pow(smoothstep(0.06, 0.86, refractedLuminance), 1.1);
     vec3 materialEmission = vec3(1.0)
         * (innerFresnel * 0.060 + bodyDiffusion * 0.040) * materialEnergy;
-    vec3 emission = causticColor * core * mix(0.004, 0.95, caustic)
+    vec3 emission = lightColor * softRim * mix(0.006, 0.12, bloomCaustic)
         + bloomColor * bloom * mix(0.002, 0.18, bloomCaustic)
         + refractedLight + bodyRefraction + materialEmission;
 
@@ -107,7 +103,7 @@ void main() {
         * bodyDiffusion * 0.12;
     float materialAlpha = (innerFresnel * 0.012 + bodyDiffusion * 0.018)
         * materialEnergy;
-    float alpha = clamp(core * mix(0.16, 0.28, caustic)
+    float alpha = clamp(softRim * mix(0.006, 0.025, bloomCaustic)
         + bloom * mix(0.004, 0.045, bloomCaustic)
         + shadow + bodyShadow + materialAlpha, 0.0, 0.38);
     vec3 premultiplied = lightColor * alpha;

@@ -158,7 +158,7 @@ if overviewUsesHyprlandBlur then
     hl.layer_rule({ match = { namespace = "quickshell:overview" }, blur = true})
 end
 hl.layer_rule({ match = { namespace = "quickshell:overview" }, xray = false})
-hl.layer_rule({ match = { namespace = "quickshell:overview" }, ignore_alpha = overviewUsesHyprlandBlur and 0.2 or 1})
+hl.layer_rule({ match = { namespace = "quickshell:overview" }, ignore_alpha = overviewUsesHyprlandBlur and 0.05 or 1})
 hl.layer_rule({ match = { namespace = "quickshell:onScreenDisplay" }, xray = false})
 hl.layer_rule({ match = { namespace = "quickshell:onScreenDisplay" }, ignore_alpha = 0.5})
 hl.layer_rule({ match = { namespace = "quickshell:osk" }, animation = "slide bottom"})

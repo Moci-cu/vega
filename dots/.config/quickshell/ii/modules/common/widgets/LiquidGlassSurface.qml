@@ -130,21 +130,22 @@ Item {
             GradientStop {
                 position: 0
                 color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
-                    Math.min(0.9, root.tintColor.a + 0.20 * root.lowerGlow))
+                    Math.min(0.92, root.tintColor.a + 0.30 * root.lowerGlow))
             }
             GradientStop {
-                position: 0.38
-                color: root.tintColor
-            }
-            GradientStop {
-                position: 0.72
+                position: 0.26
                 color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
-                    Math.max(0.26, root.tintColor.a * (1 - 0.10 * root.lowerGlow)))
+                    Math.min(0.82, root.tintColor.a + 0.08 * root.lowerGlow))
+            }
+            GradientStop {
+                position: 0.62
+                color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
+                    Math.max(0.16, root.tintColor.a * (1 - 0.46 * root.lowerGlow)))
             }
             GradientStop {
                 position: 1
                 color: Qt.rgba(root.tintColor.r, root.tintColor.g, root.tintColor.b,
-                    Math.max(0.24, root.tintColor.a * (1 - 0.18 * root.lowerGlow)))
+                    Math.max(0.10, root.tintColor.a * (1 - 0.72 * root.lowerGlow)))
             }
         }
     }
@@ -152,7 +153,7 @@ Item {
     ShaderEffect {
         anchors.fill: parent
         visible: opacity > 0
-        opacity: root.textureShaderReady ? 1 : (root.compositorRimReady ? 0.02 : 0)
+        opacity: root.textureShaderReady ? 1 : (root.compositorRimReady ? 0.12 : 0)
 
         property var source: root.wallpaperSource
         property var environmentSource: root.environmentSource ?? root.wallpaperSource
