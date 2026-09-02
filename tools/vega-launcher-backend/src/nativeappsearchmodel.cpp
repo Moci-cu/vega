@@ -19,6 +19,7 @@ struct IndexedApp {
     QStringList foldedWords;
     QString initials;
     QString iconName;
+    int usageBonus;
 };
 
 struct ScoredApp {
@@ -155,6 +156,7 @@ public slots:
                 .foldedWords = foldedWords,
                 .initials = wordInitials(foldedWords),
                 .iconName = entry.value(QStringLiteral("iconName")).toString(),
+                .usageBonus = std::clamp(entry.value(QStringLiteral("usageBonus")).toInt(), 0, 49'000),
             });
         }
         index_ = std::move(index);
@@ -177,7 +179,8 @@ public slots:
                 return;
             const std::optional<int> score = fuzzyScore(index_.at(i), foldedQuery, queryWords, compactQuery);
             if (score) {
-                matches.push_back({i, *score});
+                const int usageBonus = foldedQuery.isEmpty() ? 0 : index_.at(i).usageBonus;
+                matches.push_back({i, *score + usageBonus});
                 hasConfidentMatch |= *score >= confidentMatchScore;
             }
         }

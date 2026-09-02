@@ -16,10 +16,12 @@ Singleton {
         const apps = Array.from(DesktopEntries.applications.values);
         const entries = [];
         for (const app of apps) {
+            const id = app.id || app.name;
             entries.push({
-                id: app.id || app.name,
+                id: id,
                 name: app.name,
-                iconName: app.icon
+                iconName: app.icon,
+                usageBonus: AppSearch.launcherUsageBonus(`app:${id}`)
             });
         }
         root.model.rebuildIndex(entries);
@@ -55,6 +57,14 @@ Singleton {
         target: DesktopEntries.applications
 
         function onValuesChanged() {
+            indexRebuildTimer.restart();
+        }
+    }
+
+    Connections {
+        target: AppSearch
+
+        function onUsageRevisionChanged() {
             indexRebuildTimer.restart();
         }
     }

@@ -4,6 +4,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 /**
  * - Eases fuzzy searching for applications by name
@@ -20,6 +21,11 @@ Singleton {
     property var iconExistsCache: ({})
     property var guessIconCache: ({})
     property var iconPathCache: ({})
+    property var launcherUsage: ({})
+    property int usageRevision: 0
+    readonly property int maxUsageEntries: 256
+    readonly property string launcherUsagePath: FileUtils.trimFileProtocol(
+        `${Directories.state}/user/launcher-usage.json`)
     property var substitutions: ({
         "code-url-handler": "visual-studio-code",
         "Code": "visual-studio-code",
@@ -88,6 +94,45 @@ Singleton {
         preppedIconsCache = null;
     }
 
+    function launcherUsageKey(entry) {
+        return `app:${entry?.id || entry?.name || ""}`;
+    }
+
+    function launcherUsageBonus(key, now = Date.now()) {
+        const usage = root.launcherUsage[String(key ?? "")];
+        if (!usage) return 0;
+        const count = Math.max(0, Number(usage.count) || 0);
+        const ageDays = Math.max(0, (now - (Number(usage.lastUsed) || 0)) / 86400000);
+        const countBonus = Math.min(30000, Math.log2(count + 1) * 7000);
+        const recencyBonus = Math.max(0, 12000 - ageDays * 400);
+        return Math.round(countBonus + recencyBonus);
+    }
+
+    function recordLauncherUse(key) {
+        key = String(key ?? "");
+        if (!/^(app:|action:|command-keyword:|wifi-command:)/.test(key)) return;
+        const previous = root.launcherUsage[key] ?? {};
+        const next = Object.assign({}, root.launcherUsage);
+        next[key] = {
+            count: Math.min(100000, Math.max(0, Number(previous.count) || 0) + 1),
+            lastUsed: Date.now()
+        };
+        const keys = Object.keys(next).sort((left, right) => next[right].lastUsed - next[left].lastUsed);
+        for (let i = root.maxUsageEntries; i < keys.length; ++i)
+            delete next[keys[i]];
+        root.launcherUsage = next;
+        root.queryCache = ({});
+        root.usageRevision++;
+        usageSaveTimer.restart();
+    }
+
+    function appMatchRank(entry, textScore, search) {
+        const name = String(entry?.name ?? "").trim().toLowerCase();
+        const query = String(search ?? "").trim().toLowerCase();
+        const textRank = name === query ? 3 : name.startsWith(query) ? 2 : textScore;
+        return textRank + root.launcherUsageBonus(root.launcherUsageKey(entry)) / 1000000;
+    }
+
     function preparedNames() {
         if (root.preppedNamesCache === null) {
             root.preppedNamesCache = root.list.map(app => ({
@@ -119,6 +164,47 @@ Singleton {
         function onValuesChanged() { root.clearCaches() }
     }
 
+    Timer {
+        id: usageSaveTimer
+
+        interval: 150
+        onTriggered: usageFile.setText(JSON.stringify(root.launcherUsage))
+    }
+
+    FileView {
+        id: usageFile
+
+        path: root.launcherUsagePath
+        blockLoading: true
+        onLoaded: {
+            try {
+                const parsed = JSON.parse(text() || "{}");
+                if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+                    throw new Error("invalid launcher usage data");
+                const sanitized = {};
+                for (const key of Object.keys(parsed)) {
+                    const count = Math.floor(Number(parsed[key]?.count));
+                    const lastUsed = Number(parsed[key]?.lastUsed);
+                    if (count > 0 && Number.isFinite(lastUsed) && lastUsed > 0)
+                        sanitized[key] = { count: Math.min(100000, count), lastUsed };
+                }
+                const keys = Object.keys(sanitized)
+                    .sort((left, right) => sanitized[right].lastUsed - sanitized[left].lastUsed);
+                for (let i = root.maxUsageEntries; i < keys.length; ++i)
+                    delete sanitized[keys[i]];
+                root.launcherUsage = sanitized;
+            } catch (error) {
+                root.launcherUsage = ({});
+            }
+            root.queryCache = ({});
+            root.usageRevision++;
+        }
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound)
+                usageFile.setText("{}");
+        }
+    }
+
     function fuzzyQuery(search: string, limit): var { // Idk why list<DesktopEntry> doesn't work
         const effectiveLimit = limit ?? root.resultLimit;
         const cacheKey = `${root.sloppySearch ? "sloppy" : "fuzzy"}:${effectiveLimit}:${root.scoreThreshold}:${search}`;
@@ -131,17 +217,20 @@ Singleton {
                 entry: obj,
                 score: Levendist.computeScore(obj.name.toLowerCase(), search.toLowerCase())
             })).filter(item => item.score > root.scoreThreshold)
-                .sort((a, b) => b.score - a.score)
+                .sort((a, b) => root.appMatchRank(b.entry, b.score, search)
+                    - root.appMatchRank(a.entry, a.score, search))
                 .slice(0, effectiveLimit)
                 .map(item => item.entry)
             return root.rememberCacheValue(root.queryCache, cacheKey, results, root.queryCacheLimit);
         }
 
+        const candidateLimit = Math.min(root.list.length, Math.max(effectiveLimit, 16));
         const results = Fuzzy.go(search, root.preparedNames(), {
             all: true,
             key: "name",
-            limit: effectiveLimit
-        }).map(r => {
+            limit: candidateLimit
+        }).sort((a, b) => root.appMatchRank(b.obj.entry, b.score, search)
+            - root.appMatchRank(a.obj.entry, a.score, search)).slice(0, effectiveLimit).map(r => {
             return r.obj.entry
         });
         return root.rememberCacheValue(root.queryCache, cacheKey, results, root.queryCacheLimit);

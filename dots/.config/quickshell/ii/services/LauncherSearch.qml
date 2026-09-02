@@ -67,7 +67,9 @@ Singleton {
 
     function wifiKeywordResult(queryText = root.query) {
         const queryString = String(queryText ?? "").trim().toLowerCase();
-        if (!queryString || queryString === "wifi" || !"wifi".startsWith(queryString))
+        const compactQuery = queryString.replace(/[\s-]/g, "");
+        const matchesAlias = ["wifi", "wireless"].some(alias => alias.startsWith(compactQuery));
+        if (!compactQuery || compactQuery === "wifi" || !matchesAlias)
             return null;
         return {
             key: "command-keyword:wifi",
@@ -79,6 +81,17 @@ Singleton {
             keepLauncherOpen: true,
             execute: () => root.query = "wifi"
         };
+    }
+
+    function preferredAutocomplete(queryText, appEntry) {
+        const actionEntry = root.wifiKeywordResult(queryText);
+        if (!actionEntry) return appEntry;
+        if (!appEntry) return actionEntry;
+        const query = String(queryText ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
+        const appName = String(appEntry.name ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
+        if (!appName.startsWith(query)) return actionEntry;
+        return AppSearch.launcherUsageBonus(appEntry.key) > AppSearch.launcherUsageBonus(actionEntry.key)
+            ? appEntry : actionEntry;
     }
 
     function shouldUseNativeAppSearch(queryText = root.query) {
@@ -304,8 +317,11 @@ Singleton {
 
     function executeResult(entry) {
         const resolved = root.resolvedResult(entry);
-        if (resolved?.execute)
-            resolved.execute();
+        if (!resolved?.execute) return;
+        const key = String(entry?.key ?? resolved.key ?? "");
+        AppSearch.recordLauncherUse(key.startsWith("wifi-command:")
+            ? "command-keyword:wifi" : key);
+        resolved.execute();
     }
 
     function keepsOverviewOpen(entry) {

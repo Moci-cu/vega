@@ -142,5 +142,19 @@ int main(int argc, char **argv)
             return fail("empty-query applications are not alphabetically ordered");
     }
 
+    model.rebuildIndex({
+        QVariantMap{{"id", "btop.desktop"}, {"name", "btop"}, {"iconName", "btop"}},
+        QVariantMap{{"id", "brave.desktop"}, {"name", "Brave Browser"}, {"iconName", "brave"}, {"usageBonus", 19'000}},
+    });
+    model.search("b", 2);
+    if (!waitUntil([&model] { return model.indexReady() && !model.busy() && model.rowCount() == 2; })
+        || model.get(0).value("id") != "brave.desktop")
+        return fail("launcher usage did not rerank equal-prefix applications");
+
+    model.search("btop", 2);
+    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 1; })
+        || model.get(0).value("id") != "btop.desktop")
+        return fail("launcher usage overrode an exact application match");
+
     return 0;
 }

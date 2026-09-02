@@ -315,11 +315,9 @@ Item { // Wrapper
                     .sort((left, right) => String(left.name).localeCompare(String(right.name)))
                     .map(entry => LauncherSearch.appResult(entry)))
                 : (values ?? []).filter(entry => String(entry?.key ?? "").startsWith("app:")).slice(0, limit);
-            const firstStartsWithQuery = appValues.length > 0
-                && String(appValues[0].name ?? "").toLowerCase().startsWith(query.trim().toLowerCase());
-            const keywordFallback = !root.showResults && !firstStartsWithQuery
-                ? LauncherSearch.wifiKeywordResult(query) : null;
-            root.fallbackAppEntries = keywordFallback ? [keywordFallback] : appValues;
+            const autocompleteEntry = !root.showResults
+                ? LauncherSearch.preferredAutocomplete(query, appValues[0] ?? null) : null;
+            root.fallbackAppEntries = autocompleteEntry ? [autocompleteEntry] : appValues;
             root.fallbackAppQuery = refreshedQuery;
             resultModel.values = [];
             root.finishResultsRefresh(refreshedQuery);
@@ -368,10 +366,7 @@ Item { // Wrapper
         function onSearchFinished() {
             const firstResult = NativeAppSearch.get(0);
             const query = LauncherSearch.nativeAppQuery(root.nativeResultQuery).trim().toLowerCase();
-            const firstStartsWithQuery = firstResult
-                && String(firstResult.name ?? "").toLowerCase().startsWith(query);
-            root.nativeAutocompleteResult = firstStartsWithQuery ? firstResult
-                : (LauncherSearch.wifiKeywordResult(query) ?? firstResult);
+            root.nativeAutocompleteResult = LauncherSearch.preferredAutocomplete(query, firstResult);
             root.finishResultsRefresh(root.nativeResultQuery);
         }
     }
@@ -746,7 +741,7 @@ Item { // Wrapper
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
                 navigationColumns: root.wifiPanelOpen ? 1 : root.appMode ? root.appGridColumns : 1
-                selectedResult: root.wifiPanelOpen ? null
+                selectedResult: root.wifiPanelOpen ? (wifiPanelLoader.item?.selectedAction ?? null)
                     : root.wifiCommandMode ? (wifiCommandList.currentItem?.entry ?? null)
                     : root.appMode ? (!root.showResults && root.nativeAppSearchActive
                         ? root.nativeAutocompleteResult : (appGrid.currentItem?.entry ?? null))
