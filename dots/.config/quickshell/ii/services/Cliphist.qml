@@ -18,10 +18,14 @@ Singleton {
     property real scoreThreshold: 0.2
     property list<string> entries: []
     property bool refreshPending: false
+    property var presentationCache: new Map()
     readonly property var preparedEntries: entries.map(a => ({
         name: Fuzzy.prepare(`${a.replace(/^\s*\S+\s+/, "")}`),
         entry: a
     }))
+
+    onEntriesChanged: presentationCache = new Map()
+
     function fuzzyQuery(search: string): var {
         if (search.trim() === "") {
             return entries;
@@ -49,16 +53,21 @@ Singleton {
     }
 
     function presentation(entry) {
+        if (root.presentationCache.has(entry))
+            return root.presentationCache.get(entry);
+
         const value = StringUtils.cleanCliphistEntry(entry);
         const image = value.match(/^\[\[\s*binary data\s+(\d+(?:\.\d+)?\s+\S+)\s+(\S+)\s+(\d+)x(\d+)\s*\]\]$/i);
         if (image) {
             const cachePath = FileUtils.trimFileProtocol(`${Directories.cache}/cliphist/db`)
                 .replace(FileUtils.trimFileProtocol(Directories.home), "~");
-            return {
+            const result = {
                 title: `Image ${image[3]}×${image[4]}`,
                 subtitle: `${image[2].toUpperCase()} · ${image[1]} · ${cachePath}`,
                 icon: "image"
             };
+            root.presentationCache.set(entry, result);
+            return result;
         }
         if (value.startsWith("file://")) {
             let path = value.slice(7).split(/\r?\n/)[0];
@@ -68,17 +77,21 @@ Singleton {
                 // Keep malformed clipboard URLs readable instead of dropping the row.
             }
             const home = FileUtils.trimFileProtocol(Directories.home);
-            return {
+            const result = {
                 title: path.split("/").pop() || path,
                 subtitle: path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path,
                 icon: "draft"
             };
+            root.presentationCache.set(entry, result);
+            return result;
         }
-        return {
+        const result = {
             title: value,
             subtitle: Translation.tr("Text") + " · " + Translation.tr("Clipboard history"),
             icon: "description"
         };
+        root.presentationCache.set(entry, result);
+        return result;
     }
 
     function refresh() {

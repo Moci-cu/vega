@@ -20,6 +20,7 @@ RippleButton {
     property int clipboardHorizontalPadding: 10
 
     implicitHeight: 58
+    rippleEnabled: false
     buttonRadius: Math.max(0, containerRadius - horizontalMargin)
     colBackground: current ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
     colBackgroundHover: Qt.rgba(1, 1, 1, 0.1)
@@ -29,6 +30,7 @@ RippleButton {
         anchors.fill: root
         anchors.leftMargin: root.horizontalMargin
         anchors.rightMargin: root.horizontalMargin
+        layer.enabled: false
     }
 
     onClicked: {
