@@ -37,8 +37,13 @@ RowLayout {
         const query = root.searchingText.trim();
         const count = root.resultCount;
         const index = root.currentIndex;
-        return query.length > 0 && count > 0
-            ? (root.selectedResult ?? root.resultAt(Math.max(0, index))) : null;
+        if (query.length === 0 || count <= 0)
+            return null;
+        const selectedEntry = root.selectedResult ?? root.resultAt(Math.max(0, index));
+        if (!String(selectedEntry?.key ?? "").startsWith("command-keyword:"))
+            return selectedEntry;
+        return LauncherSearch.commandKeywordResult(root.queryPrefix + searchInput.text)
+            ?? selectedEntry;
     }
     readonly property bool autocompleteIsApp: root.autocompleteEntry?.nativeApp
         || String(root.autocompleteEntry?.key ?? "").startsWith("app:")

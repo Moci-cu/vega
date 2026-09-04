@@ -19,6 +19,7 @@ Singleton {
     signal wifiPanelRequested()
     signal bluetoothPanelRequested()
     signal timerPanelRequested()
+    signal todoPanelRequested()
 
     readonly property list<var> searchPrefixEntries: [
         { name: "action", prefix: Config.options.search.prefix.action },
@@ -90,6 +91,15 @@ Singleton {
             execute: () => root.timerPanelRequested()
         },
         {
+            key: "todo",
+            name: "To-Do",
+            aliases: ["todo", "task", "tasks"],
+            verb: Translation.tr("Open"),
+            iconName: "checklist",
+            keepLauncherOpen: true,
+            execute: () => root.todoPanelRequested()
+        },
+        {
             key: "night-mode",
             name: "Night Mode",
             aliases: ["nightmode", "nightlight"],
@@ -115,7 +125,8 @@ Singleton {
     readonly property list<var> naturalTargets: [
         { key: "wifi", aliases: ["wifi", "wireless", "wlan"] },
         { key: "bluetooth", aliases: ["bluetooth", "bt"] },
-        { key: "timer", aliases: ["timer", "countdown"] }
+        { key: "timer", aliases: ["timer", "countdown"] },
+        { key: "todo", aliases: ["todo", "task", "tasks"] }
     ]
     readonly property list<string> naturalFillers: [
         "turn", "please", "the", "my", "device", "devices", "network", "networks", "radio", "now", "tolong"
@@ -193,6 +204,16 @@ Singleton {
             iconName: "timer",
             keepLauncherOpen: true,
             execute: () => root.timerPanelRequested()
+        },
+        {
+            key: "todo-open",
+            intent: "open",
+            target: "todo",
+            name: "Open To-Do",
+            verb: Translation.tr("Open"),
+            iconName: "checklist",
+            keepLauncherOpen: true,
+            execute: () => root.todoPanelRequested()
         }
     ]
 
@@ -310,10 +331,57 @@ Singleton {
         return result;
     }
 
+    function todoCommandResult(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const todoText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
+            .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const starter = ["add", "create"].find(verb => todoText === verb
+            || todoText.startsWith(`${verb} `));
+        if (starter) {
+            const guidedText = [`${starter} task`, `${starter} a task`, `${starter} todo`]
+                .find(text => text.startsWith(todoText));
+            if (guidedText)
+                return root.keywordResult({
+                    key: "todo-guide",
+                    name: Translation.tr("Add Task"),
+                    verb: Translation.tr("Add"),
+                    iconName: "add_task",
+                    keepLauncherOpen: true,
+                    execute: () => root.todoPanelRequested()
+                }, root.compactKeyword(todoText), true,
+                    `${prefixEntry?.prefix ?? ""}${guidedText}`);
+        }
+        const match = todoText.match(/^(?:add|create)\s+(?:a\s+)?(?:task|todo)(?:\s+(?:to|for))?\s+(.+)$/);
+        if (!match)
+            return null;
+        const description = match[1].trim();
+        if (!description)
+            return null;
+        const result = root.keywordResult({
+            key: "todo-add",
+            name: Translation.tr("Add “%1”").arg(description),
+            verb: Translation.tr("Add"),
+            iconName: "add_task",
+            keepLauncherOpen: true,
+            execute: () => {
+                Todo.addTask(description);
+                root.todoPanelRequested();
+            }
+        }, root.compactKeyword(todoText), false, queryString.trim());
+        result.taskDescription = description;
+        return result;
+    }
+
     function naturalCommandResult(queryText = root.query) {
         const timerCommand = root.timerCommandResult(queryText);
         if (timerCommand)
             return timerCommand;
+        const todoCommand = root.todoCommandResult(queryText);
+        if (todoCommand)
+            return todoCommand;
         const queryString = String(queryText ?? "");
         const prefixEntry = root.matchedPrefixEntry(queryString);
         if (prefixEntry && prefixEntry.name !== "action")

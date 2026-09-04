@@ -114,6 +114,9 @@ ShellRoot {
             const timerHours = LauncherSearch.commandKeywordResult("start timer for 2 hours");
             const timerSetGuide = LauncherSearch.commandKeywordResult("set");
             const timerStartGuide = LauncherSearch.commandKeywordResult("start");
+            const todoAction = LauncherSearch.commandKeywordResult("open todo");
+            const todoAddGuide = LauncherSearch.commandKeywordResult("add");
+            const todoAddAction = LauncherSearch.commandKeywordResult("add task buy milk");
             if (bluetoothAction?.key !== "command-keyword:bluetooth-open"
                     || !bluetoothAction.completeOnly
                     || bluetoothIntent?.key !== "command-keyword:bluetooth-on"
@@ -131,6 +134,9 @@ ShellRoot {
                     || timerHours?.durationMinutes !== 120
                     || timerSetGuide?.completionName !== "set timer for"
                     || timerStartGuide?.completionName !== "start timer for"
+                    || todoAction?.key !== "command-keyword:todo-open"
+                    || todoAddGuide?.completionName !== "add task"
+                    || todoAddAction?.taskDescription !== "buy milk"
                     || !["scan wifi", "scan bluetooth"].includes(scanIntent?.completionName)
                     || !["start wifi", "start bluetooth"].includes(startIntent?.completionName)
                     || LauncherSearch.commandKeywordResult("start blu")?.completionName !== "start bluetooth"
