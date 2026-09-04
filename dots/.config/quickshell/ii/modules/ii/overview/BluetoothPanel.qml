@@ -165,14 +165,6 @@ Item {
                     color: Qt.rgba(1, 1, 1, 0.58)
                     font.pixelSize: Appearance.font.pixelSize.small
                 }
-
-                MaterialLoadingIndicator {
-                    visible: root.adapter?.discovering ?? false
-                    loading: visible
-                    implicitSize: 17
-                    color: "transparent"
-                    shapeColor: Qt.rgba(0.72, 0.86, 1, 0.72)
-                }
             }
 
             ListView {
@@ -304,63 +296,71 @@ Item {
             ColumnLayout {
                 visible: root.selectedDevice !== null
                 anchors.fill: parent
-                anchors.margins: 22
+                anchors.leftMargin: 20
+                anchors.rightMargin: 20
+                anchors.topMargin: 18
+                anchors.bottomMargin: 16
                 spacing: 0
 
-                Rectangle {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 78
-                    Layout.preferredHeight: 78
-                    radius: 25
-                    color: Qt.rgba(0.56, 0.74, 0.92, 0.12)
-                    border.width: 0.8
-                    border.color: Qt.rgba(0.82, 0.92, 1, 0.18)
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 82
+                    spacing: 16
 
-                    MaterialSymbol {
-                        anchors.centerIn: parent
-                        text: Icons.getBluetoothDeviceMaterialSymbol(root.selectedDevice?.icon || "")
-                        iconSize: 40
-                        color: Qt.rgba(0.82, 0.91, 1, 0.9)
+                    Rectangle {
+                        Layout.preferredWidth: 68
+                        Layout.preferredHeight: 68
+                        radius: 22
+                        color: Qt.rgba(0.56, 0.74, 0.92, 0.12)
+                        border.width: 0.8
+                        border.color: Qt.rgba(0.82, 0.92, 1, 0.18)
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: Icons.getBluetoothDeviceMaterialSymbol(root.selectedDevice?.icon || "")
+                            iconSize: 36
+                            color: Qt.rgba(0.82, 0.91, 1, 0.9)
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: root.deviceLabel(root.selectedDevice)
+                            textFormat: Text.PlainText
+                            color: Qt.rgba(1, 1, 1, 0.94)
+                            font.pixelSize: Appearance.font.pixelSize.huge
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        Rectangle {
+                            Layout.preferredWidth: detailStatus.implicitWidth + 18
+                            Layout.preferredHeight: 26
+                            radius: 13
+                            color: root.selectedDevice?.connected
+                                ? Qt.rgba(0.38, 0.72, 0.94, 0.15) : Qt.rgba(1, 1, 1, 0.07)
+
+                            StyledText {
+                                id: detailStatus
+
+                                anchors.centerIn: parent
+                                text: root.deviceStatus(root.selectedDevice)
+                                color: root.selectedDevice?.connected
+                                    ? Qt.rgba(0.7, 0.88, 1, 0.9) : Qt.rgba(1, 1, 1, 0.58)
+                                font.pixelSize: Appearance.font.pixelSize.small
+                            }
+                        }
                     }
                 }
 
-                StyledText {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 12
-                    horizontalAlignment: Text.AlignHCenter
-                    text: root.deviceLabel(root.selectedDevice)
-                    textFormat: Text.PlainText
-                    color: Qt.rgba(1, 1, 1, 0.94)
-                    font.pixelSize: Appearance.font.pixelSize.huge
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
-
-                Rectangle {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 7
-                    implicitWidth: detailStatus.implicitWidth + 18
-                    implicitHeight: 26
-                    radius: 13
-                    color: root.selectedDevice?.connected
-                        ? Qt.rgba(0.38, 0.72, 0.94, 0.15) : Qt.rgba(1, 1, 1, 0.07)
-
-                    StyledText {
-                        id: detailStatus
-
-                        anchors.centerIn: parent
-                        text: root.deviceStatus(root.selectedDevice)
-                        color: root.selectedDevice?.connected
-                            ? Qt.rgba(0.7, 0.88, 1, 0.9) : Qt.rgba(1, 1, 1, 0.58)
-                        font.pixelSize: Appearance.font.pixelSize.small
-                    }
-                }
-
-                Item { Layout.fillHeight: true }
-
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 58
+                    Layout.topMargin: 14
+                    Layout.preferredHeight: 64
                     radius: 16
                     color: Qt.rgba(1, 1, 1, 0.055)
                     border.width: 0.7
@@ -378,8 +378,7 @@ Item {
 
                             StyledText {
                                 Layout.fillWidth: true
-                                horizontalAlignment: root.selectedDevice?.batteryAvailable
-                                    ? Text.AlignLeft : Text.AlignHCenter
+                                horizontalAlignment: Text.AlignLeft
                                 text: Translation.tr("Device address")
                                 color: Qt.rgba(1, 1, 1, 0.45)
                                 font.pixelSize: Appearance.font.pixelSize.smaller
@@ -387,8 +386,7 @@ Item {
 
                             StyledText {
                                 Layout.fillWidth: true
-                                horizontalAlignment: root.selectedDevice?.batteryAvailable
-                                    ? Text.AlignLeft : Text.AlignHCenter
+                                horizontalAlignment: Text.AlignLeft
                                 text: root.selectedDevice?.address ?? "—"
                                 color: Qt.rgba(1, 1, 1, 0.78)
                                 font.pixelSize: Appearance.font.pixelSize.small
@@ -417,9 +415,11 @@ Item {
                     }
                 }
 
+                Item { Layout.fillHeight: true }
+
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.topMargin: 12
+                    Layout.topMargin: 14
                     spacing: 8
 
                     Item { Layout.fillWidth: true }
@@ -452,30 +452,31 @@ Item {
                         colBackgroundHover: Qt.rgba(0.42, 0.72, 0.96, 0.28)
                         onClicked: root.toggleSelectedDevice()
 
-                        contentItem: Row {
-                            anchors.centerIn: parent
-                            spacing: 6
+                        contentItem: Item {
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 6
 
-                            MaterialLoadingIndicator {
-                                visible: root.selectedBusy
-                                loading: visible
-                                anchors.verticalCenter: parent.verticalCenter
-                                implicitSize: 17
-                                color: "transparent"
-                                shapeColor: Qt.rgba(1, 1, 1, 0.82)
-                            }
+                                MaterialLoadingIndicator {
+                                    visible: root.selectedBusy
+                                    loading: visible
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    implicitSize: 17
+                                    color: "transparent"
+                                    shapeColor: Qt.rgba(1, 1, 1, 0.82)
+                                }
 
-                            StyledText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: root.selectedBusy ? root.deviceStatus(root.selectedDevice)
-                                    : root.primaryActionText(root.selectedDevice)
-                                color: Qt.rgba(0.86, 0.94, 1, 0.92)
-                                font.pixelSize: Appearance.font.pixelSize.small
+                                StyledText {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root.selectedBusy ? root.deviceStatus(root.selectedDevice)
+                                        : root.primaryActionText(root.selectedDevice)
+                                    color: Qt.rgba(0.86, 0.94, 1, 0.92)
+                                    font.pixelSize: Appearance.font.pixelSize.small
+                                }
                             }
                         }
                     }
 
-                    Item { Layout.fillWidth: true }
                 }
             }
 
@@ -528,7 +529,7 @@ Item {
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 14
-            anchors.rightMargin: 10
+            anchors.rightMargin: 20
             spacing: 8
 
             MaterialLoadingIndicator {
@@ -557,32 +558,11 @@ Item {
                 elide: Text.ElideRight
             }
 
-            RippleButton {
-                implicitWidth: 54
-                implicitHeight: 30
+            StyledSwitch {
+                scale: 0.9
                 enabled: BluetoothStatus.available && !root.adapterBusy
-                buttonRadius: 15
-                colBackground: root.bluetoothEnabled
-                    ? Qt.rgba(0.35, 0.68, 0.94, 0.3) : Qt.rgba(1, 1, 1, 0.09)
-                colBackgroundHover: root.bluetoothEnabled
-                    ? Qt.rgba(0.35, 0.68, 0.94, 0.38) : Qt.rgba(1, 1, 1, 0.15)
+                checked: root.bluetoothEnabled
                 onClicked: root.toggleAdapter()
-
-                contentItem: Item {
-                    Rectangle {
-                        x: root.bluetoothEnabled ? parent.width - width - 6 : 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 20
-                        height: 20
-                        radius: 10
-                        color: root.bluetoothEnabled
-                            ? Qt.rgba(0.9, 0.96, 1, 0.96) : Qt.rgba(1, 1, 1, 0.58)
-
-                        Behavior on x {
-                            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-                        }
-                    }
-                }
             }
         }
     }
