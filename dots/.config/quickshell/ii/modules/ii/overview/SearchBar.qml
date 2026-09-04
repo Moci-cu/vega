@@ -258,10 +258,6 @@ RowLayout {
                     return;
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
-                if (root.autocompleteIsKeyword && selectedEntry.completeOnly === true) {
-                    root.setQueryImmediately(selectedEntry.completionName ?? selectedEntry.name);
-                    return;
-                }
                 if (!LauncherSearch.keepsOverviewOpen(selectedEntry))
                     GlobalStates.overviewOpen = false;
                 root.executeResult(selectedEntry);
