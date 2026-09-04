@@ -98,6 +98,43 @@ ShellRoot {
                     || LauncherSearch.isApplicationQuery("-23 + 12"))
                 return root.fail("negative leading number was not classified as calculator input");
 
+            const bluetoothAction = LauncherSearch.commandKeywordResult("open blue");
+            const bluetoothIntent = LauncherSearch.commandKeywordResult("enable b");
+            const bluetoothTypo = LauncherSearch.commandKeywordResult("open bluetoth");
+            const nightAction = LauncherSearch.commandKeywordResult("Night Mode");
+            const openIntent = LauncherSearch.commandKeywordResult("open");
+            const reorderedAction = LauncherSearch.commandKeywordResult("turn bluetooth of");
+            const scanIntent = LauncherSearch.commandKeywordResult("sc");
+            const startIntent = LauncherSearch.commandKeywordResult("sta");
+            const turnOffIntent = LauncherSearch.commandKeywordResult("turn off");
+            const wifiAction = LauncherSearch.commandKeywordResult("turn on wi");
+            const wifiTypo = LauncherSearch.commandKeywordResult("wfi");
+            if (bluetoothAction?.key !== "command-keyword:bluetooth-open"
+                    || !bluetoothAction.completeOnly
+                    || bluetoothIntent?.key !== "command-keyword:bluetooth-on"
+                    || bluetoothTypo?.key !== "command-keyword:bluetooth-open"
+                    || !["command-keyword:wifi-open", "command-keyword:bluetooth-open"].includes(openIntent?.key)
+                    || reorderedAction?.key !== "command-keyword:bluetooth-off"
+                    || !["command-keyword:wifi-off", "command-keyword:bluetooth-off"].includes(turnOffIntent?.key)
+                    || wifiAction?.key !== "command-keyword:wifi-on"
+                    || wifiTypo?.key !== "command-keyword:wifi"
+                    || !["scan wifi", "scan bluetooth"].includes(scanIntent?.completionName)
+                    || !["start wifi", "start bluetooth"].includes(startIntent?.completionName)
+                    || LauncherSearch.commandKeywordResult("start blu")?.completionName !== "start bluetooth"
+                    || LauncherSearch.commandKeywordResult("caffe")?.completionName !== "caffeine"
+                    || LauncherSearch.commandKeywordResult("open kitty") !== null
+                    || LauncherSearch.isApplicationQuery("enable bluetooth")
+                    || !LauncherSearch.isApplicationQuery(">open bluetooth")
+                    || !LauncherSearch.isApplicationQuery("bluetooth")
+                    || LauncherSearch.naturalTokens("Turn Wi-Fi off!").join(" ") !== "turn wifi off"
+                    || LauncherSearch.appAutocompleteCompletion({ name: "CachyOS Kernel Manager" }, "kernel")
+                        !== " Manager"
+                    || LauncherSearch.appAutocompleteCompletion({ name: "CachyOS Hello" }, "hello")
+                        !== " → CachyOS Hello"
+                    || nightAction?.key !== "command-keyword:night-mode"
+                    || nightAction.completeOnly)
+                return root.fail("launcher command keyword completion was classified incorrectly");
+
             if (widgetLoader.item.retainedBackdropWidth < widgetLoader.item.resultsPanelWidth
                     || widgetLoader.item.retainedBackdropHeight
                         < widgetLoader.item.searchPillHeight + widgetLoader.item.searchPanelGap

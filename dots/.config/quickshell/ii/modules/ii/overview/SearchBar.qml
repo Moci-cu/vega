@@ -59,20 +59,34 @@ RowLayout {
             return Translation.tr("Open");
         return String(entry.verb ?? "");
     }
-    readonly property string autocompleteInputQuery: LauncherSearch.nativeAppQuery(searchInput.text).trim()
     readonly property string autocompleteName: String(root.autocompleteEntry?.name ?? "")
-    readonly property bool autocompleteMatchesInput: root.calculatorActive || root.autocompleteIsAction
-        || (root.autocompleteInputQuery.length > 0
-            && root.autocompleteName.toLowerCase().startsWith(root.autocompleteInputQuery.toLowerCase()))
+    readonly property string autocompleteSuggestion: String(root.autocompleteEntry?.completionName
+        ?? root.autocompleteEntry?.name ?? "")
+    readonly property var appAutocompleteCompletion: root.autocompleteIsApp
+        ? LauncherSearch.appAutocompleteCompletion(root.autocompleteEntry, searchInput.text) : null
+    readonly property bool autocompleteMatchesInput: {
+        if (root.calculatorActive)
+            return true;
+        if (root.autocompleteIsKeyword) {
+            const key = String(root.autocompleteEntry?.key ?? "");
+            const liveQuery = root.queryPrefix + searchInput.text;
+            return LauncherSearch.commandKeywordResult(liveQuery)?.key === key
+                || (key === "command-keyword:wifi" && LauncherSearch.isWifiCommandQuery(liveQuery));
+        }
+        return root.autocompleteIsAction
+            || root.appAutocompleteCompletion !== null;
+    }
     readonly property string autocompleteCompletion: {
         if (root.calculatorActive)
             return "";
-        if (root.autocompleteIsKeyword)
-            return root.autocompleteName.slice(root.autocompleteInputQuery.length);
+        if (root.autocompleteIsKeyword) {
+            const input = searchInput.text.trim();
+            return root.autocompleteSuggestion.toLowerCase().startsWith(input.toLowerCase())
+                ? root.autocompleteSuggestion.slice(input.length) : ` → ${root.autocompleteSuggestion}`;
+        }
         if (root.autocompleteIsAction)
             return root.autocompleteName;
-        return root.autocompleteMatchesInput
-            ? root.autocompleteName.slice(root.autocompleteInputQuery.length) : "";
+        return root.appAutocompleteCompletion ?? "";
     }
 
     function cancelPendingQuery() {
@@ -244,8 +258,8 @@ RowLayout {
                     return;
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
-                if (root.autocompleteIsKeyword) {
-                    root.setQueryImmediately(selectedEntry.name);
+                if (root.autocompleteIsKeyword && selectedEntry.completeOnly === true) {
+                    root.setQueryImmediately(selectedEntry.completionName ?? selectedEntry.name);
                     return;
                 }
                 if (!LauncherSearch.keepsOverviewOpen(selectedEntry))
@@ -286,7 +300,7 @@ RowLayout {
                     if (root.resultCount === 0)
                         return;
                     const tabbedText = root.autocompleteIsKeyword
-                        ? root.selectedEntry()?.name ?? ""
+                        ? root.selectedEntry()?.completionName ?? root.selectedEntry()?.name ?? ""
                         : root.autocompleteIsAction ? root.searchingText
                         : root.selectedEntry()?.name ?? "";
                     root.setQueryImmediately(tabbedText);
