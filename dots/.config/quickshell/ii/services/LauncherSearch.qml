@@ -269,6 +269,22 @@ Singleton {
             return null;
         const timerText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
             .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const timerStarter = ["set", "start"].find(starter => timerText === starter
+            || timerText.startsWith(`${starter} `));
+        if (timerStarter) {
+            const guidedText = [`${timerStarter} timer for`, `${timerStarter} a timer for`,
+                `${timerStarter} countdown for`].find(text => text.startsWith(timerText));
+            if (guidedText)
+                return root.keywordResult({
+                    key: "timer-guide",
+                    name: Translation.tr("Set Timer"),
+                    verb: Translation.tr("Set"),
+                    iconName: "timer",
+                    keepLauncherOpen: true,
+                    execute: () => root.timerPanelRequested()
+                }, root.compactKeyword(timerText), true,
+                    `${prefixEntry?.prefix ?? ""}${guidedText}`);
+        }
         const match = timerText.match(/^(?:(?:set|start)\s+)?(?:a\s+)?(?:timer|countdown)(?:\s+(?:for|to))?\s+(\d+)(?:\s*(m|min(?:ute)?s?|h|hrs?|hours?))?$/);
         if (!match)
             return null;

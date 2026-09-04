@@ -112,6 +112,8 @@ ShellRoot {
             const timerAction = LauncherSearch.commandKeywordResult("set a timer for 60 minutes");
             const timerSuggestion = LauncherSearch.commandKeywordResult("set timer for 60");
             const timerHours = LauncherSearch.commandKeywordResult("start timer for 2 hours");
+            const timerSetGuide = LauncherSearch.commandKeywordResult("set");
+            const timerStartGuide = LauncherSearch.commandKeywordResult("start");
             if (bluetoothAction?.key !== "command-keyword:bluetooth-open"
                     || !bluetoothAction.completeOnly
                     || bluetoothIntent?.key !== "command-keyword:bluetooth-on"
@@ -127,6 +129,8 @@ ShellRoot {
                     || timerSuggestion?.completionName !== "set timer for 60 minutes"
                     || timerSuggestion.durationMinutes !== 60
                     || timerHours?.durationMinutes !== 120
+                    || timerSetGuide?.completionName !== "set timer for"
+                    || timerStartGuide?.completionName !== "start timer for"
                     || !["scan wifi", "scan bluetooth"].includes(scanIntent?.completionName)
                     || !["start wifi", "start bluetooth"].includes(startIntent?.completionName)
                     || LauncherSearch.commandKeywordResult("start blu")?.completionName !== "start bluetooth"
