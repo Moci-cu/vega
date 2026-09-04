@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Bluetooth
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Services.UPower
 
 Singleton {
     id: root
@@ -130,6 +131,29 @@ Singleton {
     ]
     readonly property list<string> naturalFillers: [
         "turn", "please", "the", "my", "device", "devices", "network", "networks", "radio", "now", "tolong"
+    ]
+    readonly property list<var> powerProfileChoices: [
+        {
+            key: "power-saver",
+            completion: "saver",
+            name: Translation.tr("Power Saver"),
+            iconName: "energy_savings_leaf",
+            value: PowerProfile.PowerSaver
+        },
+        {
+            key: "balanced",
+            completion: "balanced",
+            name: Translation.tr("Balanced"),
+            iconName: "airwave",
+            value: PowerProfile.Balanced
+        },
+        {
+            key: "performance",
+            completion: "performance",
+            name: Translation.tr("Performance"),
+            iconName: "local_fire_department",
+            value: PowerProfile.Performance
+        }
     ]
 
     readonly property list<var> naturalCommands: [
@@ -375,6 +399,32 @@ Singleton {
         return result;
     }
 
+    function powerProfileCommandResult(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const powerText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
+            .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const choice = root.powerProfileChoices.find(entry => {
+            const command = `${entry.completion} mode`;
+            return (powerText.length >= 4 && entry.completion.startsWith(powerText))
+                || (powerText.startsWith(`${entry.completion} `) && command.startsWith(powerText));
+        });
+        if (!choice || (choice.key === "performance" && !PowerProfiles.hasPerformanceProfile))
+            return null;
+        const result = root.keywordResult({
+            key: `power-profile-${choice.key}`,
+            name: Translation.tr("Set power profile to %1").arg(choice.name),
+            verb: Translation.tr("Set"),
+            iconName: choice.iconName,
+            execute: () => PowerProfiles.profile = choice.value
+        }, root.compactKeyword(powerText), powerText !== `${choice.completion} mode`,
+            `${prefixEntry?.prefix ?? ""}${choice.completion} mode`);
+        result.powerProfile = choice.key;
+        return result;
+    }
+
     function naturalCommandResult(queryText = root.query) {
         const timerCommand = root.timerCommandResult(queryText);
         if (timerCommand)
@@ -430,6 +480,9 @@ Singleton {
         const compactQuery = root.compactKeyword(queryText);
         if (!compactQuery)
             return null;
+        const powerProfileCommand = root.powerProfileCommandResult(queryText);
+        if (powerProfileCommand)
+            return powerProfileCommand;
         const naturalCommand = root.naturalCommandResult(queryText);
         if (naturalCommand)
             return naturalCommand;
@@ -477,7 +530,7 @@ Singleton {
         const query = String(queryText ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
         const appName = String(appEntry.name ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
         if (!appName.startsWith(query)) return actionEntry;
-        return AppSearch.launcherUsageBonus(appEntry.key) > AppSearch.launcherUsageBonus(actionEntry.key)
+        return AppSearch.launcherUsageBonus(appEntry.key) >= AppSearch.launcherUsageBonus(actionEntry.key)
             ? appEntry : actionEntry;
     }
 

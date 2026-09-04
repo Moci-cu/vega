@@ -117,6 +117,13 @@ ShellRoot {
             const todoAction = LauncherSearch.commandKeywordResult("open todo");
             const todoAddGuide = LauncherSearch.commandKeywordResult("add");
             const todoAddAction = LauncherSearch.commandKeywordResult("add task buy milk");
+            const powerSaverGuide = LauncherSearch.commandKeywordResult("save");
+            const powerSaverAction = LauncherSearch.commandKeywordResult("saver mode");
+            const balancedAction = LauncherSearch.commandKeywordResult("balanced mode");
+            const powerSaverConflict = LauncherSearch.preferredAutocomplete("save", {
+                key: powerSaverGuide?.key,
+                name: "Save Manager"
+            });
             if (bluetoothAction?.key !== "command-keyword:bluetooth-open"
                     || !bluetoothAction.completeOnly
                     || bluetoothIntent?.key !== "command-keyword:bluetooth-on"
@@ -137,6 +144,14 @@ ShellRoot {
                     || todoAction?.key !== "command-keyword:todo-open"
                     || todoAddGuide?.completionName !== "add task"
                     || todoAddAction?.taskDescription !== "buy milk"
+                    || powerSaverGuide?.completionName !== "saver mode"
+                    || !powerSaverGuide.completeOnly
+                    || powerSaverAction?.powerProfile !== "power-saver"
+                    || powerSaverAction.completeOnly
+                    || balancedAction?.powerProfile !== "balanced"
+                    || powerSaverConflict?.name !== "Save Manager"
+                    || !LauncherSearch.isApplicationQuery("save")
+                    || LauncherSearch.commandKeywordResult("set power profile to saver") !== null
                     || !["scan wifi", "scan bluetooth"].includes(scanIntent?.completionName)
                     || !["start wifi", "start bluetooth"].includes(startIntent?.completionName)
                     || LauncherSearch.commandKeywordResult("start blu")?.completionName !== "start bluetooth"
