@@ -112,6 +112,14 @@ Singleton {
         return true;
     }
 
+    function startPomodoroMinutes(value) {
+        resetPomodoro();
+        if (!setFocusMinutes(value))
+            return false;
+        togglePomodoro();
+        return true;
+    }
+
     // Stopwatch
     function refreshStopwatch() {  // Stopwatch stores time in 10ms
         stopwatchTime = getCurrentTimeIn10ms() - stopwatchStart;

@@ -18,6 +18,7 @@ Singleton {
 
     signal wifiPanelRequested()
     signal bluetoothPanelRequested()
+    signal timerPanelRequested()
 
     readonly property list<var> searchPrefixEntries: [
         { name: "action", prefix: Config.options.search.prefix.action },
@@ -80,6 +81,15 @@ Singleton {
             execute: () => root.query = "wifi"
         },
         {
+            key: "timer",
+            name: "Timer",
+            aliases: ["timer", "countdown"],
+            verb: Translation.tr("Open"),
+            iconName: "timer",
+            keepLauncherOpen: true,
+            execute: () => root.timerPanelRequested()
+        },
+        {
             key: "night-mode",
             name: "Night Mode",
             aliases: ["nightmode", "nightlight"],
@@ -104,7 +114,8 @@ Singleton {
     ]
     readonly property list<var> naturalTargets: [
         { key: "wifi", aliases: ["wifi", "wireless", "wlan"] },
-        { key: "bluetooth", aliases: ["bluetooth", "bt"] }
+        { key: "bluetooth", aliases: ["bluetooth", "bt"] },
+        { key: "timer", aliases: ["timer", "countdown"] }
     ]
     readonly property list<string> naturalFillers: [
         "turn", "please", "the", "my", "device", "devices", "network", "networks", "radio", "now", "tolong"
@@ -172,6 +183,16 @@ Singleton {
                 if (Bluetooth.defaultAdapter)
                     Bluetooth.defaultAdapter.enabled = false;
             }
+        },
+        {
+            key: "timer-open",
+            intent: "open",
+            target: "timer",
+            name: "Open Timer",
+            verb: Translation.tr("Open"),
+            iconName: "timer",
+            keepLauncherOpen: true,
+            execute: () => root.timerPanelRequested()
         }
     ]
 
@@ -241,7 +262,42 @@ Singleton {
         };
     }
 
+    function timerCommandResult(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const timerText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
+            .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const match = timerText.match(/^(?:(?:set|start)\s+)?(?:a\s+)?(?:timer|countdown)(?:\s+(?:for|to))?\s+(\d+)(?:\s*(m|min(?:ute)?s?|h|hrs?|hours?))?$/);
+        if (!match)
+            return null;
+        const amount = Number(match[1]);
+        const unit = match[2] ?? "minutes";
+        const minutes = unit.startsWith("h") ? amount * 60 : amount;
+        if (minutes < 1 || minutes > 1440)
+            return null;
+        const completionName = match[2] ? queryString.trim()
+            : `${queryString.trim()} ${amount === 1 ? "minute" : "minutes"}`;
+        const result = root.keywordResult({
+            key: "timer-set",
+            name: Translation.tr("%1 minute timer").arg(minutes),
+            verb: Translation.tr("Start"),
+            iconName: "timer",
+            keepLauncherOpen: true,
+            execute: () => {
+                if (TimerService.startPomodoroMinutes(minutes))
+                    root.timerPanelRequested();
+            }
+        }, root.compactKeyword(timerText), false, completionName);
+        result.durationMinutes = minutes;
+        return result;
+    }
+
     function naturalCommandResult(queryText = root.query) {
+        const timerCommand = root.timerCommandResult(queryText);
+        if (timerCommand)
+            return timerCommand;
         const queryString = String(queryText ?? "");
         const prefixEntry = root.matchedPrefixEntry(queryString);
         if (prefixEntry && prefixEntry.name !== "action")

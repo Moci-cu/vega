@@ -516,6 +516,8 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         height: 42
+        bottomLeftRadius: 22
+        bottomRightRadius: 22
         color: Qt.rgba(1, 1, 1, 0.045)
 
         Rectangle {

@@ -109,6 +109,9 @@ ShellRoot {
             const turnOffIntent = LauncherSearch.commandKeywordResult("turn off");
             const wifiAction = LauncherSearch.commandKeywordResult("turn on wi");
             const wifiTypo = LauncherSearch.commandKeywordResult("wfi");
+            const timerAction = LauncherSearch.commandKeywordResult("set a timer for 60 minutes");
+            const timerSuggestion = LauncherSearch.commandKeywordResult("set timer for 60");
+            const timerHours = LauncherSearch.commandKeywordResult("start timer for 2 hours");
             if (bluetoothAction?.key !== "command-keyword:bluetooth-open"
                     || !bluetoothAction.completeOnly
                     || bluetoothIntent?.key !== "command-keyword:bluetooth-on"
@@ -118,6 +121,12 @@ ShellRoot {
                     || !["command-keyword:wifi-off", "command-keyword:bluetooth-off"].includes(turnOffIntent?.key)
                     || wifiAction?.key !== "command-keyword:wifi-on"
                     || wifiTypo?.key !== "command-keyword:wifi"
+                    || timerAction?.key !== "command-keyword:timer-set"
+                    || timerAction.durationMinutes !== 60
+                    || timerAction.completeOnly
+                    || timerSuggestion?.completionName !== "set timer for 60 minutes"
+                    || timerSuggestion.durationMinutes !== 60
+                    || timerHours?.durationMinutes !== 120
                     || !["scan wifi", "scan bluetooth"].includes(scanIntent?.completionName)
                     || !["start wifi", "start bluetooth"].includes(startIntent?.completionName)
                     || LauncherSearch.commandKeywordResult("start blu")?.completionName !== "start bluetooth"

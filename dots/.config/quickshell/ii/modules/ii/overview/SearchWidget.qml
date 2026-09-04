@@ -62,19 +62,19 @@ Item { // Wrapper
     readonly property bool appMode: LauncherSearch.isApplicationQuery(root.searchingText)
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
     readonly property bool wifiCommandMode: LauncherSearch.isWifiCommandQuery(root.searchingText)
-    readonly property bool controlPanelOpen: wifiPanelOpen || bluetoothPanelOpen
+    readonly property bool controlPanelOpen: wifiPanelOpen || bluetoothPanelOpen || timerPanelOpen
     readonly property bool resultsVisible: showResults || controlPanelOpen
     readonly property bool appResultsReady: !appMode || (nativeAppSearchActive
         ? nativeResultQuery === searchingText && !(NativeAppSearch.model?.busy ?? false)
         : fallbackAppQuery === searchingText)
-    readonly property int activeResultCount: wifiPanelOpen
+    readonly property int activeResultCount: timerPanelOpen ? 0 : wifiPanelOpen
         ? (wifiPanelLoader.item?.networkCount ?? 0) : bluetoothPanelOpen
             ? (bluetoothPanelLoader.item?.deviceCount ?? 0) : wifiCommandMode
             ? wifiCommandList.count : appMode
                 ? (!showResults && nativeAutocompleteResult
                     ? Math.max(1, appGrid.count) : appGrid.count)
                 : listResults.count
-    readonly property int activeCurrentIndex: wifiPanelOpen
+    readonly property int activeCurrentIndex: timerPanelOpen ? -1 : wifiPanelOpen
         ? (wifiPanelLoader.item?.currentIndex ?? -1) : bluetoothPanelOpen
             ? (bluetoothPanelLoader.item?.currentIndex ?? -1) : wifiCommandMode
             ? wifiCommandList.currentIndex : appMode
@@ -91,6 +91,7 @@ Item { // Wrapper
     property bool showClipboard: false
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
+    property bool timerPanelOpen: false
     readonly property bool clipboardMode: showClipboard
     readonly property string calculatorExpression: applicationGridMode || clipboardMode || controlPanelOpen
         ? "" : LauncherSearch.mathExpression(searchingText)
@@ -138,6 +139,8 @@ Item { // Wrapper
     }
 
     function focusFirstItem() {
+        if (root.timerPanelOpen)
+            return;
         if (root.wifiPanelOpen) {
             wifiPanelLoader.item?.moveSelection(0);
             return;
@@ -160,6 +163,8 @@ Item { // Wrapper
     }
 
     function moveSelection(delta, linear = false) {
+        if (root.timerPanelOpen)
+            return;
         if (root.wifiPanelOpen) {
             wifiPanelLoader.item?.moveSelection(delta);
             return;
@@ -391,6 +396,7 @@ Item { // Wrapper
 
         function onWifiPanelRequested() {
             root.bluetoothPanelOpen = false;
+            root.timerPanelOpen = false;
             root.wifiPanelOpen = true;
             root.setSearchingText("");
             Qt.callLater(root.focusSearchInput);
@@ -398,7 +404,16 @@ Item { // Wrapper
 
         function onBluetoothPanelRequested() {
             root.wifiPanelOpen = false;
+            root.timerPanelOpen = false;
             root.bluetoothPanelOpen = true;
+            root.setSearchingText("");
+            Qt.callLater(root.focusSearchInput);
+        }
+
+        function onTimerPanelRequested() {
+            root.wifiPanelOpen = false;
+            root.bluetoothPanelOpen = false;
+            root.timerPanelOpen = true;
             root.setSearchingText("");
             Qt.callLater(root.focusSearchInput);
         }
@@ -411,6 +426,7 @@ Item { // Wrapper
             if (!GlobalStates.overviewOpen) {
                 root.wifiPanelOpen = false;
                 root.bluetoothPanelOpen = false;
+                root.timerPanelOpen = false;
             }
         }
     }
@@ -754,17 +770,20 @@ Item { // Wrapper
                 calculatorActive: root.calculatorActive
                 queryPrefix: root.applicationGridMode ? Config.options.search.prefix.app
                     : root.clipboardMode ? Config.options.search.prefix.clipboard : ""
-                inputPlaceholder: root.wifiPanelOpen ? Translation.tr("Search Wi-Fi networks…")
+                inputPlaceholder: root.timerPanelOpen ? Translation.tr("Timer")
+                    : root.wifiPanelOpen ? Translation.tr("Search Wi-Fi networks…")
                     : root.bluetoothPanelOpen ? Translation.tr("Search Bluetooth devices…")
                     : root.clipboardMode && root.showResults
                         ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
-                leadingIcon: root.wifiPanelOpen ? "wifi"
+                leadingIcon: root.timerPanelOpen ? "timer"
+                    : root.wifiPanelOpen ? "wifi"
                     : root.bluetoothPanelOpen ? "bluetooth"
                     : root.clipboardMode && root.showResults ? "content_copy" : ""
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
                 navigationColumns: root.controlPanelOpen ? 1 : root.appMode ? root.appGridColumns : 1
-                selectedResult: root.wifiPanelOpen ? (wifiPanelLoader.item?.selectedAction ?? null)
+                selectedResult: root.timerPanelOpen ? null
+                    : root.wifiPanelOpen ? (wifiPanelLoader.item?.selectedAction ?? null)
                     : root.bluetoothPanelOpen ? (bluetoothPanelLoader.item?.selectedAction ?? null)
                     : root.wifiCommandMode ? (wifiCommandList.currentItem?.entry ?? null)
                     : root.appMode ? (!root.showResults && root.nativeAppSearchActive
@@ -1255,6 +1274,15 @@ Item { // Wrapper
                     sourceComponent: BluetoothPanel {
                         filterText: root.searchingText
                     }
+                }
+
+                Loader {
+                    id: timerPanelLoader
+
+                    active: root.timerPanelOpen
+                    visible: active
+                    anchors.fill: parent
+                    sourceComponent: TimerPanel {}
                 }
             }
 
