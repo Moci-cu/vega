@@ -577,7 +577,7 @@ Item {
         }
         readonly property var localPalette: Appearance.colors.transparentBar
             ? Appearance.barPaletteAt(screenCenterX, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
-            : ({ foreground: root.foregroundColor, haloEnabled: false, haloColor: "transparent" })
+            : ({ foreground: root.foregroundColor })
         readonly property color localForeground: localPalette.foreground
         property color indColor: activeWorkspace ? Appearance.m3colors.m3onPrimary : (root.workspaceOccupied[index] ? localForeground : ColorUtils.transparentize(localForeground, 0.32))
 
@@ -597,8 +597,6 @@ Item {
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
             color: indColor
-            haloEnabled: !indicator.activeWorkspace && indicator.localPalette.haloEnabled
-            haloColor: indicator.localPalette.haloColor
             Behavior on opacity {
                 animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
             }

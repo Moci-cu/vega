@@ -99,13 +99,19 @@ int main(int argc, char **argv)
             return fail("confident application search kept a generic action");
     }
 
+    int completionsBefore = searchCompletions;
     model.search("games lau", 7, genericActions);
-    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 1; })
+    if (!waitUntil([&] {
+            return searchCompletions > completionsBefore && !model.busy() && model.rowCount() == 1;
+        })
         || model.get(0).value("id") != "heroic.desktop")
         return fail("multi-word prefixes did not resolve Heroic Games Launcher");
 
+    completionsBefore = searchCompletions;
     model.search("hgl", 7, genericActions);
-    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 1; })
+    if (!waitUntil([&] {
+            return searchCompletions > completionsBefore && !model.busy() && model.rowCount() == 1;
+        })
         || model.get(0).value("id") != "heroic.desktop")
         return fail("application initials did not resolve Heroic Games Launcher");
 
@@ -132,8 +138,11 @@ int main(int argc, char **argv)
     if (resets != 0)
         return fail("stable result model reset during mixed structural changes");
 
+    completionsBefore = searchCompletions;
     model.search("", 20);
-    if (!waitUntil([&model] { return !model.busy() && model.rowCount() == 4; }))
+    if (!waitUntil([&] {
+            return searchCompletions > completionsBefore && !model.busy() && model.rowCount() == 4;
+        }))
         return fail("empty query did not return the full application index");
     for (int row = 1; row < model.rowCount(); ++row) {
         const QString previous = model.get(row - 1).value("name").toString();

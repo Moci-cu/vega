@@ -1081,8 +1081,6 @@ Singleton {
             return [];
 
         const naturalCommand = root.naturalCommandResult();
-        if (naturalCommand)
-            return [naturalCommand];
 
         if (root.isWifiCommandQuery())
             return root.wifiCommandActions.map((action, index) => root.wifiCommandResult(action, index));
@@ -1106,6 +1104,8 @@ Singleton {
 
         //////// Prioritized by prefix /////////
         let result = [];
+        if (naturalCommand)
+            result.push(naturalCommand);
         const implicitMathQuery = root.isImplicitMathQuery(root.query);
         const startsWithActionPrefix = prefixName === "action";
         const startsWithAppPrefix = prefixName === "app";

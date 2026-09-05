@@ -13,8 +13,6 @@ import qs.modules.common.utils
 Item {
     id: root
     property color foregroundColor: Appearance.colors.colOnLayer1
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
     Layout.fillHeight: true
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
@@ -163,8 +161,6 @@ Item {
         width: artworkEnabled ? parent.implicitWidth - (artworkItem.width + mediaCircProgSlot.width + artworkContentPadding + 16) : parent.implicitWidth - mediaCircProgSlot.width - 16
         elide: Text.ElideRight
         color: root.foregroundColor
-        haloEnabled: root.haloEnabled
-        haloColor: root.haloColor
         text: `${cleanedTitle}${activePlayer?.trackArtist ? ' • ' + activePlayer.trackArtist : ''}`
     }
 

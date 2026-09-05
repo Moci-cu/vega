@@ -85,7 +85,7 @@ Item {
     }
 
     function startDiscovery() {
-        if (root.startedDiscovery || !root.adapter?.enabled || root.adapter.discovering) return;
+        if (!root.adapter?.enabled || root.adapter.discovering) return;
         root.startedDiscovery = true;
         root.adapter.discovering = true;
     }
@@ -105,7 +105,10 @@ Item {
 
     Component.onCompleted: root.startDiscovery()
     Component.onDestruction: root.stopDiscovery()
-    onAdapterChanged: Qt.callLater(root.startDiscovery)
+    onAdapterChanged: {
+        root.startedDiscovery = false;
+        Qt.callLater(root.startDiscovery);
+    }
     onFilteredDevicesChanged: {
         Qt.callLater(() => {
             if (deviceList.count <= 0) {
@@ -123,8 +126,11 @@ Item {
         ignoreUnknownSignals: true
 
         function onEnabledChanged() {
-            if (root.adapter?.enabled)
-                Qt.callLater(root.startDiscovery);
+            if (!root.adapter?.enabled) {
+                root.startedDiscovery = false;
+                return;
+            }
+            Qt.callLater(root.startDiscovery);
         }
     }
 

@@ -37,7 +37,7 @@ Item {
         }
         readonly property var adaptivePalette: Appearance.colors.transparentBar
             ? Appearance.barPaletteAt(screenCenterX, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
-            : ({ foreground: root.foregroundColor, haloEnabled: false, haloColor: "transparent" })
+            : ({ foreground: root.foregroundColor })
         property color adaptiveForeground: adaptivePalette.foreground
 
         MaterialSymbol {
@@ -46,8 +46,6 @@ Item {
             text: button.symbol
             iconSize: Appearance.font.pixelSize.large
             color: button.adaptiveForeground
-            haloEnabled: button.adaptivePalette.haloEnabled
-            haloColor: button.adaptivePalette.haloColor
         }
     }
     

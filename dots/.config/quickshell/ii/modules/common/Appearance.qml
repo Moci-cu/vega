@@ -97,10 +97,7 @@ Singleton {
     function barPaletteAt(x, sampleWidth, screen, workspaceValue, sidebarBalance) {
         if (LyricsService.mediaModeOpenCount > 0) {
             return {
-                foreground: "#FFFFFF",
-                haloEnabled: false,
-                haloColor: "transparent",
-                minimumContrast: 21,
+                foreground: "#F5F5F5",
                 sampleCount: 0,
                 centerColumn: -1
             };
@@ -108,7 +105,7 @@ Singleton {
 
         const geometry = barWallpaperGeometry(screen, workspaceValue, sidebarBalance);
         if (!geometry || barBackgroundSamples.length === 0) {
-            const fallback = ColorUtils.getTonalPalette(wallpaperColor, [wallpaperColor], m3colors.m3primary);
+            const fallback = ColorUtils.getContrastPalette([wallpaperColor]);
             fallback.sampleCount = 1;
             fallback.centerColumn = -1;
             return fallback;
@@ -130,7 +127,7 @@ Singleton {
             const column = Math.min(barSampleColumns - 1, Math.floor(sourceX * barSampleColumns));
             return barBackgroundSamples[row * barSampleColumns + column] ?? wallpaperColor;
         });
-        const palette = ColorUtils.getTonalPalette(samples[2], samples, m3colors.m3primary);
+        const palette = ColorUtils.getContrastPalette(samples);
         palette.sampleCount = samples.length;
         palette.centerColumn = centerColumn;
         return palette;

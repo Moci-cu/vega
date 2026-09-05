@@ -7,8 +7,6 @@ import QtQuick.Layouts
 MouseArea {
     id: root
     property color foregroundColor: Appearance.colors.colOnLayer1
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
     readonly property var chargeState: Battery.chargeState
     readonly property bool isCharging: Battery.isCharging
     readonly property bool isPluggedIn: Battery.isPluggedIn

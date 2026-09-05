@@ -169,40 +169,19 @@ Singleton {
         return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
     }
 
-    function getTonalPalette(bgColor, sampleColors = [bgColor], accentColor = bgColor, minContrast = 4.5) {
-        const background = Qt.color(bgColor);
-        const accent = Qt.color(accentColor);
-        const source = background.hslSaturation >= 0.08 ? background : accent;
-        const hue = isFinite(source.hslHue) && source.hslHue >= 0 ? source.hslHue : 0.76;
-        const saturation = Math.max(0.52, Math.min(0.78, source.hslSaturation));
-        const dark = Qt.hsla(hue, saturation, 0.126, 1);
-        const light = Qt.hsla(hue, saturation, 0.93, 1);
-        const samples = sampleColors?.length > 0 ? sampleColors : [background];
+    function getContrastPalette(sampleColors) {
+        const dark = Qt.color("#171717");
+        const light = Qt.color("#F5F5F5");
+        const samples = sampleColors?.length > 0 ? sampleColors : ["#000000"];
         const darkContrasts = samples.map(color => getContrastRatio(dark, color));
         const lightContrasts = samples.map(color => getContrastRatio(light, color));
-        const middle = Math.floor(samples.length / 2);
-        const darkMedian = darkContrasts.slice().sort((a, b) => a - b)[middle];
-        const lightMedian = lightContrasts.slice().sort((a, b) => a - b)[middle];
         const darkMinimum = Math.min(...darkContrasts);
         const lightMinimum = Math.min(...lightContrasts);
-        const useDark = darkMedian === lightMedian ? darkMinimum >= lightMinimum : darkMedian > lightMedian;
-        const foreground = useDark ? dark : light;
-        const minimumContrast = useDark ? darkMinimum : lightMinimum;
 
         return {
-            foreground,
-            haloEnabled: minimumContrast < minContrast,
-            haloColor: Qt.rgba(1, 1, 1, 0.18),
-            minimumContrast
+            foreground: darkMinimum >= lightMinimum ? dark : light,
+            minimumContrast: Math.max(darkMinimum, lightMinimum)
         };
-    }
-
-    /**
-     * Builds a chromatic foreground from a background/accent pair.
-     * Uses dark tone on light backgrounds and pastel tone on dark backgrounds.
-     */
-    function getTonalForeground(bgColor, accentColor = bgColor) {
-        return getTonalPalette(bgColor, [bgColor], accentColor).foreground;
     }
 
     /**

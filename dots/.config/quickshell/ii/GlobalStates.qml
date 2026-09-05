@@ -70,6 +70,10 @@ Singleton {
     }
 
     onDashboardPanelOpenChanged: {
+        if (dashboardPanelOpen && Config.options.panelFamily === "ii") {
+            dashboardPanelOpen = false;
+            return;
+        }
         if (dashboardPanelOpen) {
             Notifications.timeoutAll();
             Notifications.markAllRead();

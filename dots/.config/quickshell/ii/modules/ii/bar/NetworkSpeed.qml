@@ -9,8 +9,6 @@ Item {
     id: root
     property bool vertical: false
     property color foregroundColor: Appearance.colors.colOnLayer1
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
     readonly property bool autoHide: Config.options.bar.networkSpeed.autoHide ?? true
     readonly property int threshold: 125 // 1 Kbps = 1000 bits/s = 125 bytes/s
     readonly property bool hasActivity: {
@@ -146,8 +144,6 @@ Item {
                 anchors.verticalCenterOffset: 1
                 font.pixelSize: Appearance.font.pixelSize.small
                 color: root.foregroundColor
-                haloEnabled: root.haloEnabled
-                haloColor: root.haloColor
                 text: getDisplayText()
             }
         }
@@ -162,15 +158,11 @@ Item {
             StyledText {
                 font.pixelSize: Appearance.font.pixelSize.small
                 color: root.foregroundColor
-                haloEnabled: root.haloEnabled
-                haloColor: root.haloColor
                 text: applyIcon(formatSpeed(NetworkUsage.networkDownloadSpeed), "↓")
             }
             StyledText {
                 font.pixelSize: Appearance.font.pixelSize.small
                 color: root.foregroundColor
-                haloEnabled: root.haloEnabled
-                haloColor: root.haloColor
                 text: applyIcon(formatSpeed(NetworkUsage.networkUploadSpeed), "↑")
             }
         }

@@ -302,7 +302,7 @@ RowLayout {
                         return;
                     const tabbedText = root.autocompleteIsKeyword
                         ? root.selectedEntry()?.completionName ?? root.selectedEntry()?.name ?? ""
-                        : root.autocompleteIsAction ? root.searchingText
+                        : root.autocompleteIsAction ? root.queryPrefix + searchInput.text
                         : root.selectedEntry()?.name ?? "";
                     root.setQueryImmediately(tabbedText);
                 });

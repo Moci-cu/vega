@@ -22,10 +22,8 @@ Item {
     }
     readonly property var adaptivePalette: Appearance.colors.transparentBar
         ? Appearance.barPaletteAt(screenCenterX, width, screen, parallaxWorkspaceValue, parallaxSidebarBalance)
-        : ({ foreground: fallbackForegroundColor, haloEnabled: false, haloColor: "transparent" })
+        : ({ foreground: fallbackForegroundColor })
     property color foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : fallbackForegroundColor
-    readonly property bool haloEnabled: Appearance.colors.transparentBar && adaptivePalette.haloEnabled
-    readonly property color haloColor: adaptivePalette.haloColor
     required property string iconName
     required property double percentage
     property string valueText: `${Math.round(percentage * 100).toString()}`
@@ -67,8 +65,6 @@ Item {
                     text: iconName
                     iconSize: Appearance.font.pixelSize.normal
                     color: root.foregroundColor
-                    haloEnabled: root.haloEnabled
-                    haloColor: root.haloColor
                 }
             }
         }
@@ -88,8 +84,6 @@ Item {
                 id: percentageText
                 anchors.centerIn: parent
                 color: root.foregroundColor
-                haloEnabled: root.haloEnabled
-                haloColor: root.haloColor
                 font.pixelSize: Appearance.font.pixelSize.small
                 text: root.valueText
             }

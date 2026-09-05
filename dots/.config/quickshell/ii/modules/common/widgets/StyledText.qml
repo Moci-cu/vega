@@ -4,8 +4,6 @@ import QtQuick
 Text {
     id: root
     property bool animateChange: false
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
     property real animationDistanceX: 0
     property real animationDistanceY: 6
 

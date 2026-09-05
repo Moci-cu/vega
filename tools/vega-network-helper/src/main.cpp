@@ -17,6 +17,7 @@
 #include <QSocketNotifier>
 #include <QUuid>
 
+#include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
 
@@ -86,7 +87,14 @@ constexpr auto kSettingsInterface = "org.freedesktop.NetworkManager.Settings";
 constexpr auto kConnectionInterface = "org.freedesktop.NetworkManager.Settings.Connection";
 constexpr auto kPropertiesInterface = "org.freedesktop.DBus.Properties";
 constexpr int kDbusTimeoutMs = 10000;
+constexpr int kWriteTimeoutMs = 5000;
 constexpr qsizetype kMaxRequestBytes = 256 * 1024;
+
+struct FramedRequest
+{
+    QByteArray line;
+    bool oversized = false;
+};
 
 QJsonObject errorObject(const QString &code, const QString &message)
 {
@@ -139,6 +147,47 @@ QString securityLabel(const QString &keyManagement)
     if (keyManagement == "sae") return "sae";
     if (keyManagement == "wpa-psk") return "wpa-psk";
     return keyManagement.isEmpty() ? "open" : "unsupported";
+}
+
+bool requireReplyArgument(const QDBusMessage &reply, QString *error, const char *message)
+{
+    if (!reply.arguments().isEmpty()) return true;
+    *error = message;
+    return false;
+}
+
+QList<FramedRequest> takeRequests(QByteArray *buffer, bool *discardingOversizeLine)
+{
+    QList<FramedRequest> requests;
+    while (true) {
+        if (*discardingOversizeLine) {
+            const qsizetype newline = buffer->indexOf('\n');
+            if (newline < 0) {
+                buffer->clear();
+                return requests;
+            }
+            buffer->remove(0, newline + 1);
+            *discardingOversizeLine = false;
+        }
+
+        const qsizetype newline = buffer->indexOf('\n');
+        if (newline < 0) {
+            if (buffer->size() > kMaxRequestBytes) {
+                buffer->clear();
+                *discardingOversizeLine = true;
+                requests.append({{}, true});
+            }
+            return requests;
+        }
+
+        const QByteArray line = buffer->left(newline);
+        buffer->remove(0, newline + 1);
+        if (line.size() > kMaxRequestBytes) {
+            requests.append({{}, true});
+            continue;
+        }
+        if (!line.trimmed().isEmpty()) requests.append({line.trimmed(), false});
+    }
 }
 }
 
@@ -235,8 +284,14 @@ public:
 
         const QDBusMessage reply = call(kSettingsPath, kSettingsInterface, "AddConnection2",
             {QVariant::fromValue(settings), 1U, QVariantMap{}});
-        if (!readReply(reply, error) || reply.arguments().isEmpty()) return {};
+        if (!readReply(reply, error)
+                || !requireReplyArgument(reply, error,
+                    "NetworkManager returned no connection path for AddConnection2")) return {};
         const QDBusObjectPath path = decodeDbusValue<QDBusObjectPath>(reply.arguments().first());
+        if (path.path().isEmpty()) {
+            *error = "NetworkManager returned no connection path for AddConnection2";
+            return {};
+        }
         if (params.value("activate").toBool(true)) {
             QString activationError;
             if (!activatePath(path.path(), &activationError))
@@ -344,8 +399,13 @@ private:
             return {};
         }
         const QDBusMessage reply = call(kSettingsPath, kSettingsInterface, "GetConnectionByUuid", {uuid});
-        if (!readReply(reply, error) || reply.arguments().isEmpty()) return {};
-        return decodeDbusValue<QDBusObjectPath>(reply.arguments().first()).path();
+        if (!readReply(reply, error)
+                || !requireReplyArgument(reply, error,
+                    "No saved profile matches the requested UUID")) return {};
+        const QString resolved = decodeDbusValue<QDBusObjectPath>(reply.arguments().first()).path();
+        if (resolved.isEmpty())
+            *error = "No saved profile matches the requested UUID";
+        return resolved;
     }
 
     QString wifiDevicePath(QString *error) const
@@ -492,11 +552,30 @@ public:
         const QByteArray line = R"({"id":"1","method":"health","params":{}})";
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(line, &error);
+        QString missingArgumentError;
+        const bool rejectedMissingArgument = !requireReplyArgument(
+            QDBusMessage(), &missingArgumentError, "missing argument");
+        QByteArray oversized(kMaxRequestBytes + 1, 'x');
+        bool discardingOversizeLine = false;
+        const QList<FramedRequest> rejected = takeRequests(&oversized, &discardingOversizeLine);
+        const bool beganDiscarding = discardingOversizeLine;
+        oversized = "discarded tail\n" + line + '\n';
+        const QList<FramedRequest> recovered = takeRequests(&oversized, &discardingOversizeLine);
         return error.error == QJsonParseError::NoError
             && document.object().value("method").toString() == "health"
             && kMaxRequestBytes == 262144
+            && kWriteTimeoutMs == 5000
             && securityLabel("wpa-psk") == "wpa-psk"
-            && securityLabel("wpa-none") == "unsupported";
+            && securityLabel("wpa-none") == "unsupported"
+            && rejectedMissingArgument
+            && missingArgumentError == "missing argument"
+            && rejected.size() == 1
+            && rejected.first().oversized
+            && beganDiscarding
+            && recovered.size() == 1
+            && recovered.first().line == line
+            && !recovered.first().oversized
+            && !discardingOversizeLine;
     }
 
 private slots:
@@ -513,20 +592,14 @@ private slots:
             return;
         }
         m_buffer.append(input, bytesRead);
-        while (true) {
-            const qsizetype newline = m_buffer.indexOf('\n');
-            if (newline < 0) break;
-            const QByteArray line = m_buffer.left(newline).trimmed();
-            m_buffer.remove(0, newline + 1);
-            if (line.size() > kMaxRequestBytes) {
+        const QList<FramedRequest> requests = takeRequests(&m_buffer, &m_discardingOversizeLine);
+        for (const FramedRequest &request : requests) {
+            if (request.oversized) {
                 write({{"ok", false}, {"error", errorObject("PAYLOAD_TOO_LARGE", "Request exceeds 256 KiB")}});
-                continue;
+            } else {
+                handleLine(request.line);
             }
-            if (!line.isEmpty()) handleLine(line);
-        }
-        if (m_buffer.size() > kMaxRequestBytes) {
-            m_buffer.clear();
-            write({{"ok", false}, {"error", errorObject("PAYLOAD_TOO_LARGE", "Request exceeds 256 KiB")}});
+            if (m_outputFailed) return;
         }
     }
 
@@ -569,8 +642,9 @@ private:
         write({{"id", id}, {"ok", true}, {"result", result}});
     }
 
-    static void write(const QJsonObject &message)
+    void write(const QJsonObject &message)
     {
+        if (m_outputFailed) return;
         const QByteArray data = QJsonDocument(message).toJson(QJsonDocument::Compact) + '\n';
         qsizetype written = 0;
         while (written < data.size()) {
@@ -585,10 +659,11 @@ private:
                 pollfd descriptor{STDOUT_FILENO, POLLOUT, 0};
                 int ready;
                 do {
-                    ready = ::poll(&descriptor, 1, -1);
+                    ready = ::poll(&descriptor, 1, kWriteTimeoutMs);
                 } while (ready < 0 && errno == EINTR);
                 if (ready > 0 && (descriptor.revents & POLLOUT)) continue;
             }
+            m_outputFailed = true;
             QCoreApplication::exit(1);
             return;
         }
@@ -596,6 +671,8 @@ private:
 
     QSocketNotifier m_notifier;
     QByteArray m_buffer;
+    bool m_discardingOversizeLine = false;
+    bool m_outputFailed = false;
     NetworkManagerClient m_client;
 };
 
@@ -607,6 +684,10 @@ int main(int argc, char **argv)
 
     if (app.arguments().contains("--self-test"))
         return Protocol::selfTest() ? 0 : 1;
+
+    const int stdoutFlags = ::fcntl(STDOUT_FILENO, F_GETFL, 0);
+    if (stdoutFlags < 0 || ::fcntl(STDOUT_FILENO, F_SETFL, stdoutFlags | O_NONBLOCK) < 0)
+        return 1;
 
     Protocol protocol;
     return app.exec();

@@ -12,8 +12,6 @@ Item {
     id: root
     property bool vertical: false
     property color foregroundColor: Appearance.colors.colOnLayer1
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
     readonly property HyprlandMonitor monitor: Hyprland.monitorFor(root.QsWindow.window?.screen)
     readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
 
@@ -61,8 +59,6 @@ Item {
             Layout.fillWidth: true
             font.pixelSize: Appearance.font.pixelSize.smaller
             color: ColorUtils.transparentize(root.foregroundColor, 0.22)
-            haloEnabled: root.haloEnabled
-            haloColor: root.haloColor
             elide: Text.ElideRight
             text: root.appClassText
         }
@@ -73,8 +69,6 @@ Item {
             Layout.fillWidth: true
             font.pixelSize: Appearance.font.pixelSize.small
             color: root.foregroundColor
-            haloEnabled: root.haloEnabled
-            haloColor: root.haloColor
             elide: Text.ElideRight
             rotation: root.vertical ? 90 : 0
             text: root.vertical ? root.appClassText : root.appTitleText

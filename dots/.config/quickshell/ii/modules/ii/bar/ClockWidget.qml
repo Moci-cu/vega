@@ -7,8 +7,6 @@ import QtQuick.Layouts
 Item {
     id: root
     property color foregroundColor: Appearance.colors.colOnLayer1
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
     property bool showDate: Config.options.bar.verbose
     implicitWidth: rowLayout.implicitWidth + rowLayout.spacing * 10
     implicitHeight: Appearance.sizes.barHeight
@@ -40,8 +38,6 @@ Item {
         StyledText {
             font.pixelSize: Appearance.font.pixelSize.large
             color: root.colText
-            haloEnabled: root.haloEnabled && !dropArea.containsDrag && !rootItem.highlighted
-            haloColor: root.haloColor
             text: DateTime.time
         }
 
@@ -49,8 +45,6 @@ Item {
             visible: root.showDate
             font.pixelSize: Appearance.font.pixelSize.small
             color: root.colText
-            haloEnabled: root.haloEnabled && !dropArea.containsDrag && !rootItem.highlighted
-            haloColor: root.haloColor
             text: "•"
         }
 
@@ -58,8 +52,6 @@ Item {
             visible: root.showDate
             font.pixelSize: Appearance.font.pixelSize.small
             color: root.colText
-            haloEnabled: root.haloEnabled && !dropArea.containsDrag && !rootItem.highlighted
-            haloColor: root.haloColor
             text: DateTime.longDate
         }
     }

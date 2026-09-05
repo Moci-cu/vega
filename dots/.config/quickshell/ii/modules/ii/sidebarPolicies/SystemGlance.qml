@@ -20,6 +20,7 @@ Item {
     property real gpuUsage: 0
 
     function getUpcomingForecast(data) {
+        if (!Array.isArray(data)) return []
         const currentSlot = Math.floor(DateTime.clock.date.getHours() / 3) * 3
         let nextDay = false
         const result = []
@@ -428,9 +429,9 @@ Item {
             MeterCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                label: Translation.tr("iGPU")
+                label: Translation.tr("GPU")
                 value: glanceRoot.gpuBusyPath !== "" ? `${Math.round(glanceRoot.gpuUsage)}%` : "--"
-                detail: Translation.tr("AMD Radeon Vega iGPU")
+                detail: Translation.tr("Graphics processor")
                 secondaryDetail: glanceRoot.gpuBusyPath !== ""
                     ? Translation.tr("Live utilization")
                     : Translation.tr("Utilization unavailable")

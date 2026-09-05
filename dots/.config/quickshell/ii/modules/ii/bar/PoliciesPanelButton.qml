@@ -7,8 +7,6 @@ import qs.modules.common.widgets
 RippleButton {
     id: leftSidebarButton
     property color foregroundColor: Appearance.colors.colOnLayer0
-    property bool haloEnabled: false
-    property color haloColor: "transparent"
 
     property bool showPing: false
 

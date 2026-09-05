@@ -20,7 +20,6 @@ Item {
     property bool vertical: false
     property bool highlighted: false
     property var screen: rootItem.QsWindow.window?.screen
-    property var wallpaperSource
     readonly property int activeWorkspaceId: HyprlandData.monitors.find(monitor => monitor.name === screen?.name)?.activeWorkspace?.id ?? 1
     property real parallaxWorkspaceValue: Appearance.barWorkspaceValue(activeWorkspaceId)
     property real parallaxSidebarBalance: GlobalStates.effectiveRightOpen - GlobalStates.effectiveLeftOpen
@@ -37,10 +36,8 @@ Item {
     }
     readonly property var adaptivePalette: Appearance.colors.transparentBar
         ? Appearance.barPaletteAt(screenCenterX, width, screen, parallaxWorkspaceValue, parallaxSidebarBalance)
-        : ({ foreground: Appearance.colors.colOnLayer1, haloEnabled: false, haloColor: "transparent" })
+        : ({ foreground: Appearance.colors.colOnLayer1 })
     property color foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : Appearance.colors.colOnLayer1
-    readonly property bool haloEnabled: Appearance.colors.transparentBar && adaptivePalette.haloEnabled
-    readonly property color haloColor: adaptivePalette.haloColor
 
     implicitWidth: wrapper.implicitWidth
     implicitHeight: wrapper.implicitHeight
@@ -109,7 +106,6 @@ Item {
                                                 (barGroupStyle == 1 && barBackgroundStyle == 1) ? Appearance.colors.colLayer1 :
                                                 (barGroupStyle == 1) ? Appearance.m3colors.m3surfaceContainerLow :
                                                 "transparent"
-    readonly property bool liquidGlassEnabled: Appearance.colors.transparentBar && !rootItem.highlighted
     property color colBackground: rootItem.baseBackground
     
     property color colBackgroundHighlight: Appearance.colors.colPrimary
@@ -125,12 +121,6 @@ Item {
         startRadius: rootItem.startRadius
         endRadius: rootItem.endRadius
         colBackground: rootItem.highlighted ? rootItem.colBackgroundHighlight : rootItem.colBackground
-        liquidGlass: rootItem.liquidGlassEnabled
-        liquidGlassBackdrop: LyricsService.mediaModeOpenCount === 0
-        wallpaperSource: rootItem.wallpaperSource
-        screen: rootItem.screen
-        parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue
-        parallaxSidebarBalance: rootItem.parallaxSidebarBalance
 
         readonly property var _currentComp: {
             BarComponentRegistry._extensionCompVersion
@@ -162,7 +152,7 @@ Item {
     }
 
 
-    Component { id: weatherComp; WeatherBar { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: weatherComp; WeatherBar { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
 
     Component { id: timerComp; TimerWidget {} }
     Component { id: timerCompVert; Vertical.VerticalTimerWidget {} }
@@ -171,31 +161,31 @@ Item {
 
     Component { id: recordIndicatorComp; RecordIndicator { vertical: rootItem.vertical } }
 
-    Component { id: activeWindowComp; ActiveWindow { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: activeWindowComp; ActiveWindow { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
 
     Component { id: systemMonitorComp; Resources { foregroundColor: rootItem.foregroundColor; screen: rootItem.screen; parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue; parallaxSidebarBalance: rootItem.parallaxSidebarBalance } }
     Component { id: systemMonitorCompVert; Vertical.Resources {} }
 
     Component { id: musicPlayerCompVert; Vertical.VerticalMedia {} }
-    Component { id: musicPlayerComp; Media { foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: musicPlayerComp; Media { foregroundColor: rootItem.foregroundColor } }
 
     Component { id: utilityButtonsComp; UtilButtons { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; containerScreenCenterX: rootItem.screenCenterX; screen: rootItem.screen; parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue; parallaxSidebarBalance: rootItem.parallaxSidebarBalance } }
 
-    Component { id: batteryComp; BatteryIndicator { foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: batteryComp; BatteryIndicator { foregroundColor: rootItem.foregroundColor } }
     Component { id: batteryCompVert; Vertical.BatteryIndicator {} }
 
     Component { id: clockCompVert; Vertical.VerticalClockWidget {} }
-    Component { id: clockComp; ClockWidget { foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: clockComp; ClockWidget { foregroundColor: rootItem.foregroundColor } }
 
-    Component { id: systemTrayComp; SysTray { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: systemTrayComp; SysTray { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
 
     Component { id: dateCompVert; Vertical.VerticalDateWidget {} }
 
     Component { id: workspaceComp; Workspaces { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; screen: rootItem.screen; parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue; parallaxSidebarBalance: rootItem.parallaxSidebarBalance } }
 
-    Component { id: policiesPanelButton; PoliciesPanelButton { foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: policiesPanelButton; PoliciesPanelButton { foregroundColor: rootItem.foregroundColor } }
     
-    Component { id: dashboardPanelButton; DashboardPanelButton { foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
-    Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; haloEnabled: rootItem.haloEnabled; haloColor: rootItem.haloColor } }
+    Component { id: dashboardPanelButton; DashboardPanelButton { foregroundColor: rootItem.foregroundColor } }
+    Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
     Component { id: dashboardPanelButtonVert; VerticalDashboardPanelButton {} }
 }
