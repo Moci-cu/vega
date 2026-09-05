@@ -728,7 +728,7 @@ Item { // Wrapper
         width: implicitWidth
         height: implicitHeight
         implicitWidth: root.resultsPanelWidth
-        implicitHeight: root.searchSurfaceHeight
+        implicitHeight: root.showMetrics ? root.activeResultsPanelHeight : root.searchSurfaceHeight
             + (root.resultsVisible
                 ? root.searchPanelGap + root.activeResultsPanelHeight
                 : root.categoriesVisible ? root.searchPanelGap + root.categoryPanelHeight : 0)
@@ -769,6 +769,7 @@ Item { // Wrapper
 
         Item {
             id: searchPill
+            visible: !root.showMetrics
 
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
@@ -850,29 +851,6 @@ Item { // Wrapper
 
                 Synchronizer on searchingText {
                     property alias source: root.searchingText
-                }
-            }
-
-            RowLayout {
-                visible: root.showMetrics
-                anchors.left: parent.left
-                anchors.leftMargin: 28
-                anchors.top: parent.top
-                height: root.searchPillHeight
-                spacing: 12
-
-                MaterialSymbol {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: "monitoring"
-                    iconSize: 25
-                    color: Appearance.colors.colOnSurface
-                }
-
-                StyledText {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: Translation.tr("System metrics")
-                    font.pixelSize: 20
-                    color: Appearance.colors.colOnSurface
                 }
             }
 
@@ -1148,8 +1126,8 @@ Item { // Wrapper
             opacity: root.resultsVisible ? 1 : 0
             scale: root.resultsVisible ? 1 : 0.94
             transformOrigin: Item.Top
-            anchors.top: searchPill.bottom
-            anchors.topMargin: root.searchPanelGap
+            anchors.top: root.showMetrics ? parent.top : searchPill.bottom
+            anchors.topMargin: root.showMetrics ? 0 : root.searchPanelGap
             anchors.horizontalCenter: parent.horizontalCenter
             width: root.clipboardMode ? root.searchPillWidth : root.resultsPanelWidth
             height: root.activeResultsPanelHeight
