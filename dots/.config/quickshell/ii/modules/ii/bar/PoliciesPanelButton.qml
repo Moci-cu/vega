@@ -8,8 +8,6 @@ RippleButton {
     id: leftSidebarButton
     property color foregroundColor: Appearance.colors.colOnLayer0
 
-    property bool showPing: false
-
     property real buttonPadding: 5
     implicitWidth: distroIcon.width + buttonPadding * 2
     implicitHeight: distroIcon.height + buttonPadding * 2
@@ -19,34 +17,7 @@ RippleButton {
     colBackgroundToggled: Appearance.colors.colSecondaryContainer
     colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
     colRippleToggled: Appearance.colors.colSecondaryContainerActive
-    toggled: GlobalStates.sidebarLeftOpen
-
-    onPressed: {
-        GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
-    }
-
-    Connections {
-        target: Ai
-        function onResponseFinished() {
-            if (GlobalStates.sidebarLeftOpen) return;
-            leftSidebarButton.showPing = true;
-        }
-    }
-
-    Connections {
-        target: Booru
-        function onResponseFinished() {
-            if (GlobalStates.sidebarLeftOpen) return;
-            leftSidebarButton.showPing = true;
-        }
-    }
-
-    Connections {
-        target: GlobalStates
-        function onSidebarLeftOpenChanged() {
-            leftSidebarButton.showPing = false;
-        }
-    }
+    onPressed: LauncherSearch.metricsPanelRequested()
 
     CustomIcon {
         id: distroIcon
@@ -57,23 +28,5 @@ RippleButton {
         colorize: true
         color: leftSidebarButton.foregroundColor
 
-        Rectangle {
-            opacity: leftSidebarButton.showPing ? 1 : 0
-            visible: opacity > 0
-            anchors {
-                bottom: parent.bottom
-                right: parent.right
-                bottomMargin: -2
-                rightMargin: -2
-            }
-            implicitWidth: 8
-            implicitHeight: 8
-            radius: Appearance.rounding.full
-            color: Appearance.colors.colTertiary
-
-            Behavior on opacity {
-                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-            }
-        }
     }
 }

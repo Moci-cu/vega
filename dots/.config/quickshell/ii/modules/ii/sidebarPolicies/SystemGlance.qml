@@ -18,6 +18,7 @@ Item {
     property bool trackingResources: false
     property string gpuBusyPath: ""
     property real gpuUsage: 0
+    property bool launcherMode: false
 
     function getUpcomingForecast(data) {
         if (!Array.isArray(data)) return []
@@ -51,7 +52,7 @@ Item {
     }
 
     function updateResourceTracking() {
-        const shouldTrack = glanceRoot.visible && GlobalStates.sidebarLeftOpen
+        const shouldTrack = glanceRoot.visible && (launcherMode ? GlobalStates.overviewOpen : GlobalStates.sidebarLeftOpen)
         if (shouldTrack === glanceRoot.trackingResources) return
         glanceRoot.trackingResources = shouldTrack
         ResourceUsage.activeInstances += shouldTrack ? 1 : -1
@@ -68,6 +69,7 @@ Item {
     Connections {
         target: GlobalStates
         function onSidebarLeftOpenChanged() { glanceRoot.updateResourceTracking() }
+        function onOverviewOpenChanged() { glanceRoot.updateResourceTracking() }
     }
 
     Process {
@@ -102,33 +104,35 @@ Item {
         onTriggered: gpuUsageFile.reload()
     }
 
-    ColumnLayout {
+    GridLayout {
         anchors {
             fill: parent
             margins: 4
         }
-        spacing: 10
+        columns: glanceRoot.launcherMode ? 2 : 1
+        rowSpacing: 10
+        columnSpacing: 10
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 142
-            radius: Appearance.rounding.normal
+            Layout.preferredHeight: glanceRoot.launcherMode ? 112 : 142
+            radius: glanceRoot.launcherMode ? 28 : Appearance.rounding.normal
             color: Appearance.colors.colPrimaryContainer
 
             RowLayout {
                 anchors {
                     fill: parent
-                    margins: 18
+                    margins: glanceRoot.launcherMode ? 12 : 18
                 }
                 spacing: 18
 
                 Item {
-                    Layout.preferredWidth: 104
-                    Layout.preferredHeight: 104
+                    Layout.preferredWidth: glanceRoot.launcherMode ? 64 : 104
+                    Layout.preferredHeight: glanceRoot.launcherMode ? 64 : 104
 
                     CircularProgress {
                         anchors.centerIn: parent
-                        implicitSize: 104
+                        implicitSize: glanceRoot.launcherMode ? 64 : 104
                         lineWidth: 7
                         gapAngle: 7
                         value: glanceRoot.dayProgress
@@ -138,14 +142,14 @@ Item {
 
                     MaterialShape {
                         anchors.centerIn: parent
-                        implicitSize: 72
+                        implicitSize: glanceRoot.launcherMode ? 42 : 72
                         shapeString: "Cookie9Sided"
                         color: Appearance.colors.colPrimary
 
                         MaterialSymbol {
                             anchors.centerIn: parent
                             text: "schedule"
-                            iconSize: Appearance.font.pixelSize.hugeass
+                            iconSize: glanceRoot.launcherMode ? 24 : Appearance.font.pixelSize.hugeass
                             color: Appearance.colors.colOnPrimary
                             fill: 1
                         }
@@ -159,7 +163,7 @@ Item {
                     StyledText {
                         text: DateTime.time
                         font.family: Appearance.font.family.title
-                        font.pixelSize: Appearance.font.pixelSize.hugeass * 2
+                        font.pixelSize: glanceRoot.launcherMode ? 38 : Appearance.font.pixelSize.hugeass * 2
                         font.weight: Font.Black
                         color: Appearance.colors.colOnPrimaryContainer
                     }
@@ -173,6 +177,7 @@ Item {
                     }
 
                     RowLayout {
+                        visible: !glanceRoot.launcherMode
                         Layout.fillWidth: true
                         spacing: 5
 
@@ -198,8 +203,8 @@ Item {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 138
-            radius: Appearance.rounding.normal
+            Layout.preferredHeight: glanceRoot.launcherMode ? 112 : 138
+            radius: glanceRoot.launcherMode ? 28 : Appearance.rounding.normal
             color: Appearance.colors.colSecondaryContainer
 
             RowLayout {
@@ -221,14 +226,14 @@ Item {
                         spacing: 8
 
                         MaterialShape {
-                            implicitSize: 58
+                            implicitSize: glanceRoot.launcherMode ? 36 : 58
                             shapeString: Weather.data.wCode == 113 ? "Sunny" : "Puffy"
                             color: Appearance.colors.colSecondary
 
                             MaterialSymbol {
                                 anchors.centerIn: parent
                                 text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
-                                iconSize: Appearance.font.pixelSize.hugeass
+                                iconSize: glanceRoot.launcherMode ? 24 : Appearance.font.pixelSize.hugeass
                                 color: Appearance.colors.colOnSecondary
                                 fill: 1
                             }
@@ -279,6 +284,7 @@ Item {
                             }
 
                             StyledText {
+                                visible: !glanceRoot.launcherMode
                                 text: Translation.tr("%1 • %2")
                                     .arg(Weather.data.wDesc || Translation.tr("Weather unavailable"))
                                     .arg(Weather.data.city || Config.options.bar.weather.city)
@@ -319,14 +325,14 @@ Item {
 
                                         MaterialShape {
                                             Layout.alignment: Qt.AlignHCenter
-                                            implicitSize: 42
+                                    implicitSize: glanceRoot.launcherMode ? 24 : 42
                                             shapeString: "Clover4Leaf"
                                             color: Appearance.colors.colSecondaryContainer
 
                                             MaterialSymbol {
                                                 anchors.centerIn: parent
                                                 text: Icons.getWeatherIcon(modelData.code) ?? "cloud"
-                                                iconSize: Appearance.font.pixelSize.large
+                                                iconSize: glanceRoot.launcherMode ? 18 : Appearance.font.pixelSize.large
                                                 color: Appearance.colors.colOnSecondaryContainer
                                             }
                                         }
@@ -358,8 +364,8 @@ Item {
 
         TelemetryCard {
             Layout.fillWidth: true
-            Layout.preferredHeight: 112
-            label: Translation.tr("CPU performance")
+            Layout.preferredHeight: glanceRoot.launcherMode ? 128 : 112
+            label: glanceRoot.launcherMode ? Translation.tr("CPU") : Translation.tr("CPU performance")
             value: `${Math.round(ResourceUsage.cpuUsage * 100)}%`
             detail: `${ResourceUsage.cpuTemp} • ${ResourceUsage.cpuFreq}`
             secondaryDetail: ResourceUsage.cpuModel
@@ -372,8 +378,8 @@ Item {
 
         TelemetryCard {
             Layout.fillWidth: true
-            Layout.preferredHeight: 112
-            label: Translation.tr("Memory utilization")
+            Layout.preferredHeight: glanceRoot.launcherMode ? 128 : 112
+            label: glanceRoot.launcherMode ? Translation.tr("Memory") : Translation.tr("Memory utilization")
             value: `${Math.round(ResourceUsage.memoryUsedPercentage * 100)}%`
             detail: Translation.tr("%1 of %2").arg(glanceRoot.formatGB(ResourceUsage.memoryUsed)).arg(glanceRoot.formatGB(ResourceUsage.memoryTotal))
             secondaryDetail: Translation.tr("%1 available").arg(glanceRoot.formatGB(ResourceUsage.memoryFree))
@@ -387,8 +393,9 @@ Item {
         GridLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.minimumHeight: 112
-            columns: 2
+            Layout.columnSpan: glanceRoot.launcherMode ? 2 : 1
+            Layout.minimumHeight: glanceRoot.launcherMode ? 148 : 112
+            columns: glanceRoot.launcherMode ? 4 : 2
             rowSpacing: 10
             columnSpacing: 10
 
@@ -447,7 +454,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 label: Translation.tr("Energy")
-                value: `${Math.abs(Battery.energyRate).toFixed(1)} W`
+                value: Battery.available ? `${Math.abs(Battery.energyRate).toFixed(1)} W` : "--"
                 detail: Battery.isCharging
                     ? Translation.tr("Charging input")
                     : glanceRoot.externalPower
@@ -512,7 +519,7 @@ Item {
         required property string shapeString
         required property list<real> history
 
-        radius: Appearance.rounding.normal
+        radius: glanceRoot.launcherMode ? 24 : Appearance.rounding.normal
         color: Appearance.colors.colSurfaceContainerHigh
 
         RowLayout {
@@ -523,9 +530,9 @@ Item {
             spacing: 10
 
             ColumnLayout {
-                Layout.minimumWidth: 126
-                Layout.preferredWidth: 126
-                Layout.maximumWidth: 126
+                Layout.minimumWidth: glanceRoot.launcherMode ? 108 : 126
+                Layout.preferredWidth: glanceRoot.launcherMode ? 108 : 126
+                Layout.maximumWidth: glanceRoot.launcherMode ? 108 : 126
                 Layout.fillHeight: true
                 spacing: 2
 
@@ -555,7 +562,7 @@ Item {
                 StyledText {
                     text: card.value
                     font.family: Appearance.font.family.title
-                    font.pixelSize: Appearance.font.pixelSize.hugeass + 2
+                    font.pixelSize: glanceRoot.launcherMode ? 36 : Appearance.font.pixelSize.hugeass + 2
                     font.weight: Font.Black
                     color: card.accent
                 }
@@ -620,7 +627,7 @@ Item {
         required property string shapeString
         property int segments: 12
 
-        radius: Appearance.rounding.normal
+        radius: glanceRoot.launcherMode ? 24 : Appearance.rounding.normal
         color: Appearance.colors.colSurfaceContainerHigh
 
         ColumnLayout {
@@ -635,7 +642,7 @@ Item {
                 spacing: 8
 
                 MaterialShape {
-                    implicitSize: 36
+                    implicitSize: glanceRoot.launcherMode ? 28 : 36
                     shapeString: card.shapeString
                     color: card.accent
 
@@ -657,12 +664,23 @@ Item {
                 }
 
                 StyledText {
+                    visible: !glanceRoot.launcherMode
                     text: card.value
                     font.family: Appearance.font.family.title
                     font.pixelSize: Appearance.font.pixelSize.large
                     font.weight: Font.Black
                     color: card.accent
                 }
+            }
+
+            StyledText {
+                visible: glanceRoot.launcherMode
+                Layout.fillWidth: true
+                text: card.value
+                font.family: Appearance.font.family.title
+                font.pixelSize: 30
+                font.weight: Font.Black
+                color: card.accent
             }
 
             StyledText {

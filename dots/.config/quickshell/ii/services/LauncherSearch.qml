@@ -21,6 +21,7 @@ Singleton {
     signal bluetoothPanelRequested()
     signal timerPanelRequested()
     signal todoPanelRequested()
+    signal metricsPanelRequested()
 
     readonly property list<var> searchPrefixEntries: [
         { name: "action", prefix: Config.options.search.prefix.action },
@@ -73,6 +74,15 @@ Singleton {
     }
 
     readonly property list<var> commandKeywords: [
+        {
+            key: "metrics",
+            name: "System Metrics",
+            aliases: ["metrics", "system metrics", "system monitor", "performance monitor", "resources"],
+            verb: Translation.tr("Open"),
+            iconName: "monitoring",
+            keepLauncherOpen: true,
+            execute: () => root.metricsPanelRequested()
+        },
         {
             key: "wifi",
             name: "wifi",

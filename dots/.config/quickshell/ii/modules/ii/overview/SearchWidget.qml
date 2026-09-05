@@ -14,6 +14,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.modules.ii.sidebarPolicies
 
 Item { // Wrapper
     id: root
@@ -63,12 +64,12 @@ Item { // Wrapper
     readonly property bool nativeAppSearchActive: LauncherSearch.shouldUseNativeAppSearch(root.searchingText)
     readonly property bool wifiCommandMode: LauncherSearch.isWifiCommandQuery(root.searchingText)
     readonly property bool controlPanelOpen: wifiPanelOpen || bluetoothPanelOpen
-        || timerPanelOpen || todoPanelOpen
+        || timerPanelOpen || todoPanelOpen || showMetrics
     readonly property bool resultsVisible: showResults || controlPanelOpen
     readonly property bool appResultsReady: !appMode || (nativeAppSearchActive
         ? nativeResultQuery === searchingText && !(NativeAppSearch.model?.busy ?? false)
         : fallbackAppQuery === searchingText)
-    readonly property int activeResultCount: timerPanelOpen ? 0 : wifiPanelOpen
+    readonly property int activeResultCount: timerPanelOpen || showMetrics ? 0 : wifiPanelOpen
         ? (wifiPanelLoader.item?.networkCount ?? 0) : bluetoothPanelOpen
             ? (bluetoothPanelLoader.item?.deviceCount ?? 0) : todoPanelOpen
                 ? (todoPanelLoader.item?.taskCount ?? 0) : wifiCommandMode
@@ -76,7 +77,7 @@ Item { // Wrapper
                         ? (!showResults && nativeAutocompleteResult
                             ? Math.max(1, appGrid.count) : appGrid.count)
                         : listResults.count
-    readonly property int activeCurrentIndex: timerPanelOpen ? -1 : wifiPanelOpen
+    readonly property int activeCurrentIndex: timerPanelOpen || showMetrics ? -1 : wifiPanelOpen
         ? (wifiPanelLoader.item?.currentIndex ?? -1) : bluetoothPanelOpen
             ? (bluetoothPanelLoader.item?.currentIndex ?? -1) : todoPanelOpen
                 ? (todoPanelLoader.item?.currentIndex ?? -1) : wifiCommandMode
@@ -92,6 +93,16 @@ Item { // Wrapper
     property bool applicationGridMode: false
     property bool showCategories: false
     property bool showClipboard: false
+    property bool showMetrics: false
+    onShowMetricsChanged: {
+        if (!showMetrics) return;
+        root.wifiPanelOpen = false;
+        root.bluetoothPanelOpen = false;
+        root.timerPanelOpen = false;
+        root.todoPanelOpen = false;
+        root.scheduleResultsRefresh();
+        Qt.callLater(root.focusSearchInput);
+    }
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
     property bool timerPanelOpen: false
@@ -107,6 +118,7 @@ Item { // Wrapper
             : wifiCommandMode ? wifiCommandInlineHeight : 0)
     readonly property bool deepGlassMode: appMode || clipboardMode || controlPanelOpen
     readonly property bool categoriesVisible: showCategories
+        && !controlPanelOpen
         && !showResults
         && searchingText.trim().length === 0
     property real revealProgress: 1
@@ -209,6 +221,10 @@ Item { // Wrapper
     }
 
     function focusSearchInput() {
+        if (root.showMetrics) {
+            root.forceActiveFocus();
+            return;
+        }
         searchBar.forceFocus();
     }
 
@@ -224,6 +240,7 @@ Item { // Wrapper
     }
 
     function setSearchingText(text) {
+        if (root.showMetrics) return;
         searchBar.setQueryImmediately(text);
     }
 
@@ -460,6 +477,11 @@ Item { // Wrapper
         // Prevent Esc and Backspace from registering
         if (event.key === Qt.Key_Escape)
             return;
+
+        if (root.showMetrics) {
+            event.accepted = true;
+            return;
+        }
 
         // Handle Backspace: focus and delete character if not focused
         if (event.key === Qt.Key_Backspace) {
@@ -782,6 +804,8 @@ Item { // Wrapper
 
             SearchBar {
                 id: searchBar
+                visible: !root.showMetrics
+                enabled: !root.showMetrics
 
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -801,7 +825,7 @@ Item { // Wrapper
                     : root.bluetoothPanelOpen ? Translation.tr("Search Bluetooth devices…")
                     : root.clipboardMode && root.showResults
                         ? Translation.tr("Clipboard") : Translation.tr("Search or Ask")
-                leadingIcon: root.todoPanelOpen ? "checklist"
+                leadingIcon: root.showMetrics ? "monitoring" : root.todoPanelOpen ? "checklist"
                     : root.timerPanelOpen ? "timer"
                     : root.wifiPanelOpen ? "wifi"
                     : root.bluetoothPanelOpen ? "bluetooth"
@@ -809,7 +833,7 @@ Item { // Wrapper
                 resultCount: root.activeResultCount
                 currentIndex: root.activeCurrentIndex
                 navigationColumns: root.controlPanelOpen ? 1 : root.appMode ? root.appGridColumns : 1
-                selectedResult: root.timerPanelOpen ? null
+                selectedResult: root.timerPanelOpen || root.showMetrics ? null
                     : root.todoPanelOpen ? (todoPanelLoader.item?.selectedAction ?? null)
                     : root.wifiPanelOpen ? (wifiPanelLoader.item?.selectedAction ?? null)
                     : root.bluetoothPanelOpen ? (bluetoothPanelLoader.item?.selectedAction ?? null)
@@ -826,6 +850,29 @@ Item { // Wrapper
 
                 Synchronizer on searchingText {
                     property alias source: root.searchingText
+                }
+            }
+
+            RowLayout {
+                visible: root.showMetrics
+                anchors.left: parent.left
+                anchors.leftMargin: 28
+                anchors.top: parent.top
+                height: root.searchPillHeight
+                spacing: 12
+
+                MaterialSymbol {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: "monitoring"
+                    iconSize: 25
+                    color: Appearance.colors.colOnSurface
+                }
+
+                StyledText {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: Translation.tr("System metrics")
+                    font.pixelSize: 20
+                    color: Appearance.colors.colOnSurface
                 }
             }
 
@@ -1311,6 +1358,14 @@ Item { // Wrapper
                     visible: active
                     anchors.fill: parent
                     sourceComponent: TimerPanel {}
+                }
+
+                Loader {
+                    id: metricsPanelLoader
+                    anchors.fill: parent
+                    active: root.showMetrics && GlobalStates.overviewOpen
+                    visible: active
+                    sourceComponent: SystemGlance { launcherMode: true }
                 }
 
                 Loader {

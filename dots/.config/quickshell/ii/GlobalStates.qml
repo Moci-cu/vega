@@ -61,6 +61,10 @@ Singleton {
     readonly property bool dashboardOnLeft: Config.options.sidebar.position === "inverted" || Config.options.sidebar.position === "left"
 
     onPoliciesPanelOpenChanged: {
+        if (policiesPanelOpen && Config.options.panelFamily === "ii") {
+            policiesPanelOpen = false;
+            return;
+        }
         if (policiesPanelOpen) {
             if (Config.options.sidebar.position == "right" || Config.options.sidebar.position == "left") {
                 GlobalStates.dashboardPanelOpen = false

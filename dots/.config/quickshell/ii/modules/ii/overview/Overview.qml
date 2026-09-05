@@ -18,6 +18,7 @@ Scope {
     property bool applicationsOpen: false
     property bool categoriesOpen: false
     property bool clipboardOpen: false
+    property bool metricsOpen: false
     property bool workspaceMode: false
     property string focusRestoreAddress: ""
     property int focusRestoreGeneration: 0
@@ -53,6 +54,7 @@ Scope {
     }
 
     function toggleSearch() {
+        metricsOpen = false
         if (GlobalStates.overviewOpen && clipboardOpen) {
             dontAutoCancelSearch = false
             return
@@ -73,6 +75,7 @@ Scope {
     }
 
     function toggleWorkspaces() {
+        metricsOpen = false
         if (GlobalStates.overviewOpen && workspaceMode) {
             GlobalStates.overviewOpen = false
             return
@@ -88,6 +91,7 @@ Scope {
     }
 
     function toggleCategories() {
+        metricsOpen = false
         if (GlobalStates.overviewOpen && categoriesOpen) {
             GlobalStates.overviewOpen = false
             return
@@ -103,6 +107,7 @@ Scope {
     }
 
     function toggleApplications() {
+        metricsOpen = false
         if (GlobalStates.overviewOpen && applicationsOpen) {
             applicationsPending = false
             applicationsOpen = false
@@ -117,6 +122,31 @@ Scope {
         dontAutoCancelSearch = true
         setSearchingTextRequested(Config.options.search.prefix.app)
         GlobalStates.overviewOpen = true
+    }
+
+    function openMetrics() {
+        workspaceMode = false
+        applicationsPending = false
+        applicationsOpen = false
+        categoriesOpen = false
+        clipboardOpen = false
+        dontAutoCancelSearch = true
+        setSearchingTextRequested("")
+        metricsOpen = true
+        GlobalStates.overviewOpen = true
+    }
+
+    function toggleMetrics() {
+        if (GlobalStates.overviewOpen && metricsOpen) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        openMetrics()
+    }
+
+    Connections {
+        target: LauncherSearch
+        function onMetricsPanelRequested() { overviewScope.openMetrics() }
     }
 
     Connections {
@@ -276,6 +306,7 @@ Scope {
                             overviewScope.applicationsOpen = false;
                             overviewScope.categoriesOpen = false;
                             overviewScope.clipboardOpen = false;
+                            overviewScope.metricsOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
                             root.launcherScale = 0.965;
@@ -369,6 +400,7 @@ Scope {
                             applicationGridMode: overviewScope.applicationsOpen
                             showCategories: overviewScope.categoriesOpen
                             showClipboard: overviewScope.clipboardOpen
+                            showMetrics: overviewScope.metricsOpen
                             revealProgress: root.launcherRevealProgress
                             visualScale: root.launcherScale
                             anchors.centerIn: parent
@@ -428,6 +460,7 @@ Scope {
     
 
     function toggleClipboard() {
+        overviewScope.metricsOpen = false;
         if (GlobalStates.overviewOpen && overviewScope.clipboardOpen) {
             GlobalStates.overviewOpen = false;
             return;
@@ -443,6 +476,7 @@ Scope {
     }
 
     function toggleEmojis() {
+        overviewScope.metricsOpen = false;
         const emojisActive = GlobalStates.overviewOpen
             && !overviewScope.workspaceMode && !overviewScope.categoriesOpen
             && !overviewScope.clipboardOpen && overviewScope.dontAutoCancelSearch
@@ -472,6 +506,9 @@ Scope {
         }
         function applicationsToggle() {
             overviewScope.toggleApplications();
+        }
+        function metricsToggle() {
+            overviewScope.toggleMetrics();
         }
         function categoriesToggle() {
             overviewScope.toggleCategories();
@@ -563,6 +600,12 @@ Scope {
         onPressed: {
             overviewScope.toggleClipboard();
         }
+    }
+
+    GlobalShortcut {
+        name: "overviewMetricsToggle"
+        description: "Toggle system metrics"
+        onPressed: overviewScope.toggleMetrics()
     }
 
     GlobalShortcut {
