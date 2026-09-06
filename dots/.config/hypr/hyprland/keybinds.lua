@@ -109,9 +109,9 @@ hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true, description =
 hl.bind("SUPER + mouse:274", hl.dsp.window.drag(), { mouse = true })
 hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true, description = "Window: Resize" })
 --#/# bind = SUPER + ←/↑/→/↓,, -- Focus in direction
-for i = 1, 6 do
-    local arrowkey = { "Left", "Right", "Up", "Down", "BracketLeft", "BracketRight" }
-    local focusdir = { "l", "r", "u", "d", "l", "r" }
+for i = 1, 8 do
+    local arrowkey = { "Left", "Right", "Up", "Down", "BracketLeft", "BracketRight", "H", "L" }
+    local focusdir = { "l", "r", "u", "d", "l", "r", "l", "r" }
     hl.bind("SUPER + " .. arrowkey[i], hl.dsp.focus({ direction = focusdir[i] }))
 end
 --#/# bind = SUPER + SHIFT, ←/↑/→/↓,, -- Move in direction
@@ -144,7 +144,7 @@ hl.bind("SUPER + ALT + J", hl.dsp.window.resize({ x = 0, y = 50, relative = true
     { repeating = true, description = "Window: Resize down" })
 hl.bind("SUPER + ALT + K", hl.dsp.window.resize({ x = 0, y = -50, relative = true }),
     { repeating = true, description = "Window: Resize up" })
-hl.bind("SUPER + ALT + L", hl.dsp.window.resize({ x = 50, y = 0, relative = true }),
+hl.bind("SUPER + ALT + SHIFT + L", hl.dsp.window.resize({ x = 50, y = 0, relative = true }),
     { repeating = true, description = "Window: Resize right" })
 hl.bind("SUPER + D", hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }),
     { description = "Window: Maximize" })
@@ -271,7 +271,7 @@ hl.bind("SUPER + ALT + Equal",
     hl.dsp.exec_cmd("notify-send 'Urgent notification' 'Ah hell no' -u critical -a 'Hyprland keybind'"))                             -- # [hidden]
 
 --##! Session
-hl.bind("SUPER + L", hl.dsp.exec_cmd("loginctl lock-session"), { description = "Misc: Lock" })
+hl.bind("SUPER + ALT + L", hl.dsp.exec_cmd("loginctl lock-session"), { description = "Misc: Lock" })
 hl.bind("SUPER + SHIFT + L", hl.dsp.exec_cmd("systemctl suspend || loginctl suspend"),
     { locked = true, description = "Misc: Suspend system" })                                                                                   -- Sleep
 -- hl.bind("switch:on:Lid Switch", hl.dsp.exec_cmd("systemctl suspend || loginctl suspend"), {locked = true} ) -- # [hidden] Suspend when laptop lid is closed, uncomment if for whatever reason it's not the default behavior

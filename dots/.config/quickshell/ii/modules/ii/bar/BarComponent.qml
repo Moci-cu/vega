@@ -70,6 +70,7 @@ Item {
         "policies_panel_button": [policiesPanelButton, policiesPanelButton],
         "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert],
         "network_speed": [networkSpeedComp, networkSpeedComp],
+        "bongocat": [bongoCatComp, bongoCatComp],
     })
 
     property real startRadius: {
@@ -187,5 +188,6 @@ Item {
     
     Component { id: dashboardPanelButton; DashboardPanelButton { foregroundColor: rootItem.foregroundColor } }
     Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
+    Component { id: bongoCatComp; BongoCatWidget { vertical: rootItem.vertical } }
     Component { id: dashboardPanelButtonVert; VerticalDashboardPanelButton {} }
 }
