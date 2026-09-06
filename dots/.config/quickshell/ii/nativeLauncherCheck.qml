@@ -74,10 +74,10 @@ ShellRoot {
                     || widgetLoader.item.resultsPanelWidth !== 794
                     || widgetLoader.item.resultsPanelHeight !== 440
                     || widgetLoader.item.categoryEntries.length !== 4
-                    || widgetLoader.item.categoryPanelWidth !== 490
+                    || widgetLoader.item.categoryPanelWidth !== 420
                     || widgetLoader.item.categoryPanelHeight !== 184
-                    || widgetLoader.item.searchPillWidth !== 490
-                    || widgetLoader.item.searchPillHeight !== 90
+                    || widgetLoader.item.searchPillWidth !== 420
+                    || widgetLoader.item.searchPillHeight !== 72
                     || widgetLoader.item.searchPillWidth >= widgetLoader.item.resultsPanelWidth
                     || widgetLoader.item.showResults
                     || widgetLoader.item.showCategories

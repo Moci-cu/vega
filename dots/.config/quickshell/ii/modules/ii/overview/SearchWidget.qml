@@ -48,8 +48,8 @@ Item { // Wrapper
         { label: "Actions", icon: "layers" },
         { label: "Clipboard", icon: "content_copy" }
     ]
-    readonly property real searchPillWidth: 490
-    readonly property real searchPillHeight: 90
+    readonly property real searchPillWidth: 420
+    readonly property real searchPillHeight: 72
     readonly property real calculatorPanelHeight: 64
     readonly property real wifiCommandRowHeight: 52
     readonly property real wifiCommandInlineHeight: LauncherSearch.wifiCommandActions.length
