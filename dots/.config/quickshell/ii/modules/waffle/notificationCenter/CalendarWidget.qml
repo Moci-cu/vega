@@ -64,6 +64,7 @@ BodyRectangle {
             }
             CalendarView {
                 id: calendarView
+                scrollAnimation: Looks.transition.scroll
                 locale: root.locale
                 verticalPadding: 2
                 buttonSize: 41 // ???

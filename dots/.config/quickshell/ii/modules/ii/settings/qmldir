@@ -1,0 +1,7 @@
+module qs.modules.ii.settings
+ExtensionBadge ExtensionBadge.qml
+ExtensionCard ExtensionCard.qml
+ExtensionConfigPanel ExtensionConfigPanel.qml
+ExtensionList ExtensionList.qml
+InstalledExtensionCard InstalledExtensionCard.qml
+InstalledExtensionList InstalledExtensionList.qml

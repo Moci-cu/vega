@@ -17,7 +17,6 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions as CF
-import qs.modules.settings
 
 ApplicationWindow {
     id: root

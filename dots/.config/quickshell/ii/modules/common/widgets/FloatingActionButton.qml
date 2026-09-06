@@ -46,6 +46,7 @@ RippleButton {
             visible: root.buttonText?.length > 0
             active: true
             sourceComponent: Revealer {
+                implicitHeight: buttonText.implicitHeight
                 visible: root.expanded || implicitWidth > 0
                 reveal: root.expanded
                 implicitWidth: reveal ? (buttonText.implicitWidth + root.elementSpacing + contentRowLayout.horizontalMargins) : 0

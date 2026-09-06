@@ -5,6 +5,7 @@ Hyprland dotfiles based on illogical-impulse, built with Quickshell (QtQuick/QML
 ## Commands
 
 - **Run settings app:** `qs -c ii settings.qml` (separate QApplication)
+- **Standalone QML checks:** `qs -p dots/.config/quickshell/ii/systemMetricsCheck.qml` (also `barColorCheck.qml`, `nativeLauncherCheck.qml`, `networkModelCheck.qml`, `pomodoroUiCheck.qml`). Keep check filenames lowercase-first: Quickshell scans uppercase QML siblings and their imports even when Settings does not instantiate them.
 - **Setup/update:** `./setup-ii-vynx.sh` or `vynx update` (CLI)
 - **Legacy setup router:** `./setup <subcommand>` (install, uninstall, exp-update, etc.)
 - **LSP setup:** `touch ~/.config/quickshell/ii/.qmlls.ini` — gitignored, create manually
