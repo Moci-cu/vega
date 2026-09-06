@@ -363,7 +363,6 @@ Scope {
 
                 function setSearchingText(text) {
                     searchWidget.setSearchingText(text);
-                    searchWidget.focusFirstItem();
                 }
 
                 Item {

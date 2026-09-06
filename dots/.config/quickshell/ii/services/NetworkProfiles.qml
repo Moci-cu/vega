@@ -43,11 +43,12 @@ Singleton {
 
     function stop(): void {
         readyTimer.stop()
+        lastError = Translation.tr("Wi-Fi helper stopped")
         helperProcess.running = false
         available = false
         loading = false
         operationRunning = false
-        failPending(Translation.tr("Wi-Fi helper stopped"))
+        failPending(lastError)
     }
 
     function retry(): void {
@@ -86,10 +87,11 @@ Singleton {
     }
 
     function failPending(message: string): void {
+        const reason = message.trim() || Translation.tr("Wi-Fi helper is unavailable")
         const pending = pendingRequests
         pendingRequests = ({})
         for (const id in pending) {
-            if (pending[id].callback) pending[id].callback(false, undefined, { message: message })
+            if (pending[id].callback) pending[id].callback(false, undefined, { message: reason })
         }
     }
 
@@ -118,7 +120,10 @@ Singleton {
     }
 
     function runWrite(method: string, params: var, callback: var): void {
-        if (operationRunning) return
+        if (operationRunning) {
+            if (callback) callback(false, undefined, { message: Translation.tr("Another Wi-Fi operation is in progress") })
+            return
+        }
         operationRunning = true
         lastError = ""
         request(method, params, function(ok, result, error) {

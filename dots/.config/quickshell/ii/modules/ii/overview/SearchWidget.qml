@@ -129,6 +129,7 @@ Item { // Wrapper
     property var pendingResultAction: null
     property string nativeResultQuery: ""
     property var nativeAutocompleteResult: null
+    property bool appSelectionReady: false
     property real retainedBackdropWidth: resultsPanelWidth + 4
     property real retainedBackdropHeight: searchPillHeight + searchPanelGap
         + Math.max(resultsPanelHeight, clipboardPanelHeight) + 4
@@ -269,10 +270,13 @@ Item { // Wrapper
     }
 
     function finishResultsRefresh(query) {
+        if (query !== root.searchingText)
+            return;
+        root.focusFirstItem();
+        root.appSelectionReady = true;
         Qt.callLater(() => {
             if (query !== root.searchingText)
                 return;
-            root.focusFirstItem();
             if (query !== root.pendingResultQuery || !root.pendingResultAction)
                 return;
             const action = root.pendingResultAction;
@@ -377,6 +381,7 @@ Item { // Wrapper
     }
 
     function scheduleResultsRefresh() {
+        root.appSelectionReady = false;
         resultsRefreshTimer.restart();
     }
 
@@ -557,7 +562,8 @@ Item { // Wrapper
         }
 
         onHoveredChanged: {
-            if (hovered && !appGrid.moving && appGrid.currentIndex !== index)
+            if (hovered && root.appSelectionReady && appGrid.visible
+                    && !appGrid.moving && appGrid.currentIndex !== index)
                 appGrid.currentIndex = index;
         }
         onClicked: {
@@ -1201,6 +1207,7 @@ Item { // Wrapper
                     id: appGrid
 
                     visible: !root.controlPanelOpen && root.appMode && root.appResultsReady
+                        && root.appSelectionReady
                     anchors.fill: parent
                     clip: true
                     cellWidth: root.appGridCellWidth

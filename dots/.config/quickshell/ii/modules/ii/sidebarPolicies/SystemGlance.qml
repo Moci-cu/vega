@@ -13,16 +13,16 @@ Item {
         const date = DateTime.clock.date
         return (date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds()) / 86400
     }
-    readonly property var upcomingForecast: getUpcomingForecast(Weather.hourlyForecast)
+    readonly property int forecastSlot: Math.floor(DateTime.clock.date.getHours() / 3) * 3
+    readonly property var upcomingForecast: getUpcomingForecast(Weather.hourlyForecast, forecastSlot)
     readonly property bool externalPower: Battery.isCharging || Battery.chargeState == 4
     property bool trackingResources: false
     property string gpuBusyPath: ""
     property real gpuUsage: 0
     property bool launcherMode: false
 
-    function getUpcomingForecast(data) {
+    function getUpcomingForecast(data, currentSlot) {
         if (!Array.isArray(data)) return []
-        const currentSlot = Math.floor(DateTime.clock.date.getHours() / 3) * 3
         let nextDay = false
         const result = []
 
@@ -41,7 +41,7 @@ Item {
     }
 
     function formatGB(kb) {
-        return (kb / (1024 * 1024)).toFixed(1) + " GB"
+        return (kb / (1024 * 1024)).toFixed(1) + " GiB"
     }
 
     function formatBatteryTime(seconds) {
@@ -65,6 +65,7 @@ Item {
             ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
     }
     onVisibleChanged: updateResourceTracking()
+    onLauncherModeChanged: updateResourceTracking()
 
     Connections {
         target: GlobalStates
