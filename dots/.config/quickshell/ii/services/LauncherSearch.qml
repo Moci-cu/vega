@@ -54,7 +54,8 @@ Singleton {
     }
 
     function isImplicitMathQuery(queryText = root.query) {
-        return /^[+-]?\d/.test(String(queryText ?? "").trim());
+        const queryString = String(queryText ?? "").trim();
+        return /^[+-]?\d[\d\s.]*[+\-*\/%^][\d\s.+\-*\/%^()]*$/.test(queryString);
     }
 
     function isApplicationQuery(queryText = root.query) {
@@ -212,10 +213,7 @@ Singleton {
             name: "Enable Bluetooth",
             verb: Translation.tr("Turn On"),
             iconName: "bluetooth",
-            execute: () => {
-                if (Bluetooth.defaultAdapter)
-                    Bluetooth.defaultAdapter.enabled = true;
-            }
+            execute: () => BluetoothStatus.setEnabled(true)
         },
         {
             key: "bluetooth-off",
@@ -224,10 +222,7 @@ Singleton {
             name: "Disable Bluetooth",
             verb: Translation.tr("Turn Off"),
             iconName: "bluetooth_disabled",
-            execute: () => {
-                if (Bluetooth.defaultAdapter)
-                    Bluetooth.defaultAdapter.enabled = false;
-            }
+            execute: () => BluetoothStatus.setEnabled(false)
         },
         {
             key: "timer-open",

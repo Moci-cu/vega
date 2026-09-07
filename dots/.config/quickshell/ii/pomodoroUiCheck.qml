@@ -23,7 +23,10 @@ ShellRoot {
         interval: 1000
         running: true
         onTriggered: {
-            if (widgetLoader.status !== Loader.Ready || !widgetLoader.item) Qt.exit(2);
+            if (widgetLoader.status !== Loader.Ready || !widgetLoader.item) {
+                Qt.exit(2);
+                return;
+            }
             console.log("[PomodoroUiCheck] ready=332x350");
             Qt.quit();
         }

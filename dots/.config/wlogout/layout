@@ -24,7 +24,7 @@
 }
 {
     "label" : "suspend",
-    "action" : "loginctl lock-session && sleep 1.5 && systemctl suspend || loginctl suspend",
+    "action" : "loginctl lock-session && sleep 1.5 && (systemctl suspend || loginctl suspend)",
     "text" : "bedtime",
     "keybind" : "u"
 }

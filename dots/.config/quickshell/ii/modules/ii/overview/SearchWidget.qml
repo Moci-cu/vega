@@ -591,9 +591,6 @@ Item { // Wrapper
                         border.width: gridItem.toggled ? 0.6 : 0
                         border.color: Qt.rgba(1, 1, 1, 0.16)
 
-                        Behavior on color {
-                            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-                        }
                     }
 
                     IconImage {

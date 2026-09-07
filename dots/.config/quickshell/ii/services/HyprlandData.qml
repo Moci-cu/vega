@@ -28,6 +28,10 @@ Singleton {
     property bool layersDirty: false
     property bool workspacesDirty: false
     property bool activeWorkspaceDirty: false
+    readonly property int refreshRetryDelayMs: 250
+    readonly property int maxRefreshRetryDelayMs: 4000
+    readonly property int maxRefreshRetries: 5
+    property var refreshRetryAttempts: ({})
 
     // Convenient stuff
 
@@ -91,14 +95,45 @@ Singleton {
         if (categories.activeWorkspace) root.activeWorkspaceDirty = true;
     }
 
+    function resetRefreshRetry(category) {
+        if (root.refreshRetryAttempts[category] === undefined)
+            return;
+        const attempts = Object.assign({}, root.refreshRetryAttempts);
+        delete attempts[category];
+        root.refreshRetryAttempts = attempts;
+    }
+
     function requestRefresh(categories) {
         root.markDirty(categories);
         if (!refreshCoalesceTimer.running) refreshCoalesceTimer.start();
     }
 
     function retryRefresh(categories) {
-        root.markDirty(categories);
-        if (!refreshRetryTimer.running) refreshRetryTimer.start();
+        const attempts = Object.assign({}, root.refreshRetryAttempts);
+        const retryCategories = {};
+        let retryDelay = root.refreshRetryDelayMs;
+        let hasRetries = false;
+        for (const category in categories) {
+            if (!categories[category]) continue;
+            const attempt = (attempts[category] ?? 0) + 1;
+            if (attempt > root.maxRefreshRetries) {
+                console.warn(`[HyprlandData] ${category} refresh stopped after ${root.maxRefreshRetries} retries`);
+                continue;
+            }
+            attempts[category] = attempt;
+            retryCategories[category] = true;
+            retryDelay = Math.max(retryDelay, Math.min(
+                root.maxRefreshRetryDelayMs,
+                root.refreshRetryDelayMs * Math.pow(2, attempt - 1)
+            ));
+            hasRetries = true;
+        }
+        root.refreshRetryAttempts = attempts;
+        root.markDirty(retryCategories);
+        if (hasRetries) {
+            refreshRetryTimer.interval = retryDelay;
+            refreshRetryTimer.restart();
+        }
     }
 
     function flushRefreshes() {
@@ -284,6 +319,7 @@ Singleton {
         request: "clients"
         onFailed: root.retryRefresh({ clients: true })
         onCompleted: response => {
+            root.resetRefreshRetry("clients");
             root.windowList = response;
             let tempWinByAddress = {};
             for (var i = 0; i < root.windowList.length; ++i) {
@@ -301,6 +337,7 @@ Singleton {
         request: "monitors"
         onFailed: root.retryRefresh({ monitors: true })
         onCompleted: response => {
+            root.resetRefreshRetry("monitors");
             root.monitors = response;
             if (root.monitorsDirty) refreshCoalesceTimer.restart();
         }
@@ -311,6 +348,7 @@ Singleton {
         request: "layers"
         onFailed: root.retryRefresh({ layers: true })
         onCompleted: response => {
+            root.resetRefreshRetry("layers");
             root.layers = response;
             if (root.layersDirty) refreshCoalesceTimer.restart();
         }
@@ -321,6 +359,7 @@ Singleton {
         request: "workspaces"
         onFailed: root.retryRefresh({ workspaces: true })
         onCompleted: response => {
+            root.resetRefreshRetry("workspaces");
             root.workspaces = response.filter(ws => !GlobalStates.lockTemporaryWorkspaceIds.includes(ws.id));
             let tempWorkspaceById = {};
             for (var i = 0; i < root.workspaces.length; ++i) {
@@ -338,6 +377,7 @@ Singleton {
         request: "activeworkspace"
         onFailed: root.retryRefresh({ activeWorkspace: true })
         onCompleted: response => {
+            root.resetRefreshRetry("activeWorkspace");
             root.activeWorkspace = response;
             if (root.activeWorkspaceDirty) refreshCoalesceTimer.restart();
         }

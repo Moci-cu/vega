@@ -129,11 +129,21 @@ Item {
         dialog: BluetoothDialog {}
         onShownChanged: {
             if (!shown) {
-                Bluetooth.defaultAdapter.discovering = false;
+                if (Bluetooth.defaultAdapter)
+                    Bluetooth.defaultAdapter.discovering = false;
             } else {
-                Bluetooth.defaultAdapter.enabled = true;
-                Bluetooth.defaultAdapter.discovering = true;
+                BluetoothStatus.setEnabled(true);
+                if (Bluetooth.defaultAdapter?.enabled)
+                    Bluetooth.defaultAdapter.discovering = true;
             }
+        }
+    }
+
+    Connections {
+        target: Bluetooth.defaultAdapter
+        function onEnabledChanged() {
+            if (root.showBluetoothDialog && Bluetooth.defaultAdapter.enabled)
+                Bluetooth.defaultAdapter.discovering = true;
         }
     }
 

@@ -12,7 +12,7 @@ ShellRoot {
         for (let index = 1; index < networks.length; index++) {
             const previous = networks[index - 1];
             const current = networks[index];
-            if (previous.ssid.localeCompare(current.ssid) > 0) Qt.exit(2);
+            if (String(previous?.ssid ?? "").localeCompare(String(current?.ssid ?? "")) > 0) Qt.exit(2);
         }
     }
 

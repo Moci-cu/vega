@@ -33,6 +33,7 @@ Item {
     readonly property var selectedDevice: filteredDevices.find(
         device => device.address === root.selectedAddress)
         ?? (deviceList.currentIndex >= 0 ? filteredDevices[deviceList.currentIndex] : null)
+        ?? null
     readonly property bool selectedBusy: selectedDevice?.pairing
         || selectedDevice?.state === BluetoothDeviceState.Connecting
         || selectedDevice?.state === BluetoothDeviceState.Disconnecting
@@ -100,7 +101,7 @@ Item {
         if (!root.adapter || root.adapterBusy) return;
         if (root.adapter.enabled)
             root.stopDiscovery();
-        root.adapter.enabled = !root.adapter.enabled;
+        BluetoothStatus.toggle();
     }
 
     Component.onCompleted: root.startDiscovery()

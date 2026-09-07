@@ -20,14 +20,23 @@ Singleton {
     // Transparency. The quadratic functions were derived from analysis of hand-picked transparency values.
     ColorQuantizer {
         id: wallColorQuant
-        property string wallpaperPath: Config.options.background.wallpaperPath
+        property string wallpaperPath: String(Config.options.background.wallpaperPath ?? "").trim()
         property bool wallpaperIsVideo: wallpaperPath.endsWith(".mp4") || wallpaperPath.endsWith(".webm") || wallpaperPath.endsWith(".mkv") || wallpaperPath.endsWith(".avi") || wallpaperPath.endsWith(".mov")
-        source: Qt.resolvedUrl(wallpaperIsVideo ? Config.options.background.thumbnailPath : Config.options.background.wallpaperPath)
+        property string samplePath: wallpaperIsVideo
+            ? String(Config.options.background.thumbnailPath ?? "").trim()
+            : wallpaperPath
+        property url resolvedSamplePath: samplePath ? Qt.resolvedUrl(samplePath) : ""
+        source: resolvedSamplePath
         depth: 0 // 2^0 = 1 color
         rescaleSize: 10
     }
     property color wallpaperColor: wallColorQuant.colors[0] ?? m3colors.m3primary
-    property string wallpaperSamplePath: FileUtils.trimFileProtocol(wallColorQuant.source.toString())
+    property string wallpaperSamplePath: {
+        const resolvedPath = wallColorQuant.resolvedSamplePath.toString();
+        return wallColorQuant.samplePath !== "" && resolvedPath !== ""
+            ? FileUtils.trimFileProtocol(resolvedPath)
+            : "";
+    }
     readonly property int barSampleColumns: 384
     readonly property int barSampleRows: 64
     property int wallpaperSampleWidth: 1
@@ -137,7 +146,16 @@ Singleton {
         return barPaletteAt(x, sampleWidth, screen, barWorkspaceValue(workspaceId), sidebarBalance).foreground;
     }
 
-    onWallpaperSamplePathChanged: barColorSampleTimer.restart()
+    function resetWallpaperSamples() {
+        wallpaperSampleWidth = 1;
+        wallpaperSampleHeight = 1;
+        barBackgroundSamples = Array(barSampleColumns * barSampleRows).fill(wallpaperColor);
+    }
+
+    onWallpaperSamplePathChanged: {
+        root.resetWallpaperSamples();
+        barColorSampleTimer.restart();
+    }
     Component.onCompleted: barColorSampleTimer.restart()
 
     Timer {
@@ -158,14 +176,31 @@ Singleton {
         ]
         stdout: StdioCollector {
             onStreamFinished: {
-                if (!text) return;
-                const dimensions = text.match(/^(\d+)\s+(\d+)/);
-                const samples = text.match(/#[0-9A-Fa-f]{6}/g);
-                if (!dimensions || !samples || samples.length !== root.barSampleColumns * root.barSampleRows) return;
-                root.wallpaperSampleWidth = Number(dimensions[1]);
-                root.wallpaperSampleHeight = Number(dimensions[2]);
+                const output = String(text ?? "").trim();
+                const dimensions = output.match(/^(\d+)\s+(\d+)/);
+                const samples = output.match(/#[0-9A-Fa-f]{6}/g);
+                const width = dimensions ? Number(dimensions[1]) : 0;
+                const height = dimensions ? Number(dimensions[2]) : 0;
+                const expectedSamples = root.barSampleColumns * root.barSampleRows;
+                if (width <= 0 || height <= 0 || !samples || samples.length !== expectedSamples) {
+                    console.warn(`[Appearance] invalid or incomplete wallpaper sampler output (dimensions=${width}x${height}, samples=${samples?.length ?? 0}/${expectedSamples})`);
+                    root.resetWallpaperSamples();
+                    return;
+                }
+                root.wallpaperSampleWidth = width;
+                root.wallpaperSampleHeight = height;
                 root.barBackgroundSamples = samples;
             }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const message = String(text ?? "").trim();
+                if (message) console.warn("[Appearance] wallpaper sampler:", message);
+            }
+        }
+        onExited: exitCode => {
+            if (exitCode !== 0 && root.wallpaperSamplePath !== "")
+                console.warn(`[Appearance] wallpaper sampler exited with code ${exitCode}`);
         }
     }
     property real autoBackgroundTransparency: { // y = 0.5768x^2 - 0.759x + 0.2896

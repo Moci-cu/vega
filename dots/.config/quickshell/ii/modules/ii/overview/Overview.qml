@@ -517,7 +517,13 @@ Scope {
         }
         function open() {
             overviewScope.workspaceMode = false;
+            overviewScope.applicationsPending = false;
+            overviewScope.applicationsOpen = false;
             overviewScope.categoriesOpen = false;
+            overviewScope.clipboardOpen = false;
+            overviewScope.metricsOpen = false;
+            overviewScope.dontAutoCancelSearch = false;
+            overviewScope.setSearchingTextRequested("");
             GlobalStates.overviewOpen = true;
         }
         function toggleReleaseInterrupt() {

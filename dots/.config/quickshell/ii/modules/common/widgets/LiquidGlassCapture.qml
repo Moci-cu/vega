@@ -33,8 +33,8 @@ Item {
     readonly property real targetScreenY: root.windowOriginY + root.targetScenePosition.y
     readonly property real cropX: Math.max(0, root.targetScreenX - root.padding)
     readonly property real cropY: Math.max(0, root.targetScreenY - root.padding)
-    readonly property real cropRight: Math.min(root.screen?.width ?? 1, root.targetScreenX + root.target.width + root.padding)
-    readonly property real cropBottom: Math.min(root.screen?.height ?? 1, root.targetScreenY + root.target.height + root.padding)
+    readonly property real cropRight: Math.min(root.screen?.width ?? 1, root.targetScreenX + (root.target?.width ?? 0) + root.padding)
+    readonly property real cropBottom: Math.min(root.screen?.height ?? 1, root.targetScreenY + (root.target?.height ?? 0) + root.padding)
     readonly property real targetOffsetX: root.targetScreenX - root.cropX
     readonly property real targetOffsetY: root.targetScreenY - root.cropY
     readonly property real sourceWidth: backdrop.width

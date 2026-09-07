@@ -13,8 +13,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QMap>
 #include <QRandomGenerator>
 #include <QSocketNotifier>
+#include <QThread>
 #include <QUuid>
 
 #include <fcntl.h>
@@ -246,7 +248,7 @@ public:
             const NmSettings settings = getSettings(path.path(), &settingsError);
             if (!settingsError.isEmpty()) continue;
             const QVariantMap connection = settings.value("connection");
-            if (connection.value("type").toString() != "802-11-wireless") continue;
+            if (!isWifiProfile(settings)) continue;
 
             const QVariantMap wifi = settings.value("802-11-wireless");
             const QVariantMap security = settings.value("802-11-wireless-security");
@@ -302,11 +304,10 @@ public:
 
     QJsonObject updateProfile(const QJsonObject &params, QString *error)
     {
-        const QString path = findProfilePath(params, error);
+        NmSettings current;
+        const QString path = findProfilePath(params, error, &current);
         if (path.isEmpty()) return {};
 
-        NmSettings current = getSettings(path, error);
-        if (!error->isEmpty()) return {};
         NmSettings updated;
         if (!buildSettings(params, &updated, error, current)) return {};
 
@@ -388,23 +389,39 @@ private:
         return decodeDbusValue<NmSettings>(reply.arguments().first());
     }
 
-    QString findProfilePath(const QJsonObject &params, QString *error) const
+    static bool isWifiProfile(const NmSettings &settings)
     {
-        const QString directPath = params.value("path").toString();
-        if (directPath.startsWith("/org/freedesktop/NetworkManager/Settings/")) return directPath;
+        return settings.value("connection").value("type").toString() == "802-11-wireless";
+    }
 
-        const QString uuid = params.value("uuid").toString();
-        if (uuid.isEmpty()) {
-            *error = "A saved profile path or UUID is required";
+    QString findProfilePath(const QJsonObject &params, QString *error,
+                            NmSettings *profileSettings = nullptr) const
+    {
+        QString resolved = params.value("path").toString();
+        if (!resolved.startsWith("/org/freedesktop/NetworkManager/Settings/")) {
+            const QString uuid = params.value("uuid").toString();
+            if (uuid.isEmpty()) {
+                *error = "A saved profile path or UUID is required";
+                return {};
+            }
+            const QDBusMessage reply = call(kSettingsPath, kSettingsInterface, "GetConnectionByUuid", {uuid});
+            if (!readReply(reply, error)
+                    || !requireReplyArgument(reply, error,
+                        "No saved profile matches the requested UUID")) return {};
+            resolved = decodeDbusValue<QDBusObjectPath>(reply.arguments().first()).path();
+            if (resolved.isEmpty()) {
+                *error = "No saved profile matches the requested UUID";
+                return {};
+            }
+        }
+
+        const NmSettings settings = getSettings(resolved, error);
+        if (!error->isEmpty()) return {};
+        if (!isWifiProfile(settings)) {
+            *error = "Requested profile is not a Wi-Fi profile";
             return {};
         }
-        const QDBusMessage reply = call(kSettingsPath, kSettingsInterface, "GetConnectionByUuid", {uuid});
-        if (!readReply(reply, error)
-                || !requireReplyArgument(reply, error,
-                    "No saved profile matches the requested UUID")) return {};
-        const QString resolved = decodeDbusValue<QDBusObjectPath>(reply.arguments().first()).path();
-        if (resolved.isEmpty())
-            *error = "No saved profile matches the requested UUID";
+        if (profileSettings) *profileSettings = settings;
         return resolved;
     }
 
@@ -533,6 +550,63 @@ private:
     QDBusConnection m_bus;
 };
 
+class NetworkManagerWorker final : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit NetworkManagerWorker(QObject *parent = nullptr) : QObject(parent) {}
+
+public slots:
+    void initialize()
+    {
+        if (m_client) return;
+        m_client = new NetworkManagerClient(this);
+        connect(m_client, &NetworkManagerClient::profilesChanged,
+                this, &NetworkManagerWorker::profilesChanged);
+    }
+
+    void process(quint64 sequence, const QJsonObject &request)
+    {
+        initialize();
+
+        const QJsonValue id = request.value("id");
+        const QString method = request.value("method").toString();
+        const QJsonObject params = request.value("params").toObject();
+        QString error;
+        QJsonValue result;
+        if (method == "health") result = m_client->health();
+        else if (method == "list_profiles") result = m_client->listProfiles(&error);
+        else if (method == "create_profile") result = m_client->createProfile(params, &error);
+        else if (method == "update_profile") result = m_client->updateProfile(params, &error);
+        else if (method == "delete_profile") result = m_client->deleteProfile(params, &error);
+        else if (method == "activate_profile") result = m_client->activateProfile(params, &error);
+        else {
+            emit responseReady(sequence, {
+                {"id", id}, {"ok", false},
+                {"error", errorObject("METHOD_NOT_FOUND", "Unknown method")}
+            });
+            return;
+        }
+
+        if (!error.isEmpty()) {
+            emit responseReady(sequence, {
+                {"id", id}, {"ok", false},
+                {"error", errorObject("BACKEND_ERROR", error)}
+            });
+            return;
+        }
+        emit responseReady(sequence, {{"id", id}, {"ok", true}, {"result", result}});
+    }
+
+signals:
+    void responseReady(quint64 sequence, const QJsonObject &response);
+    void profilesChanged();
+
+private:
+    NetworkManagerClient *m_client = nullptr;
+};
+
 class Protocol final : public QObject
 {
     Q_OBJECT
@@ -542,9 +616,22 @@ public:
         : QObject(parent), m_notifier(STDIN_FILENO, QSocketNotifier::Read, this)
     {
         connect(&m_notifier, &QSocketNotifier::activated, this, &Protocol::readAvailable);
-        connect(&m_client, &NetworkManagerClient::profilesChanged, this, [this]() {
-            write({{"event", "profiles_changed"}});
-        });
+        m_worker = new NetworkManagerWorker;
+        m_worker->moveToThread(&m_workerThread);
+        connect(m_worker, &NetworkManagerWorker::responseReady,
+                this, &Protocol::queueResponse, Qt::QueuedConnection);
+        connect(m_worker, &NetworkManagerWorker::profilesChanged,
+                this, &Protocol::onProfilesChanged, Qt::QueuedConnection);
+        connect(&m_workerThread, &QThread::finished, m_worker, &QObject::deleteLater);
+        m_workerThread.setObjectName("vega-network-helper-dbus");
+        m_workerThread.start();
+        QMetaObject::invokeMethod(m_worker, &NetworkManagerWorker::initialize, Qt::QueuedConnection);
+    }
+
+    ~Protocol() override
+    {
+        m_workerThread.quit();
+        m_workerThread.wait();
     }
 
     static bool selfTest()
@@ -584,7 +671,9 @@ private slots:
         char input[8192];
         const ssize_t bytesRead = ::read(STDIN_FILENO, input, sizeof(input));
         if (bytesRead == 0) {
-            QCoreApplication::quit();
+            m_inputClosed = true;
+            m_notifier.setEnabled(false);
+            maybeQuit();
             return;
         }
         if (bytesRead < 0) {
@@ -594,22 +683,46 @@ private slots:
         m_buffer.append(input, bytesRead);
         const QList<FramedRequest> requests = takeRequests(&m_buffer, &m_discardingOversizeLine);
         for (const FramedRequest &request : requests) {
+            const quint64 sequence = m_nextSequence++;
             if (request.oversized) {
-                write({{"ok", false}, {"error", errorObject("PAYLOAD_TOO_LARGE", "Request exceeds 256 KiB")}});
+                queueResponse(sequence, {{"ok", false},
+                    {"error", errorObject("PAYLOAD_TOO_LARGE", "Request exceeds 256 KiB")}});
             } else {
-                handleLine(request.line);
+                handleLine(request.line, sequence);
             }
             if (m_outputFailed) return;
         }
     }
 
+private slots:
+    void queueResponse(quint64 sequence, const QJsonObject &response)
+    {
+        m_responses.insert(sequence, response);
+        while (true) {
+            const auto it = m_responses.find(m_nextResponse);
+            if (it == m_responses.end()) break;
+            const QJsonObject next = it.value();
+            m_responses.erase(it);
+            ++m_nextResponse;
+            write(next);
+            if (m_outputFailed) return;
+        }
+        maybeQuit();
+    }
+
+    void onProfilesChanged()
+    {
+        write({{"event", "profiles_changed"}});
+    }
+
 private:
-    void handleLine(const QByteArray &line)
+    void handleLine(const QByteArray &line, quint64 sequence)
     {
         QJsonParseError parseError;
         const QJsonDocument document = QJsonDocument::fromJson(line, &parseError);
         if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-            write({{"ok", false}, {"error", errorObject("INVALID_JSON", "Request must be one JSON object")}});
+            queueResponse(sequence, {{"ok", false},
+                {"error", errorObject("INVALID_JSON", "Request must be one JSON object")}});
             return;
         }
 
@@ -618,28 +731,20 @@ private:
         const QString method = request.value("method").toString();
         const QJsonObject params = request.value("params").toObject();
         if (id.isUndefined() || method.isEmpty()) {
-            write({{"id", id}, {"ok", false}, {"error", errorObject("INVALID_REQUEST", "id and method are required")}});
+            queueResponse(sequence, {{"id", id}, {"ok", false},
+                {"error", errorObject("INVALID_REQUEST", "id and method are required")}});
             return;
         }
 
-        QString error;
-        QJsonValue result;
-        if (method == "health") result = m_client.health();
-        else if (method == "list_profiles") result = m_client.listProfiles(&error);
-        else if (method == "create_profile") result = m_client.createProfile(params, &error);
-        else if (method == "update_profile") result = m_client.updateProfile(params, &error);
-        else if (method == "delete_profile") result = m_client.deleteProfile(params, &error);
-        else if (method == "activate_profile") result = m_client.activateProfile(params, &error);
-        else {
-            write({{"id", id}, {"ok", false}, {"error", errorObject("METHOD_NOT_FOUND", "Unknown method")}});
-            return;
-        }
+        QMetaObject::invokeMethod(m_worker, [worker = m_worker, sequence, request]() {
+            worker->process(sequence, request);
+        }, Qt::QueuedConnection);
+    }
 
-        if (!error.isEmpty()) {
-            write({{"id", id}, {"ok", false}, {"error", errorObject("BACKEND_ERROR", error)}});
-            return;
-        }
-        write({{"id", id}, {"ok", true}, {"result", result}});
+    void maybeQuit()
+    {
+        if (m_inputClosed && m_nextResponse == m_nextSequence)
+            QCoreApplication::quit();
     }
 
     void write(const QJsonObject &message)
@@ -670,10 +775,15 @@ private:
     }
 
     QSocketNotifier m_notifier;
+    QThread m_workerThread;
+    NetworkManagerWorker *m_worker = nullptr;
     QByteArray m_buffer;
     bool m_discardingOversizeLine = false;
+    bool m_inputClosed = false;
     bool m_outputFailed = false;
-    NetworkManagerClient m_client;
+    quint64 m_nextSequence = 0;
+    quint64 m_nextResponse = 0;
+    QMap<quint64, QJsonObject> m_responses;
 };
 
 int main(int argc, char **argv)

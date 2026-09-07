@@ -10,10 +10,33 @@ Singleton {
     id: root
 
     readonly property bool available: Bluetooth.adapters.values.length > 0
+    readonly property var adapter: Bluetooth.defaultAdapter
     readonly property bool enabled: Bluetooth.defaultAdapter?.enabled ?? false
     readonly property BluetoothDevice firstActiveDevice: Bluetooth.defaultAdapter?.devices.values.find(device => device.connected) ?? null
     readonly property int activeDeviceCount: Bluetooth.defaultAdapter?.devices.values.filter(device => device.connected).length ?? 0
     readonly property bool connected: Bluetooth.devices.values.some(d => d.connected)
+
+    function setEnabled(value) {
+        if (!root.adapter) return;
+        if (!value || root.adapter.state !== BluetoothAdapterState.Blocked) {
+            root.adapter.enabled = value;
+            return;
+        }
+        if (!unblockProcess.running) unblockProcess.running = true;
+    }
+
+    function toggle() {
+        root.setEnabled(!root.enabled);
+    }
+
+    Process {
+        id: unblockProcess
+        command: ["rfkill", "unblock", "bluetooth"]
+        onExited: (exitCode, _) => {
+            if (exitCode === 0 && root.adapter) root.adapter.enabled = true;
+            else console.warn(`[BluetoothStatus] rfkill unblock failed (${exitCode})`);
+        }
+    }
 
     function sortFunction(a, b) {
         // Ones with meaningful names before MAC addresses

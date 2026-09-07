@@ -113,7 +113,6 @@ Singleton {
     }
 
     function startPomodoroMinutes(value) {
-        resetPomodoro();
         if (!setFocusMinutes(value))
             return false;
         togglePomodoro();
