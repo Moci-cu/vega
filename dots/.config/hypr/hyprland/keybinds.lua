@@ -272,9 +272,9 @@ hl.bind("SUPER + ALT + Equal",
 
 --##! Session
 hl.bind("SUPER + ALT + L", hl.dsp.exec_cmd("loginctl lock-session"), { description = "Misc: Lock" })
-hl.bind("SUPER + SHIFT + L", hl.dsp.exec_cmd("systemctl suspend || loginctl suspend"),
+hl.bind("SUPER + SHIFT + L", hl.dsp.exec_cmd("loginctl lock-session && sleep 1.5 && systemctl suspend || loginctl suspend"),
     { locked = true, description = "Misc: Suspend system" })                                                                                   -- Sleep
--- hl.bind("switch:on:Lid Switch", hl.dsp.exec_cmd("systemctl suspend || loginctl suspend"), {locked = true} ) -- # [hidden] Suspend when laptop lid is closed, uncomment if for whatever reason it's not the default behavior
+-- hl.bind("switch:on:Lid Switch", hl.dsp.exec_cmd("loginctl lock-session && sleep 1.5 && systemctl suspend || loginctl suspend"), {locked = true} ) -- # [hidden] Suspend when laptop lid is closed, uncomment if for whatever reason it's not the default behavior
 
 hl.bind("CTRL + SHIFT + ALT + SUPER + Delete", hl.dsp.exec_cmd("systemctl poweroff || loginctl poweroff"),
     { description = "Misc: Shutdown" })                                                                                                       -- # [hidden] Power off

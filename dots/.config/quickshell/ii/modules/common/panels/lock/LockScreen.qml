@@ -21,6 +21,27 @@ Scope {
 
     required property Component lockSurface
     property alias context: lockContext
+    property int unlockAnimationDuration: 0
+    property bool closing: false
+
+    function finishUnlock() {
+        if (!root.closing || !lockContext.authenticationResolved) return;
+        if (Config.options.lock.security.unlockKeyring && lockContext.passwordAuthenticated)
+            root.unlockKeyring();
+        GlobalStates.screenLocked = false;
+        lockContext.reset();
+        root.closing = false;
+        if (lockContext.alsoInhibitIdle) {
+            lockContext.alsoInhibitIdle = false;
+            Idle.toggleInhibit(true);
+        }
+    }
+
+    Timer {
+        id: unlockAnimationTimer
+        interval: root.unlockAnimationDuration
+        onTriggered: root.finishUnlock()
+    }
     property Component sessionLockSurface: WlSessionLockSurface {
         id: sessionLockSurface
         color: "transparent"
@@ -59,6 +80,8 @@ Scope {
             target: GlobalStates
             function onScreenLockedChanged() {
                 if (GlobalStates.screenLocked) {
+                    root.closing = false;
+                    unlockAnimationTimer.stop();
                     if (GlobalStates.overlayOpen) {
                         GlobalStates.overlayOpen = false;
                     }
@@ -81,22 +104,14 @@ Scope {
                 return;
             }
 
-            // Unlock the keyring if configured to do so
-            if (Config.options.lock.security.unlockKeyring && lockContext.passwordAuthenticated)
-                root.unlockKeyring(); // Async
-
-            // Unlock the screen before exiting, or the compositor will display a
-            // fallback lock you can't interact with.
-            GlobalStates.screenLocked = false;
-
-            // Reset
-            lockContext.reset();
-
-            // Post-unlock actions
-            if (lockContext.alsoInhibitIdle) {
-                lockContext.alsoInhibitIdle = false;
-                Idle.toggleInhibit(true);
-            }
+            if (!lockContext.authenticationResolved || root.closing) return;
+            root.closing = true;
+            // Keep the session locked throughout the exit video. A fixed deadline
+            // also completes authenticated unlock if the media decoder fails.
+            if (root.unlockAnimationDuration > 0)
+                unlockAnimationTimer.start();
+            else
+                root.finishUnlock();
         }
     }
 

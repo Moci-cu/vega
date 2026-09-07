@@ -222,6 +222,19 @@ ContentPage {
         icon: "lock"
         title: Translation.tr("Lock screen")
 
+        ContentSubsection {
+            title: Translation.tr("Lock screen style")
+            enabled: !Config.options.lock.useHyprlock
+            ConfigSelectionArray {
+                currentValue: Config.options.lock.style
+                onSelected: newValue => { Config.options.lock.style = newValue; }
+                options: [
+                    { displayName: "Vega", icon: "lock", value: "vega" },
+                    { displayName: "Unit-4", icon: "grid_on", value: "unit4" }
+                ]
+            }
+        }
+
         ConfigSwitch {
             buttonIcon: "water_drop"
             text: Translation.tr('Use Hyprlock (instead of Quickshell)')

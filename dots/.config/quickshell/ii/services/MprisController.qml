@@ -72,7 +72,9 @@ Singleton {
 	function updatePlayerPositions() {
 		const updatedPlayers = [];
 		for (const request of Object.values(root.positionTickerRequests)) {
-			if (!request.running || !request.player || updatedPlayers.includes(request.player)) continue;
+			if (!request.running || !request.player || !root.allPlayers.includes(request.player)
+				|| !request.player.isPlaying || !request.player.positionSupported
+				|| updatedPlayers.includes(request.player)) continue;
 			updatedPlayers.push(request.player);
 			request.player.positionChanged();
 		}

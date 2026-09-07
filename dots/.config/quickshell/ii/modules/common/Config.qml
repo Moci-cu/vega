@@ -548,6 +548,7 @@ Singleton {
             }
 
             property JsonObject lock: JsonObject {
+                property string style: "vega"
                 property bool useHyprlock: false
                 property bool launchOnStartup: false
                 property JsonObject blur: JsonObject {

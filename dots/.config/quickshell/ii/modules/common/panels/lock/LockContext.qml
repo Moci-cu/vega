@@ -100,7 +100,10 @@ Scope {
     }
 
     function resetClearTimer() {
-        passwordClearTimer.restart();
+        if (root.currentText.length > 0 && !root.authenticationResolved && !root.unlockInProgress)
+            passwordClearTimer.restart();
+        else
+            passwordClearTimer.stop();
     }
 
     function biometricResultName(result) {
@@ -163,7 +166,9 @@ Scope {
         id: passwordClearTimer
         interval: 10000
         onTriggered: {
-            root.reset();
+            // Expiring input must not cancel PAM or the pending biometric unlock.
+            if (!root.authenticationResolved && !root.unlockInProgress)
+                root.clearText();
         }
     }
 
@@ -173,7 +178,7 @@ Scope {
             GlobalStates.screenUnlockFailed = false;
         }
         GlobalStates.screenLockContainsCharacters = currentText.length > 0;
-        passwordClearTimer.restart();
+        root.resetClearTimer();
     }
 
     function tryUnlock(alsoInhibitIdle = false) {
@@ -181,6 +186,7 @@ Scope {
         root.alsoInhibitIdle = alsoInhibitIdle;
         root.unlockInProgress = true;
         root.passwordAuthenticated = false;
+        passwordClearTimer.stop();
         pam.start();
     }
 
@@ -346,6 +352,7 @@ Scope {
         root.authenticationResolved = true;
         root.passwordAuthenticated = false;
         root.unlockInProgress = true;
+        passwordClearTimer.stop();
         root.fingerprintSessionAllowed = false;
         root.faceSessionAllowed = false;
         fingerprintRetryTimer.stop();

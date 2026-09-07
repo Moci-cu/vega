@@ -33,8 +33,13 @@ LockScreen {
         }
     }
 
-    lockSurface: LockSurface {
-        context: root.context
+    readonly property string selectedStyle: Config.options.lock.style
+    unlockAnimationDuration: selectedStyle === "unit4" ? 850 : 0
+
+    lockSurface: Loader {
+        sourceComponent: root.selectedStyle === "unit4" ? unit4Surface : vegaSurface
+        Component { id: vegaSurface; LockSurface { context: root.context } }
+        Component { id: unit4Surface; Unit4LockSurface { context: root.context; closing: root.closing } }
     }
 
     // Single batch for lock and unlock so we don't race multiple hyprctl calls

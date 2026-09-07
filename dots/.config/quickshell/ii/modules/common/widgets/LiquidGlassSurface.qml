@@ -150,79 +150,83 @@ Item {
         }
     }
 
-    ShaderEffect {
+    Loader {
         anchors.fill: parent
-        visible: opacity > 0
-        opacity: root.textureShaderReady ? 1 : (root.compositorRimReady ? 0.12 : 0)
+        active: root.visible && root.shaderReady
+        sourceComponent: ShaderEffect {
+            opacity: root.textureShaderReady ? 1 : 0.12
 
-        property var source: root.wallpaperSource
-        property var environmentSource: root.environmentSource ?? root.wallpaperSource
-        property vector2d itemSize: Qt.vector2d(width, height)
-        property vector4d sourceRect: Qt.vector4d(
-            root.sampleRect.x,
-            root.sampleRect.y,
-            root.sampleRect.width,
-            root.sampleRect.height
-        )
-        property vector4d cornerRadii: Qt.vector4d(
-            root.topLeftRadius,
-            root.topRightRadius,
-            root.bottomRightRadius,
-            root.bottomLeftRadius
-        )
-        property color glassTint: root.tintColor
-        property real lightAngle: -0.82
-            + 0.28 * ((root.scenePosition.x + root.width / 2) / Math.max(1, root.screen?.width ?? 1) - 0.5)
-            + 0.22 * (root.parallaxWorkspaceValue - 0.5)
-            + 0.08 * root.parallaxSidebarBalance
-            + 0.45 * root.interaction * (root.interactionPoint.x - 0.5)
-        property vector2d lightDirection: Qt.vector2d(Math.cos(lightAngle), Math.sin(lightAngle))
-        property real refraction: root.refraction
-        property real enhancedOptics: root.enhancedOptics ? 1 : 0
-        property real interactiveOptics: root.interactiveOptics ? 1 : 0
-        property real responsiveOptics: root.responsiveOptics ? 1 : 0
-        property real interaction: root.interaction
-        property vector2d interactionPoint: Qt.vector2d(root.interactionPoint.x, root.interactionPoint.y)
-        property real thicknessOverride: root.thicknessOverride
-        property real edgeLighting: root.edgeLighting
-        property real lowerGlow: root.lowerGlow
-        property real ambientSpillStrength: root.ambientSpillStrength
-        property real ambientDiffusion: root.ambientDiffusion
-        property bool detailedEnvironment: root.detailedEnvironment
+            property var source: root.wallpaperSource
+            property var environmentSource: root.environmentSource ?? root.wallpaperSource
+            property vector2d itemSize: Qt.vector2d(root.width, root.height)
+            property vector4d sourceRect: Qt.vector4d(
+                root.sampleRect.x,
+                root.sampleRect.y,
+                root.sampleRect.width,
+                root.sampleRect.height
+            )
+            property vector4d cornerRadii: Qt.vector4d(
+                root.topLeftRadius,
+                root.topRightRadius,
+                root.bottomRightRadius,
+                root.bottomLeftRadius
+            )
+            property color glassTint: root.tintColor
+            property real lightAngle: -0.82
+                + 0.28 * ((root.scenePosition.x + root.width / 2) / Math.max(1, root.screen?.width ?? 1) - 0.5)
+                + 0.22 * (root.parallaxWorkspaceValue - 0.5)
+                + 0.08 * root.parallaxSidebarBalance
+                + 0.45 * root.interaction * (root.interactionPoint.x - 0.5)
+            property vector2d lightDirection: Qt.vector2d(Math.cos(lightAngle), Math.sin(lightAngle))
+            property real refraction: root.refraction
+            property real enhancedOptics: root.enhancedOptics ? 1 : 0
+            property real interactiveOptics: root.interactiveOptics ? 1 : 0
+            property real responsiveOptics: root.responsiveOptics ? 1 : 0
+            property real interaction: root.interaction
+            property vector2d interactionPoint: Qt.vector2d(root.interactionPoint.x, root.interactionPoint.y)
+            property real thicknessOverride: root.thicknessOverride
+            property real edgeLighting: root.edgeLighting
+            property real lowerGlow: root.lowerGlow
+            property real ambientSpillStrength: root.ambientSpillStrength
+            property real ambientDiffusion: root.ambientDiffusion
+            property bool detailedEnvironment: root.detailedEnvironment
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-22")
+            fragmentShader: Qt.resolvedUrl("shaders/liquidglass.frag.qsb?rev=apple-fresnel-22")
 
-        Behavior on opacity {
-            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
         }
     }
 
-    ShaderEffect {
+    Loader {
         anchors.fill: parent
         anchors.margins: -2
-        visible: opacity > 0
-        opacity: root.compositorRimReady ? 1 : 0
+        active: root.visible && root.compositorRimReady
+        sourceComponent: ShaderEffect {
+            property var source: root.wallpaperSource
+            property var environmentSource: root.environmentSource ?? root.wallpaperSource
+            property vector2d itemSize: Qt.vector2d(root.width, root.height)
+            property vector4d sourceRect: Qt.vector4d(
+                root.sampleRect.x,
+                root.sampleRect.y,
+                root.sampleRect.width,
+                root.sampleRect.height
+            )
+            property vector4d cornerRadii: Qt.vector4d(
+                root.topLeftRadius,
+                root.topRightRadius,
+                root.bottomRightRadius,
+                root.bottomLeftRadius
+            )
+            property real edgeLighting: root.edgeLighting
+            property real lowerGlow: root.lowerGlow
+            property real effectPadding: 2
 
-        property var source: root.wallpaperSource
-        property var environmentSource: root.environmentSource ?? root.wallpaperSource
-        property vector2d itemSize: Qt.vector2d(root.width, root.height)
-        property vector4d sourceRect: Qt.vector4d(
-            root.sampleRect.x,
-            root.sampleRect.y,
-            root.sampleRect.width,
-            root.sampleRect.height
-        )
-        property vector4d cornerRadii: Qt.vector4d(
-            root.topLeftRadius,
-            root.topRightRadius,
-            root.bottomRightRadius,
-            root.bottomLeftRadius
-        )
-        property real edgeLighting: root.edgeLighting
-        property real lowerGlow: root.lowerGlow
-        property real effectPadding: 2
+            opacity: 1
 
-        fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-24")
+            fragmentShader: Qt.resolvedUrl("shaders/liquidglassrim.frag.qsb?rev=optical-overlay-24")
+        }
     }
 
     Rectangle {
