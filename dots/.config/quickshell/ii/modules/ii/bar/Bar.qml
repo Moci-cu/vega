@@ -9,6 +9,7 @@ import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.modules.ii.bar.end4pc as Pc
 
 Scope {
     id: bar
@@ -37,7 +38,8 @@ Scope {
 
                 property int monitorIndex: barLoader.monitorIndex
                 property bool hasActiveWindows: false
-                property bool showBarBackground: barRoot.hasActiveWindows && Config.options.bar.barBackgroundStyle === 2 || Config.options.bar.barBackgroundStyle === 1
+                property bool showBarBackground: !Config.options.bar.end4pc.enable && (barRoot.hasActiveWindows && Config.options.bar.barBackgroundStyle === 2 || Config.options.bar.barBackgroundStyle === 1)
+                readonly property real contentHeight: Config.options.bar.end4pc.enable ? 40 : Appearance.sizes.barHeight
 
                 Connections {
                     enabled: Config.options.bar.barBackgroundStyle === 2
@@ -76,9 +78,9 @@ Scope {
                 property bool mustShow: hoverRegion.containsMouse || superShow
                 exclusionMode: ExclusionMode.Ignore
                 exclusiveZone: (Config?.options.bar.autoHide.enable && (!mustShow || !Config?.options.bar.autoHide.pushWindows)) ? 0 :
-                    Appearance.sizes.baseBarHeight + (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut : 0)
+                    (Config.options.bar.end4pc.enable ? 45 : Appearance.sizes.baseBarHeight + (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut : 0))
                 WlrLayershell.namespace: "quickshell:bar"
-                implicitHeight: Appearance.sizes.barHeight + Appearance.rounding.screenRounding
+                implicitHeight: contentHeight + Appearance.rounding.screenRounding
                 mask: Region {
                     item: hoverMaskRegion
                 }
@@ -93,8 +95,9 @@ Scope {
                 }
 
                 margins {
+                    top: Config.options.bar.end4pc.enable && !Config.options.bar.bottom ? 5 : 0
                     right: (Config.options.interactions.deadPixelWorkaround.enable && barRoot.anchors.right) * -1
-                    bottom: (Config.options.interactions.deadPixelWorkaround.enable && barRoot.anchors.bottom) * -1
+                    bottom: (Config.options.interactions.deadPixelWorkaround.enable && barRoot.anchors.bottom) * -1 + (Config.options.bar.end4pc.enable && Config.options.bar.bottom ? 5 : 0)
                 }
 
                 // Include in focus grab
@@ -123,16 +126,19 @@ Scope {
                         }
                     }
 
-                    BarContent {
+                    Loader {
                         id: barContent
-                        
-                        implicitHeight: Appearance.sizes.barHeight
+                        active: Config.ready
+                        sourceComponent: Config.options.bar.end4pc.enable ? materialBar : originalBar
+                        Component { id: materialBar; Pc.BarContent { monitorIndex: barRoot.monitorIndex } }
+                        Component { id: originalBar; BarContent { monitorIndex: barRoot.monitorIndex } }
+                        height: barRoot.contentHeight
                         anchors {
                             right: parent.right
                             left: parent.left
                             top: parent.top
                             bottom: undefined
-                            topMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -Appearance.sizes.barHeight : 0
+                            topMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -barRoot.contentHeight : 0
                             bottomMargin: (Config.options.interactions.deadPixelWorkaround.enable && barRoot.anchors.bottom) * -1
                             rightMargin: (Config.options.interactions.deadPixelWorkaround.enable && barRoot.anchors.right) * -1
                         }
@@ -158,7 +164,7 @@ Scope {
                             PropertyChanges {
                                 target: barContent
                                 anchors.topMargin: 0
-                                anchors.bottomMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -Appearance.sizes.barHeight : 0
+                                anchors.bottomMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -barRoot.contentHeight : 0
                             }
                         }
                     }

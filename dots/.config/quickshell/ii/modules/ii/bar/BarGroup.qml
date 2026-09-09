@@ -37,15 +37,7 @@ Item {
     GridLayout {
         id: gridLayout
         columns: root.vertical ? 1 : -1
-        anchors {
-            verticalCenter: root.vertical ? undefined : parent.verticalCenter
-            horizontalCenter: root.vertical ? parent.horizontalCenter : undefined
-            left: root.vertical ? undefined : parent.left
-            right: root.vertical ? undefined : parent.right
-            top: root.vertical ? parent.top : undefined
-            bottom: root.vertical ? parent.bottom : undefined
-            margins: root.padding
-        }
+        anchors.centerIn: parent
         columnSpacing: 4
         rowSpacing: 12
     }

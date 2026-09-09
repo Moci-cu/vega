@@ -10,6 +10,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.modules.ii.bar.end4pc as Pc
 
 Scope {
     id: bar
@@ -37,7 +38,8 @@ Scope {
 
                 property int monitorIndex: barLoader.monitorIndex
                 property bool hasActiveWindows: false
-                property bool showBarBackground: barRoot.hasActiveWindows && Config.options.bar.barBackgroundStyle === 2 || Config.options.bar.barBackgroundStyle === 1
+                property bool showBarBackground: !Config.options.bar.end4pc.enable && (barRoot.hasActiveWindows && Config.options.bar.barBackgroundStyle === 2 || Config.options.bar.barBackgroundStyle === 1)
+                readonly property real contentWidth: Config.options.bar.end4pc.enable ? 56 : Appearance.sizes.verticalBarWidth
 
                 Connections {
                     enabled: Config.options.bar.barBackgroundStyle === 2
@@ -75,10 +77,10 @@ Scope {
                 property bool mustShow: hoverRegion.containsMouse || superShow
                 exclusionMode: ExclusionMode.Ignore
                 exclusiveZone: (Config?.options.bar.autoHide.enable && (!mustShow || !Config?.options.bar.autoHide.pushWindows)) ? 0 :
-                    Appearance.sizes.baseVerticalBarWidth + (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut : 0)
+                    (Config.options.bar.end4pc.enable ? 56 : Appearance.sizes.baseVerticalBarWidth + (Config.options.bar.cornerStyle === 1 ? Appearance.sizes.hyprlandGapsOut : 0))
                 WlrLayershell.namespace: "quickshell:verticalBar"
                 // WlrLayershell.layer: WlrLayer.Overlay // TODO enable this when bar can hide when fullscreen
-                implicitWidth: Appearance.sizes.verticalBarWidth + Appearance.rounding.screenRounding
+                implicitWidth: contentWidth + Appearance.rounding.screenRounding
                 mask: Region {
                     item: hoverMaskRegion
                 }
@@ -114,15 +116,19 @@ Scope {
                         }
                     }
 
-                    VerticalBarContent {
+                    Loader {
                         id: barContent
-                        implicitWidth: Appearance.sizes.verticalBarWidth
+                        width: barRoot.contentWidth
+                        active: Config.ready
+                        sourceComponent: Config.options.bar.end4pc.enable ? pcContent : legacyContent
+                        Component { id: pcContent; Pc.BarContent { vertical: true; monitorIndex: barRoot.monitorIndex } }
+                        Component { id: legacyContent; VerticalBarContent {} }
                         anchors {
                             top: parent.top
                             bottom: parent.bottom
                             left: parent.left
                             right: undefined
-                            leftMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -Appearance.sizes.verticalBarWidth : 0
+                            leftMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -barRoot.contentWidth : 0
                             rightMargin: 0
                         }
                         Behavior on anchors.leftMargin {
@@ -147,7 +153,7 @@ Scope {
                             PropertyChanges {
                                 target: barContent
                                 anchors.topMargin: 0
-                                anchors.rightMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -Appearance.sizes.barHeight : 0
+                                anchors.rightMargin: (Config?.options.bar.autoHide.enable && !mustShow) ? -barRoot.contentWidth : 0
                             }
                         }
                     }

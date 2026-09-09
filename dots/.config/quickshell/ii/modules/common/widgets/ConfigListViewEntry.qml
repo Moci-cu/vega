@@ -7,9 +7,9 @@ import qs.modules.common.widgets
 
 Item {
     id: wrapper
-    
+
     required property var modelData
-    readonly property var compInfo: BarComponentRegistry.getComponent(modelData.id)
+    readonly property var compInfo: root.componentCatalog.find(c => c.id === modelData.id)
 
     property bool alternateColor: visualIndex % 2 == 0
     property color colBackground: alternateColor ? Appearance.colors.colLayer3 : Appearance.colors.colLayer2
@@ -71,12 +71,12 @@ Item {
         Behavior on opacity {
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
-        
+
         topLeftRadius: topRadius
         topRightRadius: topRadius
         bottomLeftRadius: bottomRadius
         bottomRightRadius: bottomRadius
-        
+
         height: contentRow.implicitHeight + 4
 
         color: dragArea.held ? colActive : colBackground
@@ -122,7 +122,7 @@ Item {
                 iconSize: Appearance.font.pixelSize.huge
                 color: Appearance.colors.colOutline
             }
-            
+
             MaterialSymbol {
                 id: icon
                 Layout.leftMargin: 10
@@ -143,7 +143,7 @@ Item {
                     pixelSize: Appearance.font.pixelSize.normal
                 }
             }
-            
+
             Item {
                 height: 40
                 Layout.fillWidth: true
@@ -160,10 +160,10 @@ Item {
                     }
                 }
             }
-            
-            
+
+
             Loader {
-                active: barSection == 1 // only showing it on center layout
+                active: root.showCenterButton && barSection == 1
                 sourceComponent: EntryButton {
                     iconText: "adjust"
                     iconFill: modelData.centered
@@ -174,7 +174,7 @@ Item {
                     }
                 }
             }
-            
+
 
             EntryButton {
                 id: removeButton
@@ -189,9 +189,9 @@ Item {
             }
         }
 
-        
+
     }
-    
+
     DropArea {
         id: dropArea
         anchors {
@@ -202,7 +202,7 @@ Item {
         onEntered: (drag) => {
             let fromIndex = drag.source.parent.visualIndex
             let toIndex = wrapper.visualIndex
-            
+
             visualModel.items.move(fromIndex, toIndex)
         }
     }
@@ -260,4 +260,3 @@ Item {
         }
     }
 }
-    

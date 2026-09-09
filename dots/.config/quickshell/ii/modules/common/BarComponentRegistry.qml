@@ -27,6 +27,21 @@ Singleton {
     ]
 
     property var extensionComponents: []
+    readonly property var end4pcComponents: [
+        {id: "launcherButton", icon: "search", title: "Launcher"},
+        {id: "workspaces", icon: "workspaces", title: "Workspaces"},
+        {id: "media", icon: "music_note", title: "Media"},
+        {id: "visualizer", icon: "graphic_eq", title: "Visualizer", repeatable: true},
+        {id: "docktoPanel", icon: "apps", title: "Dock to panel"},
+        {id: "sysTray", icon: "system_update_alt", title: "Tray"},
+        {id: "powerButton", icon: "power_settings_new", title: "Power button"},
+        {id: "systemIcons", icon: "tune", title: "System icons"},
+        {id: "resources", icon: "monitor_heart", title: "Resources"},
+        {id: "batteryIndicator", icon: "battery_android_6", title: "Battery"},
+        {id: "updatesCount", icon: "update", title: "Updates"},
+        {id: "clockWidget", icon: "schedule", title: "Clock"}
+    ]
+    readonly property var end4pcCatalog: end4pcComponents.concat(allComponents.filter(c => !end4pcComponents.some(pc => pc.id === c.id)))
     property var allComponents: root.builtinComponents.concat(root.extensionComponents)
 
     property var _extensionCompCache: ({})

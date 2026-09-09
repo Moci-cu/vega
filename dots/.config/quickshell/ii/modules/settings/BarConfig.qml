@@ -28,41 +28,51 @@ ContentPage {
         page.contentY = item.y
     }
 
+    component BarLayoutEditor: ConfigListView {
+        required property string section
+        readonly property bool pc: Config.options.bar.end4pc.enable
+        componentCatalog: pc ? BarComponentRegistry.end4pcCatalog : BarComponentRegistry.allComponents
+        showCenterButton: !pc
+        usedIds: pc ? [].concat(Config.options.bar.end4pc.left, Config.options.bar.end4pc.center, Config.options.bar.end4pc.right)
+            : [].concat(Config.options.bar.layouts.left, Config.options.bar.layouts.center, Config.options.bar.layouts.right).map(c => c.id)
+        listModel: pc ? Config.options.bar.end4pc[section].map(id => ({id, visible: true, centered: false})) : Config.options.bar.layouts[section]
+        onUpdated: newList => {
+            if (pc) Config.options.bar.end4pc[section] = newList.map(c => c.id);
+            else Config.options.bar.layouts[section] = newList;
+        }
+    }
+
 
     ContentSection {
         icon: "mobile_layout"
         title: Translation.tr("Bar layout")
+        ConfigSwitch {
+            text: Translation.tr("end4-pC Material bar")
+            checked: Config.options.bar.end4pc.enable
+            onCheckedChanged: Config.options.bar.end4pc.enable = checked
+        }
         ContentSubsection {
             title: Translation.tr("Left layout")
             tooltip: Translation.tr("Top layout in vertical mode")
-            ConfigListView {
+            BarLayoutEditor {
+                section: "left"
                 barSection: 0
-                listModel: Config.options.bar.layouts.left
-                onUpdated: (newList) => {
-                    Config.options.bar.layouts.left = newList
-                }
             }
         }
         ContentSubsection {
             title: Translation.tr("Center layout")
             tooltip: Translation.tr("Center the component with the button")
-            ConfigListView {
+            BarLayoutEditor {
+                section: "center"
                 barSection: 1
-                listModel: Config.options.bar.layouts.center
-                onUpdated: (newList) => {
-                    Config.options.bar.layouts.center = newList
-                }
             }
         }
         ContentSubsection {
             title: Translation.tr("Right layout")
             tooltip: Translation.tr("Bottom layout in vertical mode")
-            ConfigListView {
+            BarLayoutEditor {
+                section: "right"
                 barSection: 2
-                listModel: Config.options.bar.layouts.right
-                onUpdated: (newList) => {
-                    Config.options.bar.layouts.right = newList
-                }
             }
         }
     }
