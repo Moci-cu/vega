@@ -35,7 +35,7 @@ Scope {
     readonly property int fingerprintSuccess: 5
     property int fingerprintState: root.fingerprintUnavailable
     property int fingerprintRetryCount: 0
-    readonly property int maxFingerprintRetries: 2
+    readonly property int maxFingerprintRetries: 5
     readonly property string fingerprintUsername: Quickshell.env("USER") || SystemInfo.username
     readonly property string fingerprintStatusText: {
         switch (root.fingerprintState) {
@@ -109,6 +109,7 @@ Scope {
     function biometricResultName(result) {
         if (result === PamResult.Success) return "success";
         if (result === PamResult.MaxTries) return "max-tries";
+        if (result === PamResult.Error) return "error";
         return "failed";
     }
 
@@ -128,7 +129,8 @@ Scope {
         root.passwordAuthenticated = false;
         root.fingerprintRetryCount = 0;
         if (GlobalStates.screenLocked) {
-            root.tryFingerUnlock();
+            root.refreshFingerprintAvailability();
+            root.refreshFaceAvailability();
             root.scheduleFaceUnlock();
         }
     }
@@ -239,7 +241,6 @@ Scope {
     }
 
     function refreshFingerprintAvailability() {
-        if (root.fingerprintsConfigured) return;
         if (!fingerprintCheckProc.running) fingerprintCheckProc.running = true;
     }
 
@@ -414,7 +415,7 @@ Scope {
 
     Timer {
         id: fingerprintRetryTimer
-        interval: 750
+        interval: Math.min(4000, 500 * Math.pow(2, root.fingerprintRetryCount))
         onTriggered: root.tryFingerUnlock()
     }
 
@@ -627,12 +628,8 @@ Scope {
             } else if (!root.fingerprintSessionAllowed) {
                 root.logBiometric("Ignored stale fingerprint PAM completion");
                 return;
-            } else if (result == PamResult.MaxTries) {
-                root.logBiometric("Fingerprint PAM result: max-tries");
-                root.fingerprintSessionAllowed = false;
-                root.fingerprintState = root.fingerprintFailed;
             } else {
-                root.logBiometric("Fingerprint PAM result: failed");
+                root.logBiometric("Fingerprint PAM result: " + root.biometricResultName(result));
                 root.scheduleFingerprintRetry();
             }
         }

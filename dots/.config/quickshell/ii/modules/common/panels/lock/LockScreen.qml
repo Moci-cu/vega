@@ -86,10 +86,6 @@ Scope {
                         GlobalStates.overlayOpen = false;
                     }
                     lockContext.reset();
-                    lockContext.refreshFingerprintAvailability();
-                    lockContext.refreshFaceAvailability();
-                    lockContext.tryFingerUnlock();
-                    lockContext.scheduleFaceUnlock();
                 }
             }
         }
