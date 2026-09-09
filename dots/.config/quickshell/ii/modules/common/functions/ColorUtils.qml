@@ -150,14 +150,38 @@ Singleton {
      * @returns {string} The hex color ("#FFFFFF" or "#000000") that ensures high contrast.
      */
     function getContrastingTextColor(bgColor) {
-        let color = Qt.color(bgColor);
+        const luminance = getRelativeLuminance(bgColor);
+        return luminance < 0.179 ? "#FFFFFF" : "#000000";
+    }
+
+    function getRelativeLuminance(colorValue) {
+        const color = Qt.color(colorValue);
         // Calculate relative luminance using WCAG formula
         let r = color.r <= 0.03928 ? color.r / 12.92 : Math.pow((color.r + 0.055) / 1.055, 2.4);
         let g = color.g <= 0.03928 ? color.g / 12.92 : Math.pow((color.g + 0.055) / 1.055, 2.4);
         let b = color.b <= 0.03928 ? color.b / 12.92 : Math.pow((color.b + 0.055) / 1.055, 2.4);
-        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        // Return high contrast color
-        return luminance < 0.5 ? "#FFFFFF" : "#000000";
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    function getContrastRatio(firstColor, secondColor) {
+        const first = getRelativeLuminance(firstColor);
+        const second = getRelativeLuminance(secondColor);
+        return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    }
+
+    function getContrastPalette(sampleColors) {
+        const dark = Qt.color("#171717");
+        const light = Qt.color("#F5F5F5");
+        const samples = sampleColors?.length > 0 ? sampleColors : ["#000000"];
+        const darkContrasts = samples.map(color => getContrastRatio(dark, color));
+        const lightContrasts = samples.map(color => getContrastRatio(light, color));
+        const darkMinimum = Math.min(...darkContrasts);
+        const lightMinimum = Math.min(...lightContrasts);
+
+        return {
+            foreground: darkMinimum >= lightMinimum ? dark : light,
+            minimumContrast: Math.max(darkMinimum, lightMinimum)
+        };
     }
 
     /**

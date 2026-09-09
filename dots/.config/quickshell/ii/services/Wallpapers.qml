@@ -41,7 +41,7 @@ Singleton {
         "mp4", "mkv", "webm", "avi", "mov", "m4v", "ogv"
     ]
     function isVideoFile(name) {
-        return videoExtensions.some(ext => name.endsWith("." + ext))
+        return videoExtensions.some(ext => name.toLowerCase().endsWith("." + ext))
     }
 
     // Executions

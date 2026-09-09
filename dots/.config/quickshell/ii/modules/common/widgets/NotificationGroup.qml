@@ -113,16 +113,13 @@ MouseArea { // Notification group area
         }
     }
 
-    StyledRectangularShadow {
-        target: background
-        visible: popup
-    }
     Rectangle { // Background of the notification
         id: background
         anchors.left: parent.left
         width: parent.width
-        color: popup ? Appearance.colors.colBackgroundSurfaceContainer : Appearance.colors.colLayer2
+        color: popup ? "transparent" : Appearance.colors.colLayer2
         radius: Appearance.rounding.normal
+        antialiasing: true
         anchors.leftMargin: root.xOffset
 
         Behavior on anchors.leftMargin {
@@ -138,6 +135,16 @@ MouseArea { // Notification group area
         implicitHeight: root.expanded ? 
             row.implicitHeight + padding * 2 :
             Math.min(80, row.implicitHeight + padding * 2)
+
+        LiquidGlassSurface {
+            anchors.fill: parent
+            shown: root.popup
+            compositorBackdrop: true
+            tintColor: Appearance.m3colors.darkmode
+                ? Qt.rgba(0, 0, 0, 0.18)
+                : Qt.rgba(1, 1, 1, 0.18)
+            radius: background.radius
+        }
 
         Behavior on implicitHeight {
             id: implicitHeightAnim

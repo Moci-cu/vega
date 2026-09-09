@@ -124,7 +124,7 @@ Scope {
 
     Loader {
         id: osdLoader
-        active: GlobalStates.osdVolumeOpen
+        active: true
 
         sourceComponent: PanelWindow {
             id: osdRoot
@@ -144,7 +144,7 @@ Scope {
                 bottom: Config.options.bar.bottom
             }
             mask: Region {
-                item: osdValuesWrapper
+                item: GlobalStates.osdVolumeOpen ? osdValuesWrapper : null
             }
 
             exclusionMode: ExclusionMode.Ignore
@@ -156,7 +156,19 @@ Scope {
 
             implicitWidth: columnLayout.implicitWidth
             implicitHeight: columnLayout.implicitHeight
-            visible: osdLoader.active
+            // Keep the surface mapped so blur keeps sampling the active window while closing.
+            visible: true
+
+            LiquidGlassCapture {
+                id: osdGlassCapture
+                screen: osdRoot.screen
+                target: osdIndicatorLoader
+                active: GlobalStates.osdVolumeOpen
+                windowOriginX: Math.max(0, ((screen?.width ?? osdRoot.width) - osdRoot.width) / 2)
+                windowOriginY: Config.options.bar.bottom
+                    ? Math.max(0, (screen?.height ?? osdRoot.height) - osdRoot.height - Appearance.sizes.barHeight)
+                    : Appearance.sizes.barHeight
+            }
 
             ColumnLayout {
                 id: columnLayout
@@ -168,6 +180,15 @@ Scope {
                     implicitHeight: contentColumnLayout.implicitHeight
                     implicitWidth: contentColumnLayout.implicitWidth
                     clip: true
+                    opacity: GlobalStates.osdVolumeOpen ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Appearance.animation.elementMoveFast.duration
+                            easing.type: Appearance.animation.elementMoveFast.type
+                            easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
+                        }
+                    }
 
                     MouseArea {
                         anchors.fill: parent
@@ -187,6 +208,7 @@ Scope {
                         Loader {
                             id: osdIndicatorLoader
                             source: root.indicators.find(i => i.id === root.currentIndicator)?.sourceUrl
+                            onLoaded: item.glassCapture = osdGlassCapture
                         }
 
                         Item {

@@ -7,6 +7,7 @@ import qs.modules.common.widgets
 
 RippleButton { // Right sidebar button
     id: rightSidebarButton
+    property color foregroundColor: Appearance.colors.colOnLayer0
 
     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
     Layout.rightMargin: Appearance.rounding.screenRounding
@@ -22,7 +23,7 @@ RippleButton { // Right sidebar button
     colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
     colRippleToggled: Appearance.colors.colSecondaryContainerActive
     toggled: GlobalStates.sidebarRightOpen
-    property color colText: toggled ? Appearance.m3colors.m3onSecondaryContainer : Appearance.colors.colOnLayer0
+    property color colText: toggled ? Appearance.m3colors.m3onSecondaryContainer : foregroundColor
 
     Behavior on colText {
         animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)

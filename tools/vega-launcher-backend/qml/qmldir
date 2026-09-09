@@ -1,0 +1,3 @@
+module Vega.Launcher
+plugin vega_launcherplugin
+classname VegaLauncherPlugin

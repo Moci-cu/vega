@@ -7,6 +7,7 @@ Revealer { // Scroll hint
     property string icon
     property string side: "left"
     property string tooltipText: ""
+    property color foregroundColor: Appearance.colors.colSubtext
     
     MouseArea {
         id: mouseArea
@@ -43,17 +44,17 @@ Revealer { // Scroll hint
             MaterialSymbol {
                 text: "keyboard_arrow_up"
                 iconSize: 14
-                color: Appearance.colors.colSubtext
+                color: root.foregroundColor
             }
             MaterialSymbol {
                 text: root.icon
                 iconSize: 14
-                color: Appearance.colors.colSubtext
+                color: root.foregroundColor
             }
             MaterialSymbol {
                 text: "keyboard_arrow_down"
                 iconSize: 14
-                color: Appearance.colors.colSubtext
+                color: root.foregroundColor
             }
         }
     }

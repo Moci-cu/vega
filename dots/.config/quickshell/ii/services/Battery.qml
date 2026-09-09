@@ -80,7 +80,7 @@ Singleton {
 
     onIsSuspendingAndNotChargingChanged: {
         if (root.available && isSuspendingAndNotCharging) {
-            Quickshell.execDetached(["bash", "-c", `systemctl suspend || loginctl suspend`]);
+            Quickshell.execDetached(["bash", "-c", `loginctl lock-session && sleep 1.5 && (systemctl suspend || loginctl suspend)`]);
         }
     }
 

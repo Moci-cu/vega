@@ -12,7 +12,7 @@ Rectangle {
     id: root
 
     Layout.fillWidth: true
-    
+
     // short version of -> height: listModel.length * 40 + (listModel.length - 1) * 4 + listModel.length * 4 + 20 (component height + space between them + component margin + listView padding)
     implicitHeight: listModel.length * 48 + componentSelector.height + 16 + 6
 
@@ -22,11 +22,13 @@ Rectangle {
     property int barSection // 0: left, 1: center, 2: right
     property var listModel
     property int selectedCompIndex
+    property var componentCatalog: BarComponentRegistry.allComponents
+    property bool showCenterButton: true
 
     property bool dragging: false
 
     // Compute available components from registry based on what's already used
-    readonly property var usedIds: {
+    property var usedIds: {
         let ids = []
         let allLists = [
             Config.options.bar.layouts.left,
@@ -40,7 +42,7 @@ Rectangle {
         }
         return ids
     }
-    readonly property var availableComps: BarComponentRegistry.getAvailableComponents(usedIds)
+    readonly property var availableComps: componentCatalog.filter(c => c.repeatable || !usedIds.includes(c.id))
 
     signal updated(var newList)
 
@@ -104,9 +106,9 @@ Rectangle {
 
         spacing: 4
         cacheBuffer: 50
-        
+
     }
-    
+
     RowLayout {
         id: componentSelectRow
         anchors {
@@ -120,7 +122,7 @@ Rectangle {
 
         StyledComboBox {
             id: componentSelector
-            
+
             topRightRadius: Appearance.rounding.verysmall
             bottomRightRadius: Appearance.rounding.verysmall
 
@@ -149,7 +151,7 @@ Rectangle {
             colBackground: Appearance.colors.colSecondaryContainer
             colBackgroundHover: Appearance.colors.colSecondaryContainerHover
             rippleColor: Appearance.colors.colSecondaryContainerActive
-            
+
             onClicked: {
                 let available = root.availableComps
                 if (available[root.selectedCompIndex] == null) return
@@ -161,6 +163,6 @@ Rectangle {
             }
         }
     }
-    
-    
-} 
+
+
+}

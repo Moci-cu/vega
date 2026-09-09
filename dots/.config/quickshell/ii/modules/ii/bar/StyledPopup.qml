@@ -20,9 +20,11 @@ LazyLoader {
     property bool _popupHovered: false
     property bool _stickyActive: false
     property bool _targetHovered: hoverTarget ? hoverTarget.containsMouse : false
-
-    active: holdOpen
+    readonly property bool _requestedOpen: holdOpen
         || (stickyHover ? _stickyActive : (hoverTarget && hoverTarget.containsMouse))
+    property bool _surfaceActive: false
+
+    active: _surfaceActive
 
     // I have NO FUCKING IDEA why we cant use a normal timer here
     // Because if we do, we FUCKING cannot reference the timer from anywhere
@@ -34,6 +36,29 @@ LazyLoader {
                 root._stickyActive = false;
             }
         }
+        property Timer close: Timer {
+            interval: Appearance.animation.elementMoveExit.duration
+            onTriggered: {
+                if (!root._requestedOpen)
+                    root._surfaceActive = false;
+            }
+        }
+    }
+
+    Component.onCompleted: root._surfaceActive = root._requestedOpen
+
+    on_RequestedOpenChanged: {
+        if (_requestedOpen) {
+            _timers.close.stop();
+            _surfaceActive = true;
+            Qt.callLater(() => root.item?.showPopup());
+            return;
+        }
+
+        if (!_surfaceActive)
+            return;
+        root.item?.hidePopup();
+        _timers.close.restart();
     }
 
     function _evaluateStickyState() {
@@ -81,7 +106,7 @@ LazyLoader {
         implicitHeight: popupBackground.targetHeight + Appearance.sizes.elevationMargin * 2 + root.popupBackgroundMargin
 
         mask: Region {
-            item: popupBackground
+            item: root._requestedOpen ? popupBackground : null
         }
 
         exclusionMode: ExclusionMode.Ignore
@@ -124,11 +149,15 @@ LazyLoader {
             ? WlrKeyboardFocus.OnDemand
             : WlrKeyboardFocus.None
 
-        StyledRectangularShadow {
-            target: popupBackground
-        }
-
         property real animProgress: 0.0
+        function showPopup() {
+            closeAnim.stop();
+            openAnim.restart();
+        }
+        function hidePopup() {
+            openAnim.stop();
+            closeAnim.restart();
+        }
         readonly property Item heroItem: {
             if (!root.contentItem) return null;
             for (let i = 0; i < root.contentItem.children.length; i++) {
@@ -139,14 +168,26 @@ LazyLoader {
         }
         readonly property real heroHeight: heroItem ? heroItem.implicitHeight : 0
 
-        NumberAnimation on animProgress {
+        Component.onCompleted: showPopup()
+
+        NumberAnimation {
             id: openAnim
-            from: 0
+            target: popupWindow
+            property: "animProgress"
             to: 1
-            running: true
             duration: Appearance.animation.elementMove.duration
             easing.type: Appearance.animation.elementMove.type
             easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        }
+
+        NumberAnimation {
+            id: closeAnim
+            target: popupWindow
+            property: "animProgress"
+            to: 0
+            duration: Appearance.animation.elementMoveExit.duration
+            easing.type: Appearance.animation.elementMoveExit.type
+            easing.bezierCurve: Appearance.animation.elementMoveExit.bezierCurve
         }
 
         Rectangle {
@@ -214,8 +255,18 @@ LazyLoader {
                 return (heroHeight + margin * 2) + (_commitHeight - (heroHeight + margin * 2)) * popupWindow.animProgress;
             }
 
-            color: Appearance.m3colors.m3surfaceContainer
+            color: Appearance.colors.colGlassSurfaceContainer
             radius: root.popupRadius
+            antialiasing: true
+
+            transform: Translate {
+                x: popupBackground.isVertical
+                    ? (1 - popupWindow.animProgress) * (popupBackground.isBottom ? popupBackground.width : -popupBackground.width)
+                    : 0
+                y: popupBackground.isVertical
+                    ? 0
+                    : (1 - popupWindow.animProgress) * (popupBackground.isBottom ? popupBackground.height : -popupBackground.height)
+            }
 
             Item {
                 id: contentContainer

@@ -45,19 +45,17 @@ Item {
     implicitHeight: sidebarRightBackground.implicitHeight
     implicitWidth: sidebarRightBackground.implicitWidth
 
-    StyledRectangularShadow {
-        target: sidebarRightBackground
-    }
     Rectangle {
         id: sidebarRightBackground
 
         anchors.fill: parent
         implicitHeight: parent.height - Appearance.sizes.hyprlandGapsOut * 2
         implicitWidth: sidebarWidth - Appearance.sizes.hyprlandGapsOut * 2
-        color: Appearance.colors.colLayer0
+        color: Appearance.colors.colGlassSurface
         border.width: 1
         border.color: Appearance.colors.colLayer0Border
         radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
+        antialiasing: true
 
         ColumnLayout {
             anchors.fill: parent
@@ -131,11 +129,21 @@ Item {
         dialog: BluetoothDialog {}
         onShownChanged: {
             if (!shown) {
-                Bluetooth.defaultAdapter.discovering = false;
+                if (Bluetooth.defaultAdapter)
+                    Bluetooth.defaultAdapter.discovering = false;
             } else {
-                Bluetooth.defaultAdapter.enabled = true;
-                Bluetooth.defaultAdapter.discovering = true;
+                BluetoothStatus.setEnabled(true);
+                if (Bluetooth.defaultAdapter?.enabled)
+                    Bluetooth.defaultAdapter.discovering = true;
             }
+        }
+    }
+
+    Connections {
+        target: Bluetooth.defaultAdapter
+        function onEnabledChanged() {
+            if (root.showBluetoothDialog && Bluetooth.defaultAdapter.enabled)
+                Bluetooth.defaultAdapter.discovering = true;
         }
     }
 

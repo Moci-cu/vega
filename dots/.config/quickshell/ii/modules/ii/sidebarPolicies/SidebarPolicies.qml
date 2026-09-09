@@ -15,6 +15,8 @@ Scope { // Scope
     property bool extend: false
     property Component contentComponent: SidebarPoliciesContent {}
     property Item sidebarContent
+    property bool sidebarShown: GlobalStates.sidebarLeftOpen
+    property bool surfaceVisible: GlobalStates.sidebarLeftOpen
 
     readonly property bool isOnLeft: {
         const pos = Config.options.sidebar.position;
@@ -64,6 +66,16 @@ Scope { // Scope
         else root.pin = !root.pin;
     }
 
+    function toggleSystemGlance() {
+        if (GlobalStates.sidebarLeftOpen && root.sidebarContent?.systemGlanceActive) {
+            GlobalStates.sidebarLeftOpen = false;
+            return;
+        }
+
+        root.sidebarContent?.showSystemGlance();
+        GlobalStates.sidebarLeftOpen = true;
+    }
+
     Component.onCompleted: {
         root.sidebarContent = contentComponent.createObject(null, {
             "scopeRoot": root,
@@ -92,7 +104,8 @@ Scope { // Scope
         
         sourceComponent: PanelWindow {
             id: panelWindow
-            visible: GlobalStates.sidebarLeftOpen
+            // Keep the surface mapped only until the close animation finishes.
+            visible: root.surfaceVisible
             
             readonly property real sidebarWidth: {
                 const p = Config.options.policies;
@@ -113,7 +126,7 @@ Scope { // Scope
             implicitWidth: Appearance.sizes.sidebarWidthExtended + Appearance.sizes.elevationMargin
             WlrLayershell.namespace: root.isOnLeft ? "quickshell:sidebarLeft" : "quickshell:sidebarRight"
             // Hyprland 0.49: OnDemand is Exclusive, Exclusive just breaks click-outside-to-close
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+            WlrLayershell.keyboardFocus: GlobalStates.sidebarLeftOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             color: "transparent"
 
             anchors {
@@ -124,21 +137,50 @@ Scope { // Scope
             }
 
             mask: Region {
-                item: sidebarLeftBackground
+                x: sidebarLeftBackground.x
+                y: sidebarLeftBackground.y
+                width: sidebarLeftBackground.width
+                height: sidebarLeftBackground.height
             }
 
-            onVisibleChanged: {
-                if (visible) {
+            Component.onCompleted: {
+                root.surfaceVisible = GlobalStates.sidebarLeftOpen;
+                root.sidebarShown = GlobalStates.sidebarLeftOpen;
+                if (GlobalStates.sidebarLeftOpen && !root.pin)
                     GlobalFocusGrab.addDismissable(panelWindow);
-                } else {
+            }
+
+            Connections {
+                target: GlobalStates
+                function onSidebarLeftOpenChanged() {
+                    if (GlobalStates.sidebarLeftOpen) {
+                        sidebarHideTimer.stop();
+                        root.surfaceVisible = true;
+                        Qt.callLater(() => {
+                            if (GlobalStates.sidebarLeftOpen) {
+                                root.sidebarShown = true;
+                                if (!root.pin)
+                                    GlobalFocusGrab.addDismissable(panelWindow);
+                            }
+                        });
+                        return;
+                    }
+
+                    root.sidebarShown = false;
                     GlobalFocusGrab.removeDismissable(panelWindow);
+                    sidebarHideTimer.restart();
                 }
+            }
+
+            Component.onDestruction: {
+                if (GlobalStates.sidebarLeftOpen)
+                    GlobalFocusGrab.removeDismissable(panelWindow);
             }
 
             Connections {
                 target: root
                 function onPinChanged() {
-                    if (panelWindow.visible) {
+                    if (GlobalStates.sidebarLeftOpen) {
                         if (root.pin) GlobalFocusGrab.removeDismissable(panelWindow);
                         else GlobalFocusGrab.addDismissable(panelWindow);
                     }
@@ -153,22 +195,30 @@ Scope { // Scope
                 }
             }
 
-            StyledRectangularShadow {
-                target: sidebarLeftBackground
-                radius: sidebarLeftBackground.radius
-            }
-
             Rectangle {
                 id: sidebarLeftBackground
-                color: Appearance.colors.colLayer0
+                color: Appearance.colors.colGlassSurface
                 border.width: root.pin ? 0 : 1
                 border.color: root.pin ? "transparent" : Appearance.colors.colLayer0Border
                 radius: root.pin ? 0 : Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
+                antialiasing: true
                 
                 height: root.pin ? parent.height : parent.height - (Appearance.sizes.hyprlandGapsOut * 2)
                 y: root.pin ? 0 : Appearance.sizes.hyprlandGapsOut
                 width: panelWindow.sidebarWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
                 property bool _initialized: false
+
+                transform: Translate {
+                    x: root.sidebarShown ? 0 : (root.isOnLeft ? -sidebarLeftBackground.width : sidebarLeftBackground.width)
+
+                    Behavior on x {
+                        NumberAnimation {
+                            duration: Appearance.animation.elementMove.duration
+                            easing.type: Appearance.animation.elementMove.type
+                            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+                        }
+                    }
+                }
 
                 Timer {
                     interval: 2500 // Avoid animations on first show
@@ -275,7 +325,7 @@ Scope { // Scope
                             right: !root.isOnLeft ? parent.right : undefined
                         }
                         implicitSize: Appearance.rounding.screenRounding
-                        color: Appearance.colors.colLayer0
+                        color: Appearance.colors.colGlassSurface
                         corner: root.isOnLeft ? RoundCorner.CornerEnum.TopLeft : RoundCorner.CornerEnum.TopRight
                     }
                     RoundCorner {
@@ -285,11 +335,20 @@ Scope { // Scope
                             right: !root.isOnLeft ? parent.right : undefined
                         }
                         implicitSize: Appearance.rounding.screenRounding
-                        color: Appearance.colors.colLayer0
+                        color: Appearance.colors.colGlassSurface
                         corner: root.isOnLeft ? RoundCorner.CornerEnum.BottomLeft : RoundCorner.CornerEnum.BottomRight
                     }
                 }
             }
+        }
+    }
+
+    Timer {
+        id: sidebarHideTimer
+        interval: Appearance.animation.elementMove.duration
+        onTriggered: {
+            if (!GlobalStates.sidebarLeftOpen)
+                root.surfaceVisible = false;
         }
     }
     
@@ -314,7 +373,7 @@ Scope { // Scope
             Rectangle {
                 id: detachedSidebarBackground
                 anchors.fill: parent
-                color: Appearance.colors.colLayer0
+                color: Appearance.colors.colGlassSurface
 
                 Keys.onPressed: (event) => {
                     if (event.modifiers === Qt.ControlModifier) {
@@ -351,6 +410,13 @@ Scope { // Scope
         onPressed: {
             GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
         }
+    }
+
+    GlobalShortcut {
+        name: "sidebarSystemGlanceToggle"
+        description: "Toggles the system glance tab on press"
+
+        onPressed: root.toggleSystemGlance()
     }
 
     GlobalShortcut {

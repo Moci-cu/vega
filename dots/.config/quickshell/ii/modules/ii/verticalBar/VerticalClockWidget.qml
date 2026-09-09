@@ -3,7 +3,6 @@ import qs.modules.common.widgets
 import qs.services
 import QtQuick
 import QtQuick.Layouts
-import qs.modules.ii.bar as Bar
 
 Item {
     id: root
@@ -56,17 +55,6 @@ Item {
             for (let i = 0; i < drop.urls.length; i++)
                 LocalSend.addDroppedFile(drop.urls[i])
             drop.accept(Qt.CopyAction)
-        }
-    }
-
-    MouseArea {
-        id: mouseArea
-        anchors.fill: parent
-        hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
-        Bar.ClockWidgetPopup {
-            compact: Config.options.bar.tooltips.compactPopups
-            hoverTarget: mouseArea
         }
     }
 }

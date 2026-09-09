@@ -9,7 +9,6 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
-import qs.modules.waffle.looks
 
 Item {
     id: root
@@ -36,6 +35,7 @@ Item {
         const diffWeeks = Math.round(diffMillis / root.millisPerWeek);
         root.targetWeekDiff += diffWeeks;
     }
+    required property Component scrollAnimation
     property int weeksPerScroll: 1
     property real targetWeekDiff: 0
     property real weekDiff: targetWeekDiff
@@ -44,7 +44,7 @@ Item {
 
     Behavior on weekDiff {
         id: weekScrollBehavior
-        animation: Looks.transition.scroll.createObject(this)
+        animation: root.scrollAnimation.createObject(this)
     }
     Timer {
         id: scrollAnimationCheckTimer

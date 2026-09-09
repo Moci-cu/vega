@@ -12,6 +12,7 @@ import qs.modules.common.utils
 
 Item {
     id: root
+    property color foregroundColor: Appearance.colors.colOnLayer1
     Layout.fillHeight: true
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
@@ -159,7 +160,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         width: artworkEnabled ? parent.implicitWidth - (artworkItem.width + mediaCircProgSlot.width + artworkContentPadding + 16) : parent.implicitWidth - mediaCircProgSlot.width - 16
         elide: Text.ElideRight
-        color: Appearance.colors.colOnLayer1
+        color: root.foregroundColor
         text: `${cleanedTitle}${activePlayer?.trackArtist ? ' • ' + activePlayer.trackArtist : ''}`
     }
 

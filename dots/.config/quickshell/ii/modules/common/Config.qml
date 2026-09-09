@@ -316,6 +316,12 @@ Singleton {
                 }
 
                 property bool bottom: false // Instead of top
+                property JsonObject end4pc: JsonObject {
+                    property bool enable: false
+                    property list<string> left: ["launcherButton", "workspaces", "media"]
+                    property list<string> center: ["visualizer", "docktoPanel", "visualizer"]
+                    property list<string> right: ["sysTray", "powerButton", "systemIcons", "resources", "batteryIndicator", "updatesCount"]
+                }
                 property int cornerStyle: 0 // 0: Hug | 1: Float | 2: Plain rectangle
                 property bool floatStyleShadow: true // Show shadow behind bar when cornerStyle == 1 (Float)
                 property int barGroupStyle: 0 // 0: Pills | 1: Island (opaque) | 2: Transparent (or maybe line-separated in the future)
@@ -548,6 +554,7 @@ Singleton {
             }
 
             property JsonObject lock: JsonObject {
+                property string style: "vega"
                 property bool useHyprlock: false
                 property bool launchOnStartup: false
                 property JsonObject blur: JsonObject {

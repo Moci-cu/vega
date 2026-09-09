@@ -6,10 +6,11 @@ import QtQuick.Layouts
 
 Item {
     id: root
+    property color foregroundColor: Appearance.colors.colOnLayer1
     property bool showDate: Config.options.bar.verbose
     implicitWidth: rowLayout.implicitWidth + rowLayout.spacing * 10
     implicitHeight: Appearance.sizes.barHeight
-    property color colText: dropArea.containsDrag ? Appearance.colors.colPrimary : rootItem.highlighted ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1
+    property color colText: dropArea.containsDrag ? Appearance.colors.colPrimary : rootItem.highlighted ? Appearance.colors.colOnPrimary : root.foregroundColor
 
     Connections {
         target: LocalSend
@@ -64,17 +65,6 @@ Item {
             for (let i = 0; i < drop.urls.length; i++)
                 LocalSend.addDroppedFile(drop.urls[i])
             drop.accept(Qt.CopyAction)
-        }
-    }
-
-    MouseArea {
-        id: mouseArea
-        anchors.fill: parent
-        hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
-        ClockWidgetPopup {
-            compact: Config.options.bar.tooltips.compactPopups
-            hoverTarget: mouseArea
         }
     }
 }

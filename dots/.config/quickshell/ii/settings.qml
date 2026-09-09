@@ -1,5 +1,6 @@
 //@ pragma UseQApplication
 //@ pragma Env QS_NO_RELOAD_POPUP=1
+//@ pragma Env II_SETTINGS_PROCESS=1
 //@ pragma Env QT_QUICK_CONTROLS_STYLE=Basic
 //@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
 
@@ -11,11 +12,11 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import Quickshell
+import Quickshell.Io
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions as CF
-import qs.modules.settings
 
 ApplicationWindow {
     id: root
@@ -30,20 +31,27 @@ ApplicationWindow {
     property int lastSearchIndex: -1
     property int resultsCount: 0
     property string pendingSearch: ""
+    property bool firstFramePresented: false
+    property bool firstPageLoadScheduled: false
+    property bool startupGeometryLocked: true
 
     function runSettingsSearch(searchText) {
-        if (searchText.trim() === "") {
+        const query = searchText.trim()
+        if (query === "") {
             root.pendingSearch = ""
             return
         }
 
-        const normalizedText = searchText.toLowerCase()
-        const results = SearchRegistry.getResultsRanked(normalizedText)
-
-        if (results === null) {
-            root.pendingSearch = searchText
+        root.pendingSearch = query
+        if (!searchControllerLoader.active) {
+            searchControllerLoader.active = true
             return
         }
+        if (searchControllerLoader.item) searchControllerLoader.item.search(query)
+    }
+
+    function applySettingsSearchResults(searchText, results) {
+        if (root.pendingSearch !== searchText) return
 
         root.pendingSearch = ""
         if (results.length === 0) {
@@ -63,52 +71,67 @@ ApplicationWindow {
         const result = results[index]
         root.resultsCount = results.length
         root.currentPage = result.pageIndex
-        SearchRegistry.currentSearch = result.matchedString
+        searchControllerLoader.item.setCurrentSearch(result.matchedString)
     }
 
     property var pages: [
         {
+            id: "quick",
             name: Translation.tr("Quick"),
             icon: "instant_mix",
             component: "modules/settings/QuickConfig.qml"
         },
         {
+            id: "general",
             name: Translation.tr("General"),
             icon: "browse",
             component: "modules/settings/GeneralConfig.qml"
         },
         {
+            id: "wifi",
+            name: Translation.tr("Wi-Fi"),
+            icon: "wifi",
+            component: "modules/settings/WifiConfig.qml"
+        },
+        {
+            id: "bar",
             name: Translation.tr("Bar"),
             icon: "toast",
             iconRotation: 180,
             component: "modules/settings/BarConfig.qml"
         },
         {
+            id: "background",
             name: Translation.tr("Background"),
             icon: "texture",
             component: "modules/settings/BackgroundConfig.qml"
         },
         {
+            id: "interface",
             name: Translation.tr("Interface"),
             icon: "bottom_app_bar",
             component: "modules/settings/InterfaceConfig.qml"
         },
         {
+            id: "services",
             name: Translation.tr("Services"),
             icon: "api",
             component: "modules/settings/ServicesConfig.qml"
         },
         {
+            id: "extensions",
             name: Translation.tr("Extensions"),
             icon: "extension",
             component: "modules/settings/ExtensionsConfig.qml"
         },
         {
+            id: "advanced",
             name: Translation.tr("Advanced"),
             icon: "construction",
             component: "modules/settings/AdvancedConfig.qml"
         },
         {
+            id: "about",
             name: Translation.tr("About"),
             icon: "info",
             component: "modules/settings/About.qml"
@@ -116,33 +139,71 @@ ApplicationWindow {
     ]
     
 
-    visible: true
+    visible: false
+    onWidthChanged: {
+        if (root.visible && root.startupGeometryLocked && Math.round(root.width) !== 1100) root.width = 1100
+    }
+    onHeightChanged: {
+        if (root.visible && root.startupGeometryLocked && Math.round(root.height) !== 750) root.height = 750
+    }
     onClosing: Qt.quit()
+    onFrameSwapped: {
+        if (root.firstFramePresented || root.firstPageLoadScheduled) return
+        root.firstPageLoadScheduled = true
+        Qt.callLater(() => root.firstFramePresented = true)
+    }
     title: "illogical-impulse Settings"
     
     Component.onCompleted: {
-        ExtensionManager.watchFileChanges = false // Settings app doesn't need file watching to prevent loops
+        const initialPage = (Quickshell.env("II_SETTINGS_PAGE") || "").trim().toLowerCase()
+        if (initialPage.length > 0) {
+            const index = root.pages.findIndex(page => page.id === initialPage)
+            if (index >= 0) root.currentPage = index
+        }
         MaterialThemeLoader.reapplyTheme()
         Config.readWriteDelay = 0 // Settings app always only sets one var at a time so delay isn't needed
+        root.width = 1100
+        root.height = 750
+        root.show()
     }
 
-    Connections {
-        target: SearchRegistry
-        function onIndexReadyChanged() {
-            if (!SearchRegistry.indexReady || root.pendingSearch === "") return
-            const searchText = root.pendingSearch
-            Qt.callLater(() => {
-                if (root.pendingSearch !== searchText) return
-                root.runSettingsSearch(searchText)
-            })
+    IpcHandler {
+        target: "settings"
+
+        function open(pageId: string): void {
+            const requestedPage = pageId.trim().toLowerCase()
+            if (requestedPage.length > 0) {
+                const index = root.pages.findIndex(page => page.id === requestedPage)
+                if (index >= 0) root.currentPage = index
+            }
+            root.show()
+            root.raise()
+            root.requestActivate()
         }
     }
 
-    minimumWidth: 750
-    minimumHeight: 500
+    Loader {
+        id: searchControllerLoader
+        active: false
+        source: "modules/settings/SettingsSearchController.qml"
+        onLoaded: {
+            item.resultsReady.connect(root.applySettingsSearchResults)
+            if (root.pendingSearch !== "") item.search(root.pendingSearch)
+        }
+    }
+
+    minimumWidth: root.startupGeometryLocked ? 1100 : 750
+    minimumHeight: root.startupGeometryLocked ? 750 : 500
     width: 1100
     height: 750
     color: Appearance.m3colors.m3background
+
+    Timer {
+        interval: 650
+        running: root.visible && root.startupGeometryLocked
+        repeat: false
+        onTriggered: root.startupGeometryLocked = false
+    }
 
     ColumnLayout {
         anchors {
@@ -248,23 +309,6 @@ ApplicationWindow {
                         root.resultsCount = 0
                         root.pendingSearch = ""
                     }
-
-                    // We may use this in the future, this only searches the best result
-                    /* onAccepted: {
-                        if (!searchInput.text || searchInput.text.trim() === "") return
-                        
-                        let normalizedText = searchInput.text.toLowerCase()
-                        let bestResult = SearchRegistry.getBestResult(normalizedText)
-
-                        if (!bestResult) {
-                            noMoreResultsAnim.restart()
-                            return
-                        }
-
-                        root.currentPage = bestResult.pageIndex
-                        root.scrollPos = bestResult.yPos
-                        SearchRegistry.currentSearch = bestResult.matchedString
-                    } */
 
                     onAccepted: root.runSettingsSearch(searchInput.text)
                 }
@@ -376,17 +420,28 @@ ApplicationWindow {
 
                 Loader {
                     id: pageLoader
+                    property bool initialPageLoaded: false
+
+                    function loadInitialPage() {
+                        if (!active || initialPageLoaded) return
+                        source = root.pages[root.currentPage].component
+                        initialPageLoaded = true
+                    }
+
                     anchors.fill: parent
                     opacity: 1.0
 
-                    active: Config.ready
-                    Component.onCompleted: {
-                        source = root.pages[0].component
-                    }
+                    active: Config.ready && root.firstFramePresented
+                    onActiveChanged: loadInitialPage()
+                    Component.onCompleted: loadInitialPage()
 
                     Connections {
                         target: root
                         function onCurrentPageChanged() {
+                            if (!pageLoader.initialPageLoaded) {
+                                pageLoader.loadInitialPage()
+                                return
+                            }
                             switchAnim.complete();
                             switchAnim.start();
                         }

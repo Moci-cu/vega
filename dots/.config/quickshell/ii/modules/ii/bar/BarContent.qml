@@ -16,9 +16,22 @@ Item { // Bar content region
 
     property var screen: root.QsWindow.window?.screen
     property int monitorIndex
+    readonly property int activeWorkspaceId: HyprlandData.monitors.find(monitor => monitor.name === screen?.name)?.activeWorkspace?.id ?? 1
+    readonly property real targetParallaxWorkspaceValue: Appearance.barWorkspaceValue(activeWorkspaceId)
+    readonly property real targetParallaxSidebarBalance: GlobalStates.effectiveRightOpen - GlobalStates.effectiveLeftOpen
+    property real parallaxWorkspaceValue: targetParallaxWorkspaceValue
+    property real parallaxSidebarBalance: targetParallaxSidebarBalance
     property var brightnessMonitor: Brightness.getMonitorForScreen(screen)
     property real useShortenedForm: (Appearance.sizes.barHellaShortenScreenWidthThreshold >= screen?.width) ? 2 : (Appearance.sizes.barShortenScreenWidthThreshold >= screen?.width) ? 1 : 0
     readonly property int centerSideModuleWidth: (useShortenedForm == 2) ? Appearance.sizes.barCenterSideModuleWidthHellaShortened : (useShortenedForm == 1) ? Appearance.sizes.barCenterSideModuleWidthShortened : Appearance.sizes.barCenterSideModuleWidth
+
+    component ParallaxAnimation: NumberAnimation {
+        duration: 600
+        easing.type: Easing.OutCubic
+    }
+
+    Behavior on parallaxWorkspaceValue { ParallaxAnimation {} }
+    Behavior on parallaxSidebarBalance { ParallaxAnimation {} }
 
     property bool hasActiveWindows: false
     property bool showBarBackground: root.hasActiveWindows && Config.options.bar.barBackgroundStyle === 2 || Config.options.bar.barBackgroundStyle === 1
@@ -75,7 +88,7 @@ Item { // Bar content region
             fill: parent
             margins: Config.options.bar.cornerStyle === 1 ? (Appearance.sizes.hyprlandGapsOut) : 0 // idk why but +1 is needed
         }
-        color: root.showBarBackground ? Appearance.colors.colLayer0 : "transparent"
+        color: root.showBarBackground ? Appearance.colors.colGlassSurface : "transparent"
         radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
         border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
         border.color: root.showBarBackground ? Appearance.colors.colLayer0Border : "transparent"
@@ -101,13 +114,15 @@ Item { // Bar content region
         onMovedAway: GlobalStates.osdBrightnessOpen = false
         onPressed: event => {
             if (event.button === Qt.LeftButton)
-                GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
+                LauncherSearch.metricsPanelRequested();
         }
 
         ScrollHint {
             reveal: barLeftSideMouseArea.hovered
             icon: Hyprsunset.gamma === 100 ? "light_mode" : "wb_twilight"
             tooltipText: Translation.tr("Scroll to change brightness")
+            readonly property var adaptivePalette: Appearance.barPaletteAt(0, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
+            foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : Appearance.colors.colSubtext
             side: "left"
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -141,6 +156,9 @@ Item { // Bar content region
             delegate: BarComponent {
                 list: Config.options.bar.layouts.left
                 barSection: 0
+                screen: root.screen
+                parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                parallaxSidebarBalance: root.parallaxSidebarBalance
             }
         }
     }
@@ -166,7 +184,10 @@ Item { // Bar content region
                 delegate: BarComponent {
                     list: Config.options.bar.layouts.center
                     barSection: 1
+                    screen: root.screen
                     originalIndex: Config.options.bar.layouts.center.findIndex(e => e.id === modelData.id) // we have to recalculate the index because repeater.model has changed
+                    parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                    parallaxSidebarBalance: root.parallaxSidebarBalance
                 }
             }
         }
@@ -183,7 +204,10 @@ Item { // Bar content region
                 delegate: BarComponent {
                     list: Config.options.bar.layouts.center
                     barSection: 1
+                    screen: root.screen
                     originalIndex: Config.options.bar.layouts.center.findIndex(e => e.id === modelData.id)
+                    parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                    parallaxSidebarBalance: root.parallaxSidebarBalance
                 }
             }
         }
@@ -201,7 +225,10 @@ Item { // Bar content region
                 delegate: BarComponent {
                     list: Config.options.bar.layouts.center
                     barSection: 1
+                    screen: root.screen
                     originalIndex: Config.options.bar.layouts.center.findIndex(e => e.id === modelData.id)
+                    parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                    parallaxSidebarBalance: root.parallaxSidebarBalance
                 }
             }
         }
@@ -224,6 +251,9 @@ Item { // Bar content region
             delegate: BarComponent {
                 list: rightRepeater.model
                 barSection: 2
+                screen: root.screen
+                parallaxWorkspaceValue: root.parallaxWorkspaceValue
+                parallaxSidebarBalance: root.parallaxSidebarBalance
             }
         }
     }
@@ -266,6 +296,8 @@ Item { // Bar content region
             reveal: barRightSideMouseArea.hovered
             icon: "volume_up"
             tooltipText: Translation.tr("Scroll to change volume")
+            readonly property var adaptivePalette: Appearance.barPaletteAt(root.screen?.width ?? 1, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
+            foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : Appearance.colors.colSubtext
             side: "right"
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter

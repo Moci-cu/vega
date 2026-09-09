@@ -2,6 +2,7 @@ import qs
 import qs.services
 import qs.services.network
 import qs.modules.common
+import qs.modules.common.functions as CF
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
@@ -12,6 +13,7 @@ WindowDialog {
     backgroundHeight: 600
 
     property string filterText: ""
+    property bool scannerAcquired: false
     readonly property var filteredWifiNetworks: {
         const query = filterText.trim().toLowerCase();
         if (query.length === 0) return Network.friendlyWifiNetworks;
@@ -19,8 +21,22 @@ WindowDialog {
     }
 
     onShowChanged: {
-        if (show) return;
+        if (show) {
+            if (!scannerAcquired) {
+                scannerAcquired = true;
+                Network.acquireWifiScanner();
+            }
+            return;
+        }
+        if (scannerAcquired) {
+            scannerAcquired = false;
+            Network.releaseWifiScanner();
+        }
         networkSearchField.clear();
+    }
+
+    Component.onDestruction: {
+        if (scannerAcquired) Network.releaseWifiScanner();
     }
 
     WindowDialogTitle {
@@ -101,7 +117,7 @@ WindowDialog {
         DialogButton {
             buttonText: Translation.tr("Details")
             onClicked: {
-                Quickshell.execDetached(["bash", "-c", `${Network.ethernet ? Config.options.apps.networkEthernet : Config.options.apps.network}`]);
+                Quickshell.execDetached([CF.FileUtils.trimFileProtocol(`${Directories.config}/hypr/hyprland/scripts/launch_settings.sh`), "wifi"]);
                 GlobalStates.sidebarRightOpen = false;
             }
         }

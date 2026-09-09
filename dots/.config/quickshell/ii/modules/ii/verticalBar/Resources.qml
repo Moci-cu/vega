@@ -2,15 +2,12 @@ import qs.services
 import qs.modules.common
 import QtQuick
 import QtQuick.Layouts
-import qs.modules.ii.bar as Bar
 
 MouseArea {
     id: root
     property bool alwaysShowAllResources: false
     implicitHeight: columnLayout.implicitHeight + 15
     implicitWidth: columnLayout.implicitWidth
-    hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
     Component.onCompleted: ResourceUsage.activeInstances++
     Component.onDestruction: ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
 
@@ -40,9 +37,5 @@ MouseArea {
             warningThreshold: Config.options.bar.resources.cpuWarningThreshold
         }
 
-    }
-
-    Bar.ResourcesPopup {
-        hoverTarget: root
     }
 }

@@ -8,6 +8,7 @@ Text {
     property real animationDistanceY: 6
 
     renderType: Text.NativeRendering
+    style: Text.Normal
     verticalAlignment: Text.AlignVCenter
     property bool shouldUseNumberFont: /^\d+$/.test(root.text)
     property var defaultFont: shouldUseNumberFont ? Appearance.font.family.numbers : Appearance.font.family.main

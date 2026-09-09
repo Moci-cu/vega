@@ -16,8 +16,12 @@ import Qt5Compat.GraphicalEffects
 
 Item {
     id: root
+    property color foregroundColor: Appearance.colors.colOnLayer1
     property bool vertical: false
-    readonly property HyprlandMonitor monitor: Hyprland.monitorFor(root.QsWindow.window?.screen)
+    property var screen
+    property real parallaxWorkspaceValue: 0.5
+    property real parallaxSidebarBalance: 0
+    readonly property HyprlandMonitor monitor: Hyprland.monitorFor(root.screen ?? root.QsWindow.window?.screen)
     readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
 
     readonly property bool useWorkspaceMap: Config.options.bar.workspaces.useWorkspaceMap
@@ -561,10 +565,21 @@ Item {
     }
 
     component WorkspaceBackgroundIndicator: Rectangle {
+        id: indicator
         property bool showNumbers: Config.options.bar.workspaces.alwaysShowNumbers || root.showNumbersByMs
         property int workspaceValue
         property bool activeWorkspace
-        property color indColor: (activeWorkspace) ? Appearance.m3colors.m3onPrimary : (root.workspaceOccupied[index] ? Appearance.m3colors.m3onSecondaryContainer : Appearance.colors.colOnLayer1Inactive)
+        readonly property real screenCenterX: {
+            width;
+            x;
+            parent?.x;
+            return mapToItem(null, width / 2, 0).x;
+        }
+        readonly property var localPalette: Appearance.colors.transparentBar
+            ? Appearance.barPaletteAt(screenCenterX, width, root.screen, root.parallaxWorkspaceValue, root.parallaxSidebarBalance)
+            : ({ foreground: root.foregroundColor })
+        readonly property color localForeground: localPalette.foreground
+        property color indColor: activeWorkspace ? Appearance.m3colors.m3onPrimary : (root.workspaceOccupied[index] ? localForeground : ColorUtils.transparentize(localForeground, 0.32))
 
         anchors.centerIn: parent
         width: root.workspaceDotSize
@@ -573,11 +588,8 @@ Item {
         visible: layout.implicitHeight + 8 < root.iconBoxWrapperSize || root.showNumbersByMs
         color: !showNumbers ?  indColor : "transparent"
 
-        Behavior on color {
-            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-        }
-
         StyledText {
+            id: workspaceLabel
             opacity: showNumbers ? 1 : 0
             anchors.centerIn: parent
             text: Config.options?.bar.workspaces.numberMap[workspaceValue - 1] || workspaceValue

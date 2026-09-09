@@ -32,6 +32,7 @@ Singleton {
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
     property bool workspaceShowNumbers: false
+    property var lockTemporaryWorkspaceIds: []
 
     property bool dashboardPanelOpen: false // formerly sidebarRightOpen
     property bool policiesPanelOpen: false  // formerly sidebarLeftOpen
@@ -60,6 +61,10 @@ Singleton {
     readonly property bool dashboardOnLeft: Config.options.sidebar.position === "inverted" || Config.options.sidebar.position === "left"
 
     onPoliciesPanelOpenChanged: {
+        if (policiesPanelOpen && Config.options.panelFamily === "ii") {
+            policiesPanelOpen = false;
+            return;
+        }
         if (policiesPanelOpen) {
             if (Config.options.sidebar.position == "right" || Config.options.sidebar.position == "left") {
                 GlobalStates.dashboardPanelOpen = false
@@ -69,6 +74,10 @@ Singleton {
     }
 
     onDashboardPanelOpenChanged: {
+        if (dashboardPanelOpen && Config.options.panelFamily === "ii") {
+            dashboardPanelOpen = false;
+            return;
+        }
         if (dashboardPanelOpen) {
             Notifications.timeoutAll();
             Notifications.markAllRead();

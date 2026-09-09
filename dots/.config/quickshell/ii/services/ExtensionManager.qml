@@ -24,7 +24,7 @@ Singleton {
     property var _updateQueue: ({}) // { extId: string, repoUrl: string, branch: string, step: string }
     property var _updateCheckQueue: []
     property bool _updateCheckRunning: false
-    property bool watchFileChanges: true
+    property bool watchFileChanges: Quickshell.env("II_SETTINGS_PROCESS") !== "1"
 
     Connections {
         target: Config.options.extensions

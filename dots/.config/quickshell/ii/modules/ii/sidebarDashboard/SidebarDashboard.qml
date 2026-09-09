@@ -10,6 +10,8 @@ import Quickshell.Hyprland
 Scope {
     id: root
     property int sidebarWidth: Appearance.sizes.sidebarWidth
+    property bool sidebarShown: GlobalStates.sidebarRightOpen
+    property bool contentLoaded: GlobalStates.sidebarRightOpen
 
     readonly property bool isOnRight: {
         const pos = Config.options.sidebar.position;
@@ -18,7 +20,8 @@ Scope {
 
     PanelWindow {
         id: panelWindow
-        visible: GlobalStates.sidebarRightOpen
+        // Keep the surface mapped only until the close animation finishes.
+        visible: root.contentLoaded
 
         function hide() {
             GlobalStates.sidebarRightOpen = false;
@@ -37,11 +40,29 @@ Scope {
             bottom: true
         }
 
-        onVisibleChanged: {
-            if (visible) {
+        Component.onCompleted: {
+            if (GlobalStates.sidebarRightOpen)
                 GlobalFocusGrab.addDismissable(panelWindow);
-            } else {
+        }
+
+        Connections {
+            target: GlobalStates
+            function onSidebarRightOpenChanged() {
+                if (GlobalStates.sidebarRightOpen) {
+                    sidebarUnloadTimer.stop();
+                    root.contentLoaded = true;
+                    Qt.callLater(() => {
+                        if (GlobalStates.sidebarRightOpen) {
+                            root.sidebarShown = true;
+                            GlobalFocusGrab.addDismissable(panelWindow);
+                        }
+                    });
+                    return;
+                }
+
+                root.sidebarShown = false;
                 GlobalFocusGrab.removeDismissable(panelWindow);
+                sidebarUnloadTimer.restart();
             }
         }
 
@@ -55,8 +76,20 @@ Scope {
         Loader {
             id: sidebarContentLoader
 
-            active: GlobalStates.sidebarRightOpen || Config?.options.sidebar.keepRightSidebarLoaded
+            active: root.contentLoaded || Config?.options.sidebar.keepRightSidebarLoaded
             sourceComponent: SidebarDashboardContent {}
+
+            transform: Translate {
+                x: root.sidebarShown ? 0 : (root.isOnRight ? sidebarContentLoader.width : -sidebarContentLoader.width)
+
+                Behavior on x {
+                    NumberAnimation {
+                        duration: Appearance.animation.elementMove.duration
+                        easing.type: Appearance.animation.elementMove.type
+                        easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+                    }
+                }
+            }
             
             width: root.sidebarWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
             height: parent.height - (Appearance.sizes.hyprlandGapsOut * 2)
@@ -99,6 +132,15 @@ Scope {
                     panelWindow.hide();
                 }
             }
+        }
+    }
+
+    Timer {
+        id: sidebarUnloadTimer
+        interval: Appearance.animation.elementMove.duration
+        onTriggered: {
+            if (!GlobalStates.sidebarRightOpen)
+                root.contentLoaded = false;
         }
     }
 

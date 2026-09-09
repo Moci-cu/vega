@@ -6,14 +6,22 @@ import qs.modules.common.functions
 import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
+import Quickshell.Bluetooth
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Services.UPower
 
 Singleton {
     id: root
 
     property string query: ""
     property int resultLimit: 15
+
+    signal wifiPanelRequested()
+    signal bluetoothPanelRequested()
+    signal timerPanelRequested()
+    signal todoPanelRequested()
+    signal metricsPanelRequested()
 
     readonly property list<var> searchPrefixEntries: [
         { name: "action", prefix: Config.options.search.prefix.action },
@@ -43,6 +51,502 @@ Singleton {
 
     function matchedPrefix(queryText = root.query) {
         return root.matchedPrefixEntry(queryText)?.prefix ?? "";
+    }
+
+    function isImplicitMathQuery(queryText = root.query) {
+        const queryString = String(queryText ?? "").trim();
+        return /^[+-]?\d[\d\s.]*[+\-*\/%^][\d\s.+\-*\/%^()]*$/.test(queryString);
+    }
+
+    function isApplicationQuery(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        if (root.isImplicitMathQuery(queryString))
+            return false;
+        if (root.isWifiCommandQuery(queryString))
+            return false;
+        if (root.naturalCommandResult(queryString))
+            return false;
+        const prefixName = root.matchedPrefixName(queryString);
+        return prefixName === "app" || prefixName === "";
+    }
+
+    function isWifiCommandQuery(queryText = root.query) {
+        return /^wi-?fi$/i.test(String(queryText ?? "").trim());
+    }
+
+    readonly property list<var> commandKeywords: [
+        {
+            key: "metrics",
+            name: "System Metrics",
+            aliases: ["metrics", "system metrics", "system monitor", "performance monitor", "resources"],
+            verb: Translation.tr("Open"),
+            iconName: "monitoring",
+            keepLauncherOpen: true,
+            execute: () => root.metricsPanelRequested()
+        },
+        {
+            key: "wifi",
+            name: "wifi",
+            aliases: ["wifi", "wireless"],
+            verb: Translation.tr("Commands"),
+            iconName: "wifi",
+            keepLauncherOpen: true,
+            execute: () => root.query = "wifi"
+        },
+        {
+            key: "timer",
+            name: "Timer",
+            aliases: ["timer", "countdown"],
+            verb: Translation.tr("Open"),
+            iconName: "timer",
+            keepLauncherOpen: true,
+            execute: () => root.timerPanelRequested()
+        },
+        {
+            key: "todo",
+            name: "To-Do",
+            aliases: ["todo", "task", "tasks"],
+            verb: Translation.tr("Open"),
+            iconName: "checklist",
+            keepLauncherOpen: true,
+            execute: () => root.todoPanelRequested()
+        },
+        {
+            key: "night-mode",
+            name: "Night Mode",
+            aliases: ["nightmode", "nightlight"],
+            verb: Hyprsunset.temperatureActive ? Translation.tr("Turn Off") : Translation.tr("Turn On"),
+            iconName: Config.options.light.night.automatic ? "night_sight_auto" : "bedtime",
+            execute: () => Hyprsunset.toggleTemperature()
+        },
+        {
+            key: "coffee-mode",
+            name: "Coffee Mode",
+            aliases: ["coffeemode", "coffemode", "coffee", "keepawake", "caffeine"],
+            verb: Idle.inhibit ? Translation.tr("Turn Off") : Translation.tr("Turn On"),
+            iconName: Idle.inhibit ? "kettle" : "coffee",
+            execute: () => Idle.toggleInhibit()
+        }
+    ]
+
+    readonly property list<var> naturalIntents: [
+        { key: "open", aliases: ["open", "show", "scan", "manage"] },
+        { key: "on", aliases: ["enable", "on", "start", "activate", "aktifkan", "nyalakan"] },
+        { key: "off", aliases: ["disable", "off", "stop", "deactivate", "matikan", "nonaktifkan"] }
+    ]
+    readonly property list<var> naturalTargets: [
+        { key: "wifi", aliases: ["wifi", "wireless", "wlan"] },
+        { key: "bluetooth", aliases: ["bluetooth", "bt"] },
+        { key: "timer", aliases: ["timer", "countdown"] },
+        { key: "todo", aliases: ["todo", "task", "tasks"] }
+    ]
+    readonly property list<string> naturalFillers: [
+        "turn", "please", "the", "my", "device", "devices", "network", "networks", "radio", "now", "tolong"
+    ]
+    readonly property list<var> powerProfileChoices: [
+        {
+            key: "power-saver",
+            completion: "saver",
+            name: Translation.tr("Power Saver"),
+            iconName: "energy_savings_leaf",
+            value: PowerProfile.PowerSaver
+        },
+        {
+            key: "balanced",
+            completion: "balanced",
+            name: Translation.tr("Balanced"),
+            iconName: "airwave",
+            value: PowerProfile.Balanced
+        },
+        {
+            key: "performance",
+            completion: "performance",
+            name: Translation.tr("Performance"),
+            iconName: "local_fire_department",
+            value: PowerProfile.Performance
+        }
+    ]
+
+    readonly property list<var> naturalCommands: [
+        {
+            key: "wifi-open",
+            intent: "open",
+            target: "wifi",
+            name: "Open Wi-Fi",
+            verb: Translation.tr("Open"),
+            iconName: "wifi_find",
+            keepLauncherOpen: true,
+            execute: () => root.wifiPanelRequested()
+        },
+        {
+            key: "wifi-on",
+            intent: "on",
+            target: "wifi",
+            name: "Enable Wi-Fi",
+            verb: Translation.tr("Turn On"),
+            iconName: "wifi",
+            execute: () => Quickshell.execDetached(["nmcli", "radio", "wifi", "on"])
+        },
+        {
+            key: "wifi-off",
+            intent: "off",
+            target: "wifi",
+            name: "Disable Wi-Fi",
+            verb: Translation.tr("Turn Off"),
+            iconName: "signal_wifi_off",
+            execute: () => Quickshell.execDetached(["nmcli", "radio", "wifi", "off"])
+        },
+        {
+            key: "bluetooth-open",
+            intent: "open",
+            target: "bluetooth",
+            name: "Open Bluetooth",
+            verb: Translation.tr("Open"),
+            iconName: "bluetooth_searching",
+            keepLauncherOpen: true,
+            execute: () => root.bluetoothPanelRequested()
+        },
+        {
+            key: "bluetooth-on",
+            intent: "on",
+            target: "bluetooth",
+            name: "Enable Bluetooth",
+            verb: Translation.tr("Turn On"),
+            iconName: "bluetooth",
+            execute: () => BluetoothStatus.setEnabled(true)
+        },
+        {
+            key: "bluetooth-off",
+            intent: "off",
+            target: "bluetooth",
+            name: "Disable Bluetooth",
+            verb: Translation.tr("Turn Off"),
+            iconName: "bluetooth_disabled",
+            execute: () => BluetoothStatus.setEnabled(false)
+        },
+        {
+            key: "timer-open",
+            intent: "open",
+            target: "timer",
+            name: "Open Timer",
+            verb: Translation.tr("Open"),
+            iconName: "timer",
+            keepLauncherOpen: true,
+            execute: () => root.timerPanelRequested()
+        },
+        {
+            key: "todo-open",
+            intent: "open",
+            target: "todo",
+            name: "Open To-Do",
+            verb: Translation.tr("Open"),
+            iconName: "checklist",
+            keepLauncherOpen: true,
+            execute: () => root.todoPanelRequested()
+        }
+    ]
+
+    function compactKeyword(text) {
+        return String(text ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
+    }
+
+    function naturalTokens(text) {
+        const normalized = String(text ?? "").toLowerCase()
+            .replace(/wi[^a-z0-9]*fi/g, "wifi")
+            .replace(/blue[^a-z0-9]*tooth/g, "bluetooth");
+        return normalized.match(/[a-z0-9]+/g) ?? [];
+    }
+
+    function naturalTokenScore(token, alias) {
+        if (token === alias)
+            return 1;
+        if (alias.startsWith(token))
+            return 0.82 + Math.min(0.16, token.length / alias.length * 0.16);
+        if (token.length < 2 || alias.length < 2)
+            return 0;
+        return Levendist.computeScore(token, alias);
+    }
+
+    function naturalGroupMatch(tokens, groups) {
+        let best = null;
+        let runnerUpScore = 0;
+        for (const group of groups) {
+            let groupMatch = { key: group.key, score: 0, tokenIndex: -1, alias: "", exact: false, prefix: false };
+            for (let tokenIndex = 0; tokenIndex < tokens.length; ++tokenIndex) {
+                for (const alias of group.aliases) {
+                    const score = root.naturalTokenScore(tokens[tokenIndex], alias);
+                    if (score <= groupMatch.score)
+                        continue;
+                    groupMatch = {
+                        key: group.key,
+                        score: score,
+                        tokenIndex: tokenIndex,
+                        alias: alias,
+                        exact: tokens[tokenIndex] === alias,
+                        prefix: alias.startsWith(tokens[tokenIndex])
+                    };
+                }
+            }
+            if (!best || groupMatch.score > best.score) {
+                runnerUpScore = best?.score ?? 0;
+                best = groupMatch;
+            } else {
+                runnerUpScore = Math.max(runnerUpScore, groupMatch.score);
+            }
+        }
+        return best?.score >= 0.74 && best.score - runnerUpScore >= 0.06 ? best : null;
+    }
+
+    function keywordResult(command, compactQuery, completeOnly = undefined, completionName = undefined) {
+        return {
+            key: `command-keyword:${command.key}`,
+            name: command.name,
+            completionName: completionName ?? command.name,
+            verb: command.verb,
+            type: Translation.tr("Action"),
+            iconName: command.iconName,
+            iconType: LauncherSearchResult.IconType.Material,
+            completeOnly: completeOnly ?? !(command.aliases ?? []).includes(compactQuery),
+            keepLauncherOpen: command.keepLauncherOpen === true,
+            execute: command.execute
+        };
+    }
+
+    function timerCommandResult(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const timerText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
+            .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const timerStarter = ["set", "start"].find(starter => timerText === starter
+            || timerText.startsWith(`${starter} `));
+        if (timerStarter) {
+            const guidedText = [`${timerStarter} timer for`, `${timerStarter} a timer for`,
+                `${timerStarter} countdown for`].find(text => text.startsWith(timerText));
+            if (guidedText)
+                return root.keywordResult({
+                    key: "timer-guide",
+                    name: Translation.tr("Set Timer"),
+                    verb: Translation.tr("Set"),
+                    iconName: "timer",
+                    keepLauncherOpen: true,
+                    execute: () => root.timerPanelRequested()
+                }, root.compactKeyword(timerText), true,
+                    `${prefixEntry?.prefix ?? ""}${guidedText}`);
+        }
+        const match = timerText.match(/^(?:(?:set|start)\s+)?(?:a\s+)?(?:timer|countdown)(?:\s+(?:for|to))?\s+(\d+)(?:\s*(m|min(?:ute)?s?|h|hrs?|hours?))?$/);
+        if (!match)
+            return null;
+        const amount = Number(match[1]);
+        const unit = match[2] ?? "minutes";
+        const minutes = unit.startsWith("h") ? amount * 60 : amount;
+        if (minutes < 1 || minutes > 1440)
+            return null;
+        const completionName = match[2] ? queryString.trim()
+            : `${queryString.trim()} ${amount === 1 ? "minute" : "minutes"}`;
+        const result = root.keywordResult({
+            key: "timer-set",
+            name: Translation.tr("%1 minute timer").arg(minutes),
+            verb: Translation.tr("Start"),
+            iconName: "timer",
+            keepLauncherOpen: true,
+            execute: () => {
+                if (TimerService.startPomodoroMinutes(minutes))
+                    root.timerPanelRequested();
+            }
+        }, root.compactKeyword(timerText), false, completionName);
+        result.durationMinutes = minutes;
+        return result;
+    }
+
+    function todoCommandResult(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const todoText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
+            .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const starter = ["add", "create"].find(verb => todoText === verb
+            || todoText.startsWith(`${verb} `));
+        if (starter) {
+            const guidedText = [`${starter} task`, `${starter} a task`, `${starter} todo`]
+                .find(text => text.startsWith(todoText));
+            if (guidedText)
+                return root.keywordResult({
+                    key: "todo-guide",
+                    name: Translation.tr("Add Task"),
+                    verb: Translation.tr("Add"),
+                    iconName: "add_task",
+                    keepLauncherOpen: true,
+                    execute: () => root.todoPanelRequested()
+                }, root.compactKeyword(todoText), true,
+                    `${prefixEntry?.prefix ?? ""}${guidedText}`);
+        }
+        const match = todoText.match(/^(?:add|create)\s+(?:a\s+)?(?:task|todo)(?:\s+(?:to|for))?\s+(.+)$/);
+        if (!match)
+            return null;
+        const description = match[1].trim();
+        if (!description)
+            return null;
+        const result = root.keywordResult({
+            key: "todo-add",
+            name: Translation.tr("Add “%1”").arg(description),
+            verb: Translation.tr("Add"),
+            iconName: "add_task",
+            keepLauncherOpen: true,
+            execute: () => {
+                Todo.addTask(description);
+                root.todoPanelRequested();
+            }
+        }, root.compactKeyword(todoText), false, queryString.trim());
+        result.taskDescription = description;
+        return result;
+    }
+
+    function powerProfileCommandResult(queryText = root.query) {
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const powerText = (prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString)
+            .trim().toLowerCase().replace(/[.!?]+$/, "");
+        const choice = root.powerProfileChoices.find(entry => {
+            const command = `${entry.completion} mode`;
+            return (powerText.length >= 4 && entry.completion.startsWith(powerText))
+                || (powerText.startsWith(`${entry.completion} `) && command.startsWith(powerText));
+        });
+        if (!choice || (choice.key === "performance" && !PowerProfiles.hasPerformanceProfile))
+            return null;
+        const result = root.keywordResult({
+            key: `power-profile-${choice.key}`,
+            name: Translation.tr("Set power profile to %1").arg(choice.name),
+            verb: Translation.tr("Set"),
+            iconName: choice.iconName,
+            execute: () => PowerProfiles.profile = choice.value
+        }, root.compactKeyword(powerText), powerText !== `${choice.completion} mode`,
+            `${prefixEntry?.prefix ?? ""}${choice.completion} mode`);
+        result.powerProfile = choice.key;
+        return result;
+    }
+
+    function naturalCommandResult(queryText = root.query) {
+        const timerCommand = root.timerCommandResult(queryText);
+        if (timerCommand)
+            return timerCommand;
+        const todoCommand = root.todoCommandResult(queryText);
+        if (todoCommand)
+            return todoCommand;
+        const queryString = String(queryText ?? "");
+        const prefixEntry = root.matchedPrefixEntry(queryString);
+        if (prefixEntry && prefixEntry.name !== "action")
+            return null;
+        const naturalText = prefixEntry ? queryString.slice(prefixEntry.prefix.length) : queryString;
+        const tokens = root.naturalTokens(naturalText);
+        if (tokens.length === 0)
+            return null;
+        const intent = root.naturalGroupMatch(tokens, root.naturalIntents);
+        const target = root.naturalGroupMatch(tokens, root.naturalTargets);
+        const hasUnknownToken = tokens.some((token, index) => index !== intent?.tokenIndex
+            && index !== target?.tokenIndex && !root.naturalFillers.includes(token));
+
+        if (!intent) {
+            if (target?.key !== "wifi" || root.isWifiCommandQuery(queryString) || hasUnknownToken)
+                return null;
+            const wifiCommand = root.commandKeywords.find(command => command.key === "wifi");
+            return wifiCommand ? root.keywordResult(wifiCommand, root.compactKeyword(naturalText),
+                !target.exact, prefixEntry ? `${prefixEntry.prefix}wifi` : "wifi") : null;
+        }
+        if (hasUnknownToken || (!target && !intent.prefix))
+            return null;
+
+        const candidates = root.naturalCommands.filter(command => command.intent === intent.key
+            && (!target || command.target === target.key));
+        if (candidates.length === 0)
+            return null;
+        let command = candidates[0];
+        for (let index = 1; index < candidates.length; ++index) {
+            if (AppSearch.launcherUsageBonus(`command-keyword:${candidates[index].key}`)
+                    > AppSearch.launcherUsageBonus(`command-keyword:${command.key}`))
+                command = candidates[index];
+        }
+        const completedTokens = tokens.slice();
+        completedTokens[intent.tokenIndex] = intent.alias;
+        if (target)
+            completedTokens[target.tokenIndex] = command.target;
+        else
+            completedTokens.push(command.target);
+        const completionName = `${prefixEntry?.prefix ?? ""}${completedTokens.join(" ")}`;
+        return root.keywordResult(command, root.compactKeyword(naturalText),
+            !target || !intent.exact || !target.exact, completionName);
+    }
+
+    function commandKeywordResult(queryText = root.query) {
+        const compactQuery = root.compactKeyword(queryText);
+        if (!compactQuery)
+            return null;
+        const powerProfileCommand = root.powerProfileCommandResult(queryText);
+        if (powerProfileCommand)
+            return powerProfileCommand;
+        const naturalCommand = root.naturalCommandResult(queryText);
+        if (naturalCommand)
+            return naturalCommand;
+        if (root.isWifiCommandQuery(queryText))
+            return null;
+        const command = root.commandKeywords.find(entry => entry.aliases.some(
+            alias => alias.startsWith(compactQuery)));
+        if (!command)
+            return null;
+        const completionName = command.name.toLowerCase().startsWith(String(queryText).trim().toLowerCase())
+            ? command.name : command.aliases.find(alias => alias.startsWith(compactQuery));
+        return root.keywordResult(command, compactQuery, undefined, completionName);
+    }
+
+    function appAutocompleteCompletion(entry, queryText) {
+        const query = root.nativeAppQuery(queryText).trim().toLowerCase();
+        const name = String(entry?.name ?? "");
+        const foldedName = name.toLowerCase();
+        if (!query || !name)
+            return null;
+        if (foldedName.startsWith(query))
+            return name.slice(query.length);
+        const containedAt = foldedName.indexOf(query);
+        if (containedAt >= 0)
+            return name.slice(containedAt + query.length) || ` → ${name}`;
+
+        const queryWords = root.naturalTokens(query);
+        const nameWords = root.naturalTokens(name);
+        let nextWord = 0;
+        for (const queryWord of queryWords) {
+            while (nextWord < nameWords.length && !nameWords[nextWord].startsWith(queryWord))
+                ++nextWord;
+            if (nextWord >= nameWords.length)
+                return null;
+            ++nextWord;
+        }
+        return queryWords.length > 0 ? ` → ${name}` : null;
+    }
+
+    function preferredAutocomplete(queryText, appEntry) {
+        const actionEntry = root.commandKeywordResult(queryText);
+        if (!actionEntry) return appEntry;
+        if (!actionEntry.completeOnly) return actionEntry;
+        if (!appEntry) return actionEntry;
+        const query = String(queryText ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
+        const appName = String(appEntry.name ?? "").trim().toLowerCase().replace(/[\s-]/g, "");
+        if (!appName.startsWith(query)) return actionEntry;
+        return AppSearch.launcherUsageBonus(appEntry.key) >= AppSearch.launcherUsageBonus(actionEntry.key)
+            ? appEntry : actionEntry;
+    }
+
+    function shouldUseNativeAppSearch(queryText = root.query) {
+        if (!NativeAppSearch.available || AppSearch.sloppySearch || Config.options.panelFamily !== "ii")
+            return false;
+        return root.isApplicationQuery(queryText);
+    }
+
+    function nativeAppQuery(queryText = root.query) {
+        return StringUtils.cleanPrefix(String(queryText ?? ""), Config.options.search.prefix.app);
     }
 
     function ensurePrefix(prefix) {
@@ -107,12 +611,6 @@ Singleton {
             }
         },
         {
-            action: "konachanwallpaper",
-            execute: () => {
-                Quickshell.execDetached([Quickshell.shellPath("scripts/colors/random/random_konachan_wall.sh")]);
-            }
-        },
-        {
             action: "light",
             execute: () => {
                 Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "light", "--noswitch"]);
@@ -159,18 +657,36 @@ Singleton {
                 Cliphist.wipe();
             }
         },
+    ]
+
+    readonly property list<var> wifiCommandActions: [
         {
-            action: "genius",
-            execute: args => {
-                if (!args || args.trim().length === 0) {
-                    Quickshell.execDetached(["notify-send", "Genius API", 
-                        Translation.tr("Usage: /genius YOUR_API_KEY"), "-a", "Shell"]);
-                    return;
-                }
-                KeyringStorage.setNestedField(["apiKeys", "genius"], args.trim());
-                Quickshell.execDetached(["notify-send", "Genius API", Translation.tr("API key saved!"), "-a", "Shell"]);
-            }
+            name: Translation.tr("Scan Wi-Fi Networks"),
+            iconName: "wifi_find",
+            verb: Translation.tr("Open"),
+            keepLauncherOpen: true,
+            execute: () => root.wifiPanelRequested()
         },
+        {
+            name: Translation.tr("Turn Wi-Fi Off"),
+            iconName: "signal_wifi_off",
+            verb: Translation.tr("Run"),
+            execute: () => Quickshell.execDetached(["nmcli", "radio", "wifi", "off"])
+        },
+        {
+            name: Translation.tr("Turn Wi-Fi On"),
+            iconName: "wifi",
+            verb: Translation.tr("Run"),
+            execute: () => Quickshell.execDetached(["nmcli", "radio", "wifi", "on"])
+        },
+        {
+            name: Translation.tr("Restart Wi-Fi"),
+            iconName: "restart_alt",
+            verb: Translation.tr("Run"),
+            execute: () => Quickshell.execDetached([
+                "sh", "-c", "nmcli radio wifi off && nmcli radio wifi on"
+            ])
+        }
     ]
 
     // Combined built-in and user actions
@@ -188,7 +704,7 @@ Singleton {
         if (prefixName === "math") {
             return query.slice(Config.options.search.prefix.math.length).trim();
         }
-        if (prefixName === "" && /^\d/.test(query)) {
+        if (prefixName === "" && root.isImplicitMathQuery(query)) {
             return query.trim();
         }
         return "";
@@ -233,7 +749,32 @@ Singleton {
         return StringUtils.stringListContainsSubstring(entry.toLowerCase(), unsafeKeywords);
     }
 
+    function resolvedResult(entry) {
+        if (!entry) return null;
+        if (entry.nativeApp) {
+            const app = AppSearch.entryById(entry.id);
+            return app ? root.appResult(app) : null;
+        }
+        if (entry.nativeFallback)
+            return root.results.find(result => result.key === entry.key) ?? null;
+        return entry;
+    }
+
+    function executeResult(entry) {
+        const resolved = root.resolvedResult(entry);
+        if (!resolved?.execute) return;
+        const key = String(entry?.key ?? resolved.key ?? "");
+        AppSearch.recordLauncherUse(key.startsWith("wifi-command:")
+            ? "command-keyword:wifi" : key);
+        resolved.execute();
+    }
+
+    function keepsOverviewOpen(entry) {
+        return root.resolvedResult(entry)?.keepLauncherOpen === true;
+    }
+
     function resultActions(entry, limit) {
+        entry = root.resolvedResult(entry);
         if (!entry) return [];
         const actions = entry.actions;
         if (typeof actions === "function") return actions(limit);
@@ -465,6 +1006,19 @@ Singleton {
         };
     }
 
+    function wifiCommandResult(action, index) {
+        return {
+            key: `wifi-command:${index}`,
+            name: action.name,
+            verb: action.verb,
+            type: Translation.tr("Wi-Fi Command"),
+            iconName: action.iconName,
+            iconType: LauncherSearchResult.IconType.Material,
+            keepLauncherOpen: action.keepLauncherOpen === true,
+            execute: action.execute
+        };
+    }
+
     Timer {
         id: nonAppResultsTimer
         interval: Config.options.search.nonAppResultDelay
@@ -510,7 +1064,7 @@ Singleton {
             if (expr.length < 2) return
             activeExpression = expr;
             fileProc.running = false;
-            fileProc.command = ["fd", "--", expr, Config.options.search.fileSearchDirectory];
+            fileProc.command = ["fd", "--fixed-strings", "--max-results", root.resultLimit.toString(), "--", expr, Config.options.search.fileSearchDirectory];
             fileProc.running = true;
         }
         stdout: StdioCollector {
@@ -519,10 +1073,7 @@ Singleton {
                     ? root.query.slice(Config.options.search.prefix.fileSearch.length).trim()
                     : "";
                 if (currentExpr !== fileProc.activeExpression) return;
-                const rawResult = this.text
-                const result = rawResult.split('\n')
-                result.pop() // deleting the last empty line
-                root.fileResults = result
+                root.fileResults = this.text.split('\n').filter(path => path.length > 0);
             }
         }
 
@@ -534,9 +1085,16 @@ Singleton {
         if (root.query == "")
             return [];
 
+        const naturalCommand = root.naturalCommandResult();
+
+        if (root.isWifiCommandQuery())
+            return root.wifiCommandActions.map((action, index) => root.wifiCommandResult(action, index));
+
         ///////////// Special cases ///////////////
         const prefixName = root.matchedPrefixName();
         if (prefixName === "clipboard") {
+            if (Config.options.panelFamily === "ii")
+                return [];
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.clipboard);
             return Cliphist.fuzzyQuery(searchString).map((entry, index, array) => root.clipboardResult(entry, index, array));
@@ -551,7 +1109,9 @@ Singleton {
 
         //////// Prioritized by prefix /////////
         let result = [];
-        const startsWithNumber = /^\d/.test(root.query);
+        if (naturalCommand)
+            result.push(naturalCommand);
+        const implicitMathQuery = root.isImplicitMathQuery(root.query);
         const startsWithActionPrefix = prefixName === "action";
         const startsWithAppPrefix = prefixName === "app";
         const startsWithFileSearchPrefix = prefixName === "fileSearch";
@@ -559,9 +1119,13 @@ Singleton {
         const startsWithShellCommandPrefix = prefixName === "shellCommand";
         const startsWithWebSearchPrefix = prefixName === "webSearch";
         const startsWithWindowPrefix = prefixName === "window";
-        if ((startsWithNumber || startsWithMathPrefix) && root.mathResult.length > 0) {
-            result.push(root.mathResultEntry());
-        } else if (startsWithShellCommandPrefix) {
+        if (implicitMathQuery || startsWithMathPrefix) {
+            if (Config.options.panelFamily === "ii")
+                return root.mathResult.length > 0 ? [root.mathResultEntry()] : [];
+            if (root.mathResult.length > 0)
+                result.push(root.mathResultEntry());
+        }
+        if (startsWithShellCommandPrefix) {
             result.push(root.commandResult());
         } else if (startsWithWebSearchPrefix) {
             result.push(root.webSearchResult());
@@ -573,8 +1137,8 @@ Singleton {
         }
 
         //////////////// Apps //////////////////
-        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !startsWithNumber;
-        if (shouldSearchApps || startsWithAppPrefix) {
+        const shouldSearchApps = !startsWithActionPrefix && !startsWithFileSearchPrefix && !startsWithMathPrefix && !startsWithShellCommandPrefix && !startsWithWebSearchPrefix && !startsWithWindowPrefix && !implicitMathQuery;
+        if ((shouldSearchApps || startsWithAppPrefix) && !root.shouldUseNativeAppSearch(root.query)) {
             result = result.concat(AppSearch.fuzzyQuery(StringUtils.cleanPrefix(root.query, Config.options.search.prefix.app), root.resultLimit).map(entry => root.appResult(entry)));
         }
 
@@ -587,7 +1151,7 @@ Singleton {
         if (Config.options.search.prefix.showDefaultActionsWithoutPrefix) {
             if (!startsWithShellCommandPrefix)
                 result.push(root.commandResult());
-            if (!startsWithNumber && !startsWithMathPrefix && root.mathResult.length > 0)
+            if (!implicitMathQuery && !startsWithMathPrefix && root.mathResult.length > 0)
                 result.push(root.mathResultEntry());
             if (!startsWithWebSearchPrefix)
                 result.push(root.webSearchResult());

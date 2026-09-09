@@ -24,10 +24,10 @@ Item {
             rightMargin: root.vertical ? 4 : 0
         }
         color: root.colBackground
-        topLeftRadius: startRadius
-        bottomLeftRadius: root.vertical ? endRadius: startRadius
-        topRightRadius: root.vertical ? startRadius: endRadius
-        bottomRightRadius: endRadius
+        topLeftRadius: root.startRadius
+        bottomLeftRadius: root.vertical ? root.endRadius : root.startRadius
+        topRightRadius: root.vertical ? root.startRadius : root.endRadius
+        bottomRightRadius: root.endRadius
 
         Behavior on color {
             animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
@@ -37,15 +37,7 @@ Item {
     GridLayout {
         id: gridLayout
         columns: root.vertical ? 1 : -1
-        anchors {
-            verticalCenter: root.vertical ? undefined : parent.verticalCenter
-            horizontalCenter: root.vertical ? parent.horizontalCenter : undefined
-            left: root.vertical ? undefined : parent.left
-            right: root.vertical ? undefined : parent.right
-            top: root.vertical ? parent.top : undefined
-            bottom: root.vertical ? parent.bottom : undefined
-            margins: root.padding
-        }
+        anchors.centerIn: parent
         columnSpacing: 4
         rowSpacing: 12
     }

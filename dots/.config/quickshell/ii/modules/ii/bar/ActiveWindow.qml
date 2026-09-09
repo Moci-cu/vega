@@ -1,5 +1,6 @@
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
@@ -10,6 +11,7 @@ import Quickshell.Hyprland
 Item {
     id: root
     property bool vertical: false
+    property color foregroundColor: Appearance.colors.colOnLayer1
     readonly property HyprlandMonitor monitor: Hyprland.monitorFor(root.QsWindow.window?.screen)
     readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
 
@@ -56,7 +58,7 @@ Item {
             visible: !root.vertical
             Layout.fillWidth: true
             font.pixelSize: Appearance.font.pixelSize.smaller
-            color: Appearance.colors.colSubtext
+            color: ColorUtils.transparentize(root.foregroundColor, 0.22)
             elide: Text.ElideRight
             text: root.appClassText
         }
@@ -66,7 +68,7 @@ Item {
             Layout.leftMargin: root.vertical ? 0 : 6
             Layout.fillWidth: true
             font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.colors.colOnLayer0
+            color: root.foregroundColor
             elide: Text.ElideRight
             rotation: root.vertical ? 90 : 0
             text: root.vertical ? root.appClassText : root.appTitleText

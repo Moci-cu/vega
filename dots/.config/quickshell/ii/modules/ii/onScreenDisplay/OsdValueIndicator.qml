@@ -1,4 +1,5 @@
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
@@ -13,6 +14,7 @@ Item {
     property bool showProgressBar: true
     property bool rotateIcon: false
     property bool scaleIcon: false
+    property var glassCapture
     property alias from: valueProgressBar.from
     property alias to: valueProgressBar.to
 
@@ -23,20 +25,45 @@ Item {
     implicitWidth: Appearance.sizes.osdWidth + 2 * Appearance.sizes.elevationMargin
     implicitHeight: valueIndicator.implicitHeight + 2 * Appearance.sizes.elevationMargin
 
-    StyledRectangularShadow {
-        target: valueIndicator
-    }
-    Rectangle {
+    Item {
         id: valueIndicator
         anchors {
             fill: parent
             margins: Appearance.sizes.elevationMargin
         }
-        radius: Appearance.rounding.full
-        color: Appearance.m3colors.m3surfaceContainer
+        property real radius: Appearance.rounding.full
 
         implicitWidth: valueRow.implicitWidth
         implicitHeight: valueRow.implicitHeight
+
+        LiquidGlassSurface {
+            id: glassSurface
+            anchors.fill: parent
+            readonly property point targetPosition: {
+                valueIndicator.x;
+                valueIndicator.y;
+                root.x;
+                root.y;
+                return root.glassCapture?.target
+                    ? valueIndicator.mapToItem(root.glassCapture.target, 0, 0)
+                    : Qt.point(0, 0);
+            }
+
+            shown: true
+            wallpaperSource: root.glassCapture?.source ?? null
+            sourceReady: root.glassCapture?.ready ?? false
+            sourceFillsItem: true
+            enhancedOptics: true
+            thicknessOverride: 0.15
+            itemSourceRect: Qt.rect(
+                ((root.glassCapture?.targetOffsetX ?? 0) + targetPosition.x) / Math.max(1, root.glassCapture?.sourceWidth ?? 1),
+                ((root.glassCapture?.targetOffsetY ?? 0) + targetPosition.y) / Math.max(1, root.glassCapture?.sourceHeight ?? 1),
+                width / Math.max(1, root.glassCapture?.sourceWidth ?? 1),
+                height / Math.max(1, root.glassCapture?.sourceHeight ?? 1)
+            )
+            tintColor: ColorUtils.transparentize(Appearance.m3colors.m3surfaceContainer, 0.62)
+            radius: valueIndicator.radius
+        }
 
         RowLayout { // Icon on the left, stuff on the right
             id: valueRow

@@ -3,7 +3,6 @@ import qs.modules.common.widgets
 import qs.services
 import QtQuick
 import QtQuick.Layouts
-import qs.modules.ii.bar as Bar
 
 MouseArea {
     id: root
@@ -15,8 +14,6 @@ MouseArea {
 
     implicitWidth: batteryProgress.implicitWidth
     implicitHeight: batteryProgress.implicitHeight
-    hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
     ClippedProgressBar {
         id: batteryProgress
         anchors.centerIn: parent
@@ -65,10 +62,5 @@ MouseArea {
                 }
             }
         }
-    }
-
-    Bar.BatteryPopup {
-        id: batteryPopup
-        hoverTarget: root
     }
 }

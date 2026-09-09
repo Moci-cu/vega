@@ -9,6 +9,7 @@ import qs.modules.common.widgets
 
 Item {
     id: root
+    property color foregroundColor: Appearance.colors.colOnLayer2
     implicitWidth: gridLayout.implicitWidth
     implicitHeight: gridLayout.implicitHeight
     property bool vertical: false
@@ -102,7 +103,7 @@ Item {
                 iconSize: Appearance.font.pixelSize.larger
                 text: "expand_more"
                 horizontalAlignment: Text.AlignHCenter
-                color: root.trayOverflowOpen ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer2
+                color: root.trayOverflowOpen ? Appearance.colors.colOnSecondaryContainer : root.foregroundColor
                 rotation: (root.trayOverflowOpen ? 180 : 0) - (90 * root.vertical) + (180 * root.invertSide)
                 Behavior on rotation {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
@@ -127,6 +128,7 @@ Item {
                         delegate: SysTrayItem {
                             required property SystemTrayItem modelData
                             item: modelData
+                            foregroundColor: root.foregroundColor
                             Layout.fillHeight: !root.vertical
                             Layout.fillWidth: root.vertical
                             onMenuClosed: root.releaseFocus();
@@ -145,6 +147,7 @@ Item {
             delegate: SysTrayItem {
                 required property SystemTrayItem modelData
                 item: modelData
+                foregroundColor: root.foregroundColor
                 Layout.fillHeight: !root.vertical
                 Layout.fillWidth: root.vertical
                 onMenuClosed: root.releaseFocus();

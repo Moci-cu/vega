@@ -14,6 +14,12 @@ import Quickshell.Hyprland
 Scope {
     id: overviewScope
     property bool dontAutoCancelSearch: false
+    property bool applicationsPending: false
+    property bool applicationsOpen: false
+    property bool categoriesOpen: false
+    property bool clipboardOpen: false
+    property bool metricsOpen: false
+    property bool workspaceMode: false
     property string focusRestoreAddress: ""
     property int focusRestoreGeneration: 0
 
@@ -45,6 +51,102 @@ Scope {
                 return
             Hyprland.dispatch(`hl.dsp.focus({window = "address:${address}"})`)
         })
+    }
+
+    function toggleSearch() {
+        metricsOpen = false
+        if (GlobalStates.overviewOpen && clipboardOpen) {
+            dontAutoCancelSearch = false
+            return
+        }
+        if (GlobalStates.overviewOpen && !workspaceMode && !categoriesOpen && !clipboardOpen
+                && !dontAutoCancelSearch && !applicationsPending) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        workspaceMode = false
+        applicationsPending = false
+        applicationsOpen = false
+        dontAutoCancelSearch = false
+        categoriesOpen = false
+        clipboardOpen = false
+        setSearchingTextRequested("")
+        GlobalStates.overviewOpen = true
+    }
+
+    function toggleWorkspaces() {
+        metricsOpen = false
+        if (GlobalStates.overviewOpen && workspaceMode) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        applicationsPending = false
+        applicationsOpen = false
+        dontAutoCancelSearch = false
+        categoriesOpen = false
+        clipboardOpen = false
+        workspaceMode = true
+        setSearchingTextRequested("")
+        GlobalStates.overviewOpen = true
+    }
+
+    function toggleCategories() {
+        metricsOpen = false
+        if (GlobalStates.overviewOpen && categoriesOpen) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        workspaceMode = false
+        applicationsPending = false
+        applicationsOpen = false
+        dontAutoCancelSearch = false
+        categoriesOpen = true
+        clipboardOpen = false
+        setSearchingTextRequested("")
+        GlobalStates.overviewOpen = true
+    }
+
+    function toggleApplications() {
+        metricsOpen = false
+        if (GlobalStates.overviewOpen && applicationsOpen) {
+            applicationsPending = false
+            applicationsOpen = false
+            GlobalStates.overviewOpen = false
+            return
+        }
+        categoriesOpen = false
+        clipboardOpen = false
+        workspaceMode = false
+        applicationsOpen = true
+        applicationsPending = false
+        dontAutoCancelSearch = true
+        setSearchingTextRequested(Config.options.search.prefix.app)
+        GlobalStates.overviewOpen = true
+    }
+
+    function openMetrics() {
+        workspaceMode = false
+        applicationsPending = false
+        applicationsOpen = false
+        categoriesOpen = false
+        clipboardOpen = false
+        dontAutoCancelSearch = true
+        setSearchingTextRequested("")
+        metricsOpen = true
+        GlobalStates.overviewOpen = true
+    }
+
+    function toggleMetrics() {
+        if (GlobalStates.overviewOpen && metricsOpen) {
+            GlobalStates.overviewOpen = false
+            return
+        }
+        openMetrics()
+    }
+
+    Connections {
+        target: LauncherSearch
+        function onMetricsPanelRequested() { overviewScope.openMetrics() }
     }
 
     Connections {
@@ -81,7 +183,7 @@ Scope {
                 readonly property bool isScrollingLayout: Persistent.states.hyprland.layout === "scrolling"
                 property string searchingText: ""
                 readonly property bool hasSearchQuery: searchingText.length > 0
-                readonly property bool showWorkspaceOverview: !hasSearchQuery
+                readonly property bool showWorkspaceOverview: overviewScope.workspaceMode && !hasSearchQuery
 
                 WlrLayershell.namespace: "quickshell:overview"
                 WlrLayershell.layer: WlrLayer.Top
@@ -106,7 +208,10 @@ Scope {
                 property bool isResettingZoom: false 
                 property real scaleAnimated: showOpeningAnimation ? GlobalStates.overviewOpen ? zoomedRatio : defaultRatio : 1
 
+                readonly property bool launcherReady: GlobalStates.overviewOpen && searchWidget.backdropReady
                 property real effectiveScale: showOpeningAnimation ? zoomedRatio - scaleAnimated + 1 : 1 
+                property real launcherScale: 1
+                property real launcherRevealProgress: 0.12
                 property bool workspaceContentReady: false
                 readonly property bool contentShown: {
                     if (!showOpeningAnimation) return GlobalStates.overviewOpen;
@@ -120,12 +225,45 @@ Scope {
                         isResettingZoom = false
                     }
                 }
+                onLauncherReadyChanged: {
+                    launcherPopAnimation.stop();
+                    if (launcherReady) {
+                        launcherPopAnimation.restart();
+                        if (overviewScope.applicationsPending) {
+                            overviewScope.applicationsPending = false;
+                            overviewScope.dontAutoCancelSearch = true;
+                        }
+                    }
+                }
 
                 // Keep the input-transparent surface alive so opening only has to reveal its content.
                 visible: true
 
                 Behavior on scaleAnimated {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(root)
+                }
+
+                ParallelAnimation {
+                    id: launcherPopAnimation
+
+                    NumberAnimation {
+                        target: root
+                        property: "launcherRevealProgress"
+                        from: 0.12
+                        to: 1
+                        duration: 280
+                        easing.type: Easing.OutCubic
+                    }
+
+                    NumberAnimation {
+                        target: root
+                        property: "launcherScale"
+                        from: 0.965
+                        to: 1
+                        duration: 420
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: Appearance.animationCurves.expressiveDefaultSpatial
+                    }
                 }
 
                 anchors {
@@ -163,8 +301,16 @@ Scope {
                             workspaceContentDelayTimer.stop();
                             root.workspaceContentReady = false;
                             searchWidget.disableExpandAnimation();
+                            root.launcherScale = 1;
+                            overviewScope.applicationsPending = false;
+                            overviewScope.applicationsOpen = false;
+                            overviewScope.categoriesOpen = false;
+                            overviewScope.clipboardOpen = false;
+                            overviewScope.metricsOpen = false;
                             overviewScope.dontAutoCancelSearch = false;
                         } else {
+                            root.launcherScale = 0.965;
+                            root.launcherRevealProgress = 0.12;
                             if (!overviewScope.dontAutoCancelSearch) {
                                 searchWidget.cancelSearch();
                             }
@@ -217,13 +363,12 @@ Scope {
 
                 function setSearchingText(text) {
                     searchWidget.setSearchingText(text);
-                    searchWidget.focusFirstItem();
                 }
 
                 Item {
                     id: contentItem
                     anchors.fill: parent
-                    opacity: root.contentShown ? 1 : 0
+                    opacity: root.contentShown && searchWidget.backdropReady ? 1 : 0
 
                     MouseArea { // We could have used PanelWindow.mask to detect this, but this is more stable
                         anchors.fill: parent
@@ -232,8 +377,8 @@ Scope {
 
                     Item { // Wrapper for animation 
                         id: searchWidgetWrapper
-                        implicitHeight: searchWidget.implicitHeight
-                        implicitWidth: searchWidget.implicitWidth
+                        width: searchWidget.implicitWidth
+                        height: searchWidget.implicitHeight
                         z: 999
 
                         Keys.onPressed: event => {
@@ -242,15 +387,38 @@ Scope {
                             }
                         }
 
-                        anchors {
-                            horizontalCenter: parent.horizontalCenter
-                            top: parent.top
-                            topMargin: root.margin * 2 + Appearance.sizes.elevationMargin
-                        }
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: Math.round(parent.height / 2
+                            - searchWidget.searchPillHeight / 2
+                            - Appearance.sizes.elevationMargin
+                            - realOverviewLoader.modelData.height * 0.20)
+
                         SearchWidget {
                             id: searchWidget
-                            scale: root.effectiveScale
-                            anchors.horizontalCenter: parent.horizontalCenter
+                            showResults: overviewScope.dontAutoCancelSearch
+                            applicationGridMode: overviewScope.applicationsOpen
+                            showCategories: overviewScope.categoriesOpen
+                            showClipboard: overviewScope.clipboardOpen
+                            showMetrics: overviewScope.metricsOpen
+                            revealProgress: root.launcherRevealProgress
+                            visualScale: root.launcherScale
+                            anchors.centerIn: parent
+
+                            onResultsPanelHidden: {
+                                if (!GlobalStates.overviewOpen || !overviewScope.clipboardOpen
+                                        || overviewScope.dontAutoCancelSearch)
+                                    return;
+                                overviewScope.clipboardOpen = false;
+                                overviewScope.setSearchingTextRequested("");
+                            }
+
+                            transform: Scale {
+                                origin.x: searchWidget.width / 2
+                                origin.y: Appearance.sizes.elevationMargin + searchWidget.searchPillHeight / 2
+                                xScale: root.launcherScale
+                                yScale: root.launcherScale
+                            }
+
                             Synchronizer on searchingText {
                                 property alias source: root.searchingText
                             }
@@ -291,20 +459,36 @@ Scope {
     
 
     function toggleClipboard() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
+        overviewScope.metricsOpen = false;
+        if (GlobalStates.overviewOpen && overviewScope.clipboardOpen) {
             GlobalStates.overviewOpen = false;
             return;
         }
+        overviewScope.workspaceMode = false;
+        overviewScope.categoriesOpen = false;
+        overviewScope.applicationsPending = false;
+        overviewScope.applicationsOpen = false;
         overviewScope.dontAutoCancelSearch = true;
+        overviewScope.clipboardOpen = true;
         overviewScope.setSearchingTextRequested(Config.options.search.prefix.clipboard);
         GlobalStates.overviewOpen = true;
     }
 
     function toggleEmojis() {
-        if (GlobalStates.overviewOpen && overviewScope.dontAutoCancelSearch) {
+        overviewScope.metricsOpen = false;
+        const emojisActive = GlobalStates.overviewOpen
+            && !overviewScope.workspaceMode && !overviewScope.categoriesOpen
+            && !overviewScope.clipboardOpen && overviewScope.dontAutoCancelSearch
+            && LauncherSearch.matchedPrefixName() === "emojis";
+        if (emojisActive) {
             GlobalStates.overviewOpen = false;
             return;
         }
+        overviewScope.workspaceMode = false;
+        overviewScope.applicationsPending = false;
+        overviewScope.applicationsOpen = false;
+        overviewScope.categoriesOpen = false;
+        overviewScope.clipboardOpen = false;
         overviewScope.dontAutoCancelSearch = true;
         overviewScope.setSearchingTextRequested(Config.options.search.prefix.emojis);
         GlobalStates.overviewOpen = true;
@@ -314,15 +498,32 @@ Scope {
         target: "search"
 
         function toggle() {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleSearch();
         }
         function workspacesToggle() {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleWorkspaces();
+        }
+        function applicationsToggle() {
+            overviewScope.toggleApplications();
+        }
+        function metricsToggle() {
+            overviewScope.toggleMetrics();
+        }
+        function categoriesToggle() {
+            overviewScope.toggleCategories();
         }
         function close() {
             GlobalStates.overviewOpen = false;
         }
         function open() {
+            overviewScope.workspaceMode = false;
+            overviewScope.applicationsPending = false;
+            overviewScope.applicationsOpen = false;
+            overviewScope.categoriesOpen = false;
+            overviewScope.clipboardOpen = false;
+            overviewScope.metricsOpen = false;
+            overviewScope.dontAutoCancelSearch = false;
+            overviewScope.setSearchingTextRequested("");
             GlobalStates.overviewOpen = true;
         }
         function toggleReleaseInterrupt() {
@@ -338,7 +539,7 @@ Scope {
         description: "Toggles search on press"
 
         onPressed: {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleSearch();
         }
     }
     GlobalShortcut {
@@ -354,7 +555,7 @@ Scope {
         description: "Toggles overview on press"
 
         onPressed: {
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleWorkspaces();
         }
     }
     GlobalShortcut {
@@ -370,7 +571,7 @@ Scope {
                 GlobalStates.superReleaseMightTrigger = true;
                 return;
             }
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            overviewScope.toggleSearch();
         }
     }
     GlobalShortcut {
@@ -382,12 +583,34 @@ Scope {
         }
     }
     GlobalShortcut {
+        name: "overviewCategoriesToggle"
+        description: "Toggle launcher categories"
+
+        onPressed: {
+            overviewScope.toggleCategories();
+        }
+    }
+    GlobalShortcut {
+        name: "overviewApplicationsToggle"
+        description: "Toggle application grid"
+
+        onPressed: {
+            overviewScope.toggleApplications();
+        }
+    }
+    GlobalShortcut {
         name: "overviewClipboardToggle"
         description: "Toggle clipboard query on overview widget"
 
         onPressed: {
             overviewScope.toggleClipboard();
         }
+    }
+
+    GlobalShortcut {
+        name: "overviewMetricsToggle"
+        description: "Toggle system metrics"
+        onPressed: overviewScope.toggleMetrics()
     }
 
     GlobalShortcut {

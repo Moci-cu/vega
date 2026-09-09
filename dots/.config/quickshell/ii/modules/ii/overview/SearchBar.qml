@@ -1,152 +1,383 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Controls
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Widgets
 import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
-import qs.modules.common.functions
 
 RowLayout {
     id: root
-    spacing: 6
+    spacing: 8
     property bool animateWidth: false
+    property bool forceExpanded: false
+    property string queryPrefix: ""
+    property string inputPlaceholder: Translation.tr("Search or Ask")
+    property string leadingIcon: ""
+    property bool calculatorActive: false
     property alias searchInput: searchInput
     property string searchingText
+    property int debounceInterval: 35
+    property int resultCount: 0
+    property int currentIndex: -1
+    property int navigationColumns: 1
+    property var selectedResult
+    property var resultAt: index => LauncherSearch.results[index]
+    property var executeResult: entry => LauncherSearch.executeResult(entry)
+    property var moveSelection: (delta, linear) => {}
+    required property var runAfterQueryCommitted
+    required property var cancelPendingQueryAction
+    property var autocompleteScreen
+    property bool caretBlinkOn: true
+    readonly property var autocompleteEntry: {
+        const query = root.searchingText.trim();
+        const count = root.resultCount;
+        const index = root.currentIndex;
+        if (query.length === 0 || count <= 0)
+            return null;
+        const selectedEntry = root.selectedResult ?? root.resultAt(Math.max(0, index));
+        if (!String(selectedEntry?.key ?? "").startsWith("command-keyword:"))
+            return selectedEntry;
+        return LauncherSearch.commandKeywordResult(root.queryPrefix + searchInput.text)
+            ?? selectedEntry;
+    }
+    readonly property bool autocompleteIsApp: root.autocompleteEntry?.nativeApp
+        || String(root.autocompleteEntry?.key ?? "").startsWith("app:")
+    readonly property bool autocompleteIsKeyword: String(root.autocompleteEntry?.key ?? "")
+        .startsWith("command-keyword:")
+    readonly property bool autocompleteIsAction: {
+        const key = String(root.autocompleteEntry?.key ?? "");
+        return root.autocompleteIsKeyword || key.startsWith("wifi-command:")
+            || key.startsWith("action:");
+    }
+    readonly property string autocompleteAction: {
+        if (root.calculatorActive)
+            return "";
+        const entry = root.autocompleteEntry;
+        if (!entry)
+            return "";
+        if (root.autocompleteIsApp)
+            return Translation.tr("Open");
+        return String(entry.verb ?? "");
+    }
+    readonly property string autocompleteName: String(root.autocompleteEntry?.name ?? "")
+    readonly property string autocompleteSuggestion: String(root.autocompleteEntry?.completionName
+        ?? root.autocompleteEntry?.name ?? "")
+    readonly property var appAutocompleteCompletion: root.autocompleteIsApp
+        ? LauncherSearch.appAutocompleteCompletion(root.autocompleteEntry, searchInput.text) : null
+    readonly property bool autocompleteMatchesInput: {
+        if (root.calculatorActive)
+            return true;
+        if (root.autocompleteIsKeyword) {
+            const key = String(root.autocompleteEntry?.key ?? "");
+            const liveQuery = root.queryPrefix + searchInput.text;
+            return LauncherSearch.commandKeywordResult(liveQuery)?.key === key
+                || (key === "command-keyword:wifi" && LauncherSearch.isWifiCommandQuery(liveQuery));
+        }
+        return root.autocompleteIsAction
+            || root.appAutocompleteCompletion !== null;
+    }
+    readonly property string autocompleteCompletion: {
+        if (root.calculatorActive)
+            return "";
+        if (root.autocompleteIsKeyword) {
+            const input = searchInput.text.trim();
+            return root.autocompleteSuggestion.toLowerCase().startsWith(input.toLowerCase())
+                ? root.autocompleteSuggestion.slice(input.length) : ` → ${root.autocompleteSuggestion}`;
+        }
+        if (root.autocompleteIsAction)
+            return root.autocompleteName;
+        return root.appAutocompleteCompletion ?? "";
+    }
+
+    function cancelPendingQuery() {
+        queryCommitTimer.stop();
+        root.cancelPendingQueryAction();
+    }
+
+    function runAfterPendingQuery(action) {
+        queryCommitTimer.stop();
+        root.runAfterQueryCommitted(root.queryPrefix + searchInput.text, action);
+    }
+
+    function setQueryImmediately(text) {
+        const query = String(text ?? "");
+        root.cancelPendingQueryAction();
+        searchInput.text = root.queryPrefix && query.startsWith(root.queryPrefix)
+            ? query.slice(root.queryPrefix.length) : query;
+        queryCommitTimer.stop();
+        LauncherSearch.query = root.queryPrefix + searchInput.text;
+    }
 
     function selectedEntry() {
-        const selectedIndex = Math.max(0, appResults.currentIndex);
-        return LauncherSearch.results[selectedIndex];
+        const selectedIndex = Math.max(0, root.currentIndex);
+        return root.selectedResult ?? root.resultAt(selectedIndex);
     }
 
     function forceFocus() {
         searchInput.forceActiveFocus();
     }
 
-    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, FileSearch, Window, DefaultSearch }
-
-    property var searchPrefixType: {
-        switch (LauncherSearch.matchedPrefixName(root.searchingText)) {
-        case "action": return SearchBar.SearchPrefixType.Action;
-        case "app": return SearchBar.SearchPrefixType.App;
-        case "clipboard": return SearchBar.SearchPrefixType.Clipboard;
-        case "emojis": return SearchBar.SearchPrefixType.Emojis;
-        case "math": return SearchBar.SearchPrefixType.Math;
-        case "shellCommand": return SearchBar.SearchPrefixType.ShellCommand;
-        case "webSearch": return SearchBar.SearchPrefixType.WebSearch;
-        case "fileSearch": return SearchBar.SearchPrefixType.FileSearch;
-        case "window": return SearchBar.SearchPrefixType.Window;
-        default: return SearchBar.SearchPrefixType.DefaultSearch;
-        }
-    }
-    
-    MaterialShapeWrappedMaterialSymbol {
-        id: searchIcon
+    MaterialSymbol {
+        visible: root.leadingIcon.length > 0
+        Layout.preferredWidth: 26
         Layout.alignment: Qt.AlignVCenter
-        iconSize: Appearance.font.pixelSize.huge
-        shape: switch(root.searchPrefixType) {
-            case SearchBar.SearchPrefixType.Action: return MaterialShape.Shape.Pill;
-            case SearchBar.SearchPrefixType.App: return MaterialShape.Shape.Clover4Leaf;
-            case SearchBar.SearchPrefixType.Clipboard: return MaterialShape.Shape.Gem;
-            case SearchBar.SearchPrefixType.Emojis: return MaterialShape.Shape.Sunny;
-            case SearchBar.SearchPrefixType.Math: return MaterialShape.Shape.PuffyDiamond;
-            case SearchBar.SearchPrefixType.ShellCommand: return MaterialShape.Shape.PixelCircle;
-            case SearchBar.SearchPrefixType.WebSearch: return MaterialShape.Shape.SoftBurst;
-            case SearchBar.SearchPrefixType.FileSearch: return MaterialShape.Shape.Cookie4Sided;
-            case SearchBar.SearchPrefixType.Window: return MaterialShape.Shape.Cookie9Sided;
-            default: return MaterialShape.Shape.Cookie7Sided;
-        }
-        text: switch (root.searchPrefixType) {
-            case SearchBar.SearchPrefixType.Action: return "settings_suggest";
-            case SearchBar.SearchPrefixType.App: return "apps";
-            case SearchBar.SearchPrefixType.Clipboard: return "content_paste_search";
-            case SearchBar.SearchPrefixType.Emojis: return "add_reaction";
-            case SearchBar.SearchPrefixType.Math: return "calculate";
-            case SearchBar.SearchPrefixType.ShellCommand: return "terminal";
-            case SearchBar.SearchPrefixType.WebSearch: return "travel_explore";
-            case SearchBar.SearchPrefixType.FileSearch: return "folder_search";
-            case SearchBar.SearchPrefixType.Window: return "select_window";
-            case SearchBar.SearchPrefixType.DefaultSearch: return "search";
-            default: return "search";
-        }
+        text: root.leadingIcon
+        iconSize: 24
+        color: Qt.rgba(1, 1, 1, 0.72)
     }
+
     ToolbarTextField { // Search box
         id: searchInput
-        Layout.topMargin: 4
-        Layout.bottomMargin: 4
-        implicitHeight: 40
+        Layout.fillWidth: true
+        implicitHeight: 46
         focus: GlobalStates.overviewOpen
-        font.pixelSize: Appearance.font.pixelSize.small
-        placeholderText: Translation.tr("Search, calculate or run")
-        implicitWidth: root.searchingText == "" ? Appearance.sizes.searchWidthCollapsed : Appearance.sizes.searchWidth
+        padding: 0
+        font.pixelSize: Appearance.font.pixelSize.larger
+        color: Qt.rgba(1, 1, 1, 0.9)
+        placeholderTextColor: Qt.rgba(1, 1, 1, 0.58)
+        placeholderText: root.inputPlaceholder
+        colBackground: "transparent"
+        renderType: Text.QtRendering
 
-        Behavior on implicitWidth {
-            id: searchWidthBehavior
-            enabled: root.animateWidth
-            NumberAnimation {
-                duration: 300
-                easing.type: Appearance.animation.elementMove.type
-                easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        cursorDelegate: Item {
+            width: 3
+            height: searchInput.font.pixelSize + 4
+            opacity: searchInput.activeFocus && !autocompleteChip.visible && root.caretBlinkOn ? 1 : 0
+
+            RectangularShadow {
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 2
+                height: parent.height / 2 + 2
+                radius: 1
+                blur: 8
+                spread: 1
+                color: Qt.rgba(0.42, 0.8, 1, 0.72)
+                cached: true
+            }
+
+            RectangularShadow {
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 2
+                height: parent.height / 2 + 2
+                radius: 1
+                blur: 8
+                spread: 1
+                color: Qt.rgba(1, 0.68, 0.3, 0.68)
+                cached: true
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 2
+                height: parent.height
+                radius: 1
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(0.82, 0.94, 1, 1)
+                    }
+                    GradientStop {
+                        position: 0.42
+                        color: Qt.rgba(1, 1, 1, 1)
+                    }
+                    GradientStop {
+                        position: 0.58
+                        color: Qt.rgba(1, 1, 1, 1)
+                    }
+                    GradientStop {
+                        position: 1
+                        color: Qt.rgba(1, 0.9, 0.72, 1)
+                    }
+                }
             }
         }
 
-        onTextChanged: LauncherSearch.query = text
+        Item {
+            id: autocompleteChip
+
+            readonly property real desiredX: Math.max(0, searchInput.cursorRectangle.x)
+
+            x: desiredX
+            anchors.verticalCenter: parent.verticalCenter
+            width: autocompleteContent.implicitWidth + 4
+            height: autocompleteContent.implicitHeight + 6
+            z: 5
+            visible: root.autocompleteAction.length > 0
+                && root.autocompleteMatchesInput
+                && searchInput.text.length > 0
+                && searchInput.cursorPosition === searchInput.text.length
+                && desiredX + width <= searchInput.width - 4
+
+            LiquidGlassSurface {
+                id: autocompleteGlass
+
+                anchors.fill: parent
+                shown: autocompleteChip.visible
+                compositorBackdrop: true
+                thicknessOverride: 0.06
+                edgeLighting: 0.34
+                screen: root.autocompleteScreen
+                tintColor: Qt.rgba(0.86, 0.9, 0.94, 0.12)
+                radius: 10
+            }
+
+            RowLayout {
+                id: autocompleteContent
+
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+
+                StyledText {
+                    visible: root.autocompleteCompletion.length > 0
+                    text: root.autocompleteCompletion.replace(/^ /, "\u00a0")
+                    color: Qt.rgba(1, 1, 1, 0.86)
+                    font: searchInput.font
+                }
+
+                StyledText {
+                    text: `— ${root.autocompleteAction}`
+                    color: Qt.rgba(1, 1, 1, 0.72)
+                    font: searchInput.font
+                }
+            }
+        }
+
+        onTextChanged: {
+            root.caretBlinkOn = true;
+            root.cancelPendingQueryAction();
+            queryCommitTimer.pendingQuery = root.queryPrefix + text;
+            queryCommitTimer.restart();
+        }
 
         onAccepted: {
-            if (appResults.count > 0) {
+            root.runAfterPendingQuery(() => {
+                if (root.resultCount <= 0)
+                    return;
                 const selectedEntry = root.selectedEntry();
                 if (!selectedEntry) return;
-                GlobalStates.overviewOpen = false;
-                selectedEntry.execute();
-            }
+                if (!LauncherSearch.keepsOverviewOpen(selectedEntry))
+                    GlobalStates.overviewOpen = false;
+                root.executeResult(selectedEntry);
+            });
         }
 
         Keys.onPressed: event => {
             const ctrlPressed = event.modifiers & Qt.ControlModifier;
             if (ctrlPressed && event.key === Qt.Key_N) {
-                if (appResults.count > 0) {
-                    appResults.currentIndex = Math.min(appResults.count - 1, appResults.currentIndex + 1);
-                    appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
-                }
+                root.moveSelection(1, true);
                 event.accepted = true;
                 return;
             }
             if (ctrlPressed && event.key === Qt.Key_P) {
-                if (appResults.count > 0) {
-                    appResults.currentIndex = Math.max(0, appResults.currentIndex - 1);
-                    appResults.positionViewAtIndex(appResults.currentIndex, ListView.Contain);
-                }
+                root.moveSelection(-1, true);
+                event.accepted = true;
+                return;
+            }
+            let selectionDelta = 0;
+            if (root.navigationColumns > 1 && event.key === Qt.Key_Left)
+                selectionDelta = -1;
+            else if (root.navigationColumns > 1 && event.key === Qt.Key_Right)
+                selectionDelta = 1;
+            else if (event.key === Qt.Key_Up)
+                selectionDelta = -root.navigationColumns;
+            else if (event.key === Qt.Key_Down)
+                selectionDelta = root.navigationColumns;
+            if (selectionDelta !== 0 && root.resultCount > 0) {
+                root.moveSelection(selectionDelta);
                 event.accepted = true;
                 return;
             }
             if (event.key === Qt.Key_Tab) {
-                if (LauncherSearch.results.length === 0) return;
-                const tabbedText = LauncherSearch.results[0].name;
-                LauncherSearch.query = tabbedText;
-                searchInput.text = tabbedText;
                 event.accepted = true;
+                root.runAfterPendingQuery(() => {
+                    if (root.resultCount === 0)
+                        return;
+                    const tabbedText = root.autocompleteIsKeyword
+                        ? root.selectedEntry()?.completionName ?? root.selectedEntry()?.name ?? ""
+                        : root.autocompleteIsAction ? root.queryPrefix + searchInput.text
+                        : root.selectedEntry()?.name ?? "";
+                    root.setQueryImmediately(tabbedText);
+                });
             }
         }
     }
 
-    IconToolbarButton {
-        Layout.topMargin: 4
-        Layout.bottomMargin: 4
-        onClicked: {
-            GlobalStates.overviewOpen = false;
-            const overviewAnimationEnabled = Config.options.overview.showOpeningAnimation
+    IconImage {
+        Layout.alignment: Qt.AlignVCenter
+        Layout.preferredWidth: 34
+        Layout.preferredHeight: 34
+        visible: root.autocompleteIsApp && root.autocompleteAction.length > 0
+            && root.autocompleteMatchesInput
+        source: AppSearch.iconPath(root.autocompleteEntry?.iconName ?? "", "image-missing")
+        asynchronous: true
+    }
 
-            if (!overviewAnimationEnabled) {
-                Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
-                return
+    MaterialSymbol {
+        visible: root.autocompleteIsAction && root.autocompleteAction.length > 0
+        Layout.alignment: Qt.AlignVCenter
+        Layout.preferredWidth: 34
+        Layout.preferredHeight: 34
+        text: root.autocompleteEntry?.iconName ?? "settings_suggest"
+        iconSize: 25
+        color: Qt.rgba(1, 1, 1, 0.72)
+    }
+
+    Timer {
+        id: queryCommitTimer
+        property string pendingQuery: ""
+        interval: root.debounceInterval
+        onTriggered: LauncherSearch.query = pendingQuery
+    }
+
+    Timer {
+        interval: 650
+        repeat: true
+        running: searchInput.activeFocus && !autocompleteChip.visible
+        onRunningChanged: root.caretBlinkOn = true
+        onTriggered: root.caretBlinkOn = !root.caretBlinkOn
+    }
+
+    IconToolbarButton {
+        id: moreActionsButton
+
+        visible: !root.calculatorActive && !root.autocompleteIsAction
+        Layout.preferredWidth: 42
+        Layout.preferredHeight: 42
+        Layout.rightMargin: 2
+        text: "more_horiz"
+        colText: Qt.rgba(1, 1, 1, 0.46)
+        onClicked: moreActionsMenu.open()
+
+        Menu {
+            id: moreActionsMenu
+
+            x: moreActionsButton.width - width
+            y: moreActionsButton.height + 4
+
+            MenuItem {
+                text: Translation.tr("Google Lens")
+                onTriggered: {
+                    GlobalStates.overviewOpen = false;
+                    if (!Config.options.overview.showOpeningAnimation) {
+                        Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
+                        return;
+                    }
+                    lensDelayTimer.start();
+                }
             }
-            lensDelayTimer.start();
-        }
-        text: "image_search"
-        StyledToolTip {
-            text: Translation.tr("Google Lens")
-            y: parent.height + 3
+
+            MenuItem {
+                text: SongRec.running ? Translation.tr("Stop recognizing music") : Translation.tr("Recognize music")
+                onTriggered: SongRec.toggleRunning()
+            }
         }
     }
 
@@ -158,47 +389,4 @@ RowLayout {
         }
     }
 
-    IconToolbarButton {
-        id: songRecButton
-        Layout.topMargin: 4
-        Layout.bottomMargin: 4
-        Layout.rightMargin: 4
-        toggled: SongRec.running
-        onClicked: SongRec.toggleRunning()
-        text: "music_cast"
-
-        StyledToolTip {
-            text: Translation.tr("Recognize music")
-            y: parent.height + 3
-        }
-
-        colText: toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
-        background: MaterialShape {
-            RotationAnimation on rotation {
-                running: songRecButton.toggled
-                duration: 12000
-                easing.type: Easing.Linear
-                loops: Animation.Infinite
-                from: 0
-                to: 360
-            }
-            shape: {
-                if (songRecButton.down) {
-                    return songRecButton.toggled ? MaterialShape.Shape.Circle : MaterialShape.Shape.Square
-                } else {
-                    return songRecButton.toggled ? MaterialShape.Shape.SoftBurst : MaterialShape.Shape.Circle
-                }
-            }
-            color: {
-                if (songRecButton.toggled) {
-                    return songRecButton.hovered ? Appearance.colors.colPrimaryHover : Appearance.colors.colPrimary
-                } else {
-                    return songRecButton.hovered ? Appearance.colors.colSurfaceContainerHigh : ColorUtils.transparentize(Appearance.colors.colSurfaceContainerHigh)
-                }
-            }
-            Behavior on color {
-                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-            }
-        }
-    }
 }

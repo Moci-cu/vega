@@ -35,7 +35,7 @@ Scope {
     readonly property int fingerprintSuccess: 5
     property int fingerprintState: root.fingerprintUnavailable
     property int fingerprintRetryCount: 0
-    readonly property int maxFingerprintRetries: 2
+    readonly property int maxFingerprintRetries: 5
     readonly property string fingerprintUsername: Quickshell.env("USER") || SystemInfo.username
     readonly property string fingerprintStatusText: {
         switch (root.fingerprintState) {
@@ -100,12 +100,16 @@ Scope {
     }
 
     function resetClearTimer() {
-        passwordClearTimer.restart();
+        if (root.currentText.length > 0 && !root.authenticationResolved && !root.unlockInProgress)
+            passwordClearTimer.restart();
+        else
+            passwordClearTimer.stop();
     }
 
     function biometricResultName(result) {
         if (result === PamResult.Success) return "success";
         if (result === PamResult.MaxTries) return "max-tries";
+        if (result === PamResult.Error) return "error";
         return "failed";
     }
 
@@ -125,7 +129,8 @@ Scope {
         root.passwordAuthenticated = false;
         root.fingerprintRetryCount = 0;
         if (GlobalStates.screenLocked) {
-            root.tryFingerUnlock();
+            root.refreshFingerprintAvailability();
+            root.refreshFaceAvailability();
             root.scheduleFaceUnlock();
         }
     }
@@ -163,7 +168,9 @@ Scope {
         id: passwordClearTimer
         interval: 10000
         onTriggered: {
-            root.reset();
+            // Expiring input must not cancel PAM or the pending biometric unlock.
+            if (!root.authenticationResolved && !root.unlockInProgress)
+                root.clearText();
         }
     }
 
@@ -173,7 +180,7 @@ Scope {
             GlobalStates.screenUnlockFailed = false;
         }
         GlobalStates.screenLockContainsCharacters = currentText.length > 0;
-        passwordClearTimer.restart();
+        root.resetClearTimer();
     }
 
     function tryUnlock(alsoInhibitIdle = false) {
@@ -181,6 +188,7 @@ Scope {
         root.alsoInhibitIdle = alsoInhibitIdle;
         root.unlockInProgress = true;
         root.passwordAuthenticated = false;
+        passwordClearTimer.stop();
         pam.start();
     }
 
@@ -233,7 +241,6 @@ Scope {
     }
 
     function refreshFingerprintAvailability() {
-        if (root.fingerprintsConfigured) return;
         if (!fingerprintCheckProc.running) fingerprintCheckProc.running = true;
     }
 
@@ -346,6 +353,7 @@ Scope {
         root.authenticationResolved = true;
         root.passwordAuthenticated = false;
         root.unlockInProgress = true;
+        passwordClearTimer.stop();
         root.fingerprintSessionAllowed = false;
         root.faceSessionAllowed = false;
         fingerprintRetryTimer.stop();
@@ -407,7 +415,7 @@ Scope {
 
     Timer {
         id: fingerprintRetryTimer
-        interval: 750
+        interval: Math.min(4000, 500 * Math.pow(2, root.fingerprintRetryCount))
         onTriggered: root.tryFingerUnlock()
     }
 
@@ -620,12 +628,8 @@ Scope {
             } else if (!root.fingerprintSessionAllowed) {
                 root.logBiometric("Ignored stale fingerprint PAM completion");
                 return;
-            } else if (result == PamResult.MaxTries) {
-                root.logBiometric("Fingerprint PAM result: max-tries");
-                root.fingerprintSessionAllowed = false;
-                root.fingerprintState = root.fingerprintFailed;
             } else {
-                root.logBiometric("Fingerprint PAM result: failed");
+                root.logBiometric("Fingerprint PAM result: " + root.biometricResultName(result));
                 root.scheduleFingerprintRetry();
             }
         }

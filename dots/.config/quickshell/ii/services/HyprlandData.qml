@@ -1,6 +1,7 @@
 pragma Singleton
 pragma ComponentBehavior: Bound
 
+import qs
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -27,6 +28,10 @@ Singleton {
     property bool layersDirty: false
     property bool workspacesDirty: false
     property bool activeWorkspaceDirty: false
+    readonly property int refreshRetryDelayMs: 250
+    readonly property int maxRefreshRetryDelayMs: 4000
+    readonly property int maxRefreshRetries: 5
+    property var refreshRetryAttempts: ({})
 
     // Convenient stuff
 
@@ -82,13 +87,53 @@ Singleton {
         });
     }
 
-    function requestRefresh(categories) {
+    function markDirty(categories) {
         if (categories.clients) root.clientsDirty = true;
         if (categories.monitors) root.monitorsDirty = true;
         if (categories.layers) root.layersDirty = true;
         if (categories.workspaces) root.workspacesDirty = true;
         if (categories.activeWorkspace) root.activeWorkspaceDirty = true;
+    }
+
+    function resetRefreshRetry(category) {
+        if (root.refreshRetryAttempts[category] === undefined)
+            return;
+        const attempts = Object.assign({}, root.refreshRetryAttempts);
+        delete attempts[category];
+        root.refreshRetryAttempts = attempts;
+    }
+
+    function requestRefresh(categories) {
+        root.markDirty(categories);
         if (!refreshCoalesceTimer.running) refreshCoalesceTimer.start();
+    }
+
+    function retryRefresh(categories) {
+        const attempts = Object.assign({}, root.refreshRetryAttempts);
+        const retryCategories = {};
+        let retryDelay = root.refreshRetryDelayMs;
+        let hasRetries = false;
+        for (const category in categories) {
+            if (!categories[category]) continue;
+            const attempt = (attempts[category] ?? 0) + 1;
+            if (attempt > root.maxRefreshRetries) {
+                console.warn(`[HyprlandData] ${category} refresh stopped after ${root.maxRefreshRetries} retries`);
+                continue;
+            }
+            attempts[category] = attempt;
+            retryCategories[category] = true;
+            retryDelay = Math.max(retryDelay, Math.min(
+                root.maxRefreshRetryDelayMs,
+                root.refreshRetryDelayMs * Math.pow(2, attempt - 1)
+            ));
+            hasRetries = true;
+        }
+        root.refreshRetryAttempts = attempts;
+        root.markDirty(retryCategories);
+        if (hasRetries) {
+            refreshRetryTimer.interval = retryDelay;
+            refreshRetryTimer.restart();
+        }
     }
 
     function flushRefreshes() {
@@ -197,6 +242,13 @@ Singleton {
         onTriggered: root.flushRefreshes()
     }
 
+    Timer {
+        id: refreshRetryTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.flushRefreshes()
+    }
+
     Connections {
         target: Hyprland
 
@@ -205,89 +257,129 @@ Singleton {
         }
     }
 
-    Process {
+    component HyprlandJsonRequest: Socket {
+        id: requestSocket
+
+        required property string request
+        property bool running: false
+        signal completed(var response)
+        signal failed()
+
+        function fail() {
+            if (!running) return;
+            running = false;
+            connected = false;
+            failed();
+        }
+
+        path: Hyprland.requestSocketPath
+        onRunningChanged: {
+            if (running) {
+                requestTimeout.restart();
+                connected = true;
+            } else {
+                requestTimeout.stop();
+            }
+        }
+
+        onConnectionStateChanged: {
+            if (connected && running) {
+                write(`j/${request}`);
+                flush();
+            } else if (!connected && running) {
+                fail();
+            }
+        }
+
+        onError: fail()
+
+        property Timer requestTimeout: Timer {
+            interval: 3000
+            onTriggered: requestSocket.fail()
+        }
+
+        parser: StdioCollector {
+            waitForEnd: false
+            onDataChanged: {
+                if (!requestSocket.running) return;
+                try {
+                    const response = JSON.parse(text);
+                    requestSocket.running = false;
+                    requestSocket.connected = false;
+                    requestSocket.completed(response);
+                } catch (error) {
+                    // A large JSON response may arrive in multiple chunks.
+                }
+            }
+        }
+    }
+
+    HyprlandJsonRequest {
         id: getClients
-        command: ["hyprctl", "clients", "-j"]
-        onExited: {
+        request: "clients"
+        onFailed: root.retryRefresh({ clients: true })
+        onCompleted: response => {
+            root.resetRefreshRetry("clients");
+            root.windowList = response;
+            let tempWinByAddress = {};
+            for (var i = 0; i < root.windowList.length; ++i) {
+                var win = root.windowList[i];
+                tempWinByAddress[win.address] = win;
+            }
+            root.windowByAddress = tempWinByAddress;
+            root.addresses = root.windowList.map(win => win.address);
             if (root.clientsDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: clientsCollector
-            onStreamFinished: {
-                root.windowList = JSON.parse(clientsCollector.text)
-                let tempWinByAddress = {};
-                for (var i = 0; i < root.windowList.length; ++i) {
-                    var win = root.windowList[i];
-                    tempWinByAddress[win.address] = win;
-                }
-                root.windowByAddress = tempWinByAddress;
-                root.addresses = root.windowList.map(win => win.address);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getMonitors
-        command: ["hyprctl", "monitors", "-j"]
-        onExited: {
+        request: "monitors"
+        onFailed: root.retryRefresh({ monitors: true })
+        onCompleted: response => {
+            root.resetRefreshRetry("monitors");
+            root.monitors = response;
             if (root.monitorsDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: monitorsCollector
-            onStreamFinished: {
-                root.monitors = JSON.parse(monitorsCollector.text);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getLayers
-        command: ["hyprctl", "layers", "-j"]
-        onExited: {
+        request: "layers"
+        onFailed: root.retryRefresh({ layers: true })
+        onCompleted: response => {
+            root.resetRefreshRetry("layers");
+            root.layers = response;
             if (root.layersDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: layersCollector
-            onStreamFinished: {
-                root.layers = JSON.parse(layersCollector.text);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getWorkspaces
-        command: ["hyprctl", "workspaces", "-j"]
-        onExited: {
+        request: "workspaces"
+        onFailed: root.retryRefresh({ workspaces: true })
+        onCompleted: response => {
+            root.resetRefreshRetry("workspaces");
+            root.workspaces = response.filter(ws => !GlobalStates.lockTemporaryWorkspaceIds.includes(ws.id));
+            let tempWorkspaceById = {};
+            for (var i = 0; i < root.workspaces.length; ++i) {
+                var ws = root.workspaces[i];
+                tempWorkspaceById[ws.id] = ws;
+            }
+            root.workspaceById = tempWorkspaceById;
+            root.workspaceIds = root.workspaces.map(ws => ws.id);
             if (root.workspacesDirty) refreshCoalesceTimer.restart();
         }
-        stdout: StdioCollector {
-            id: workspacesCollector
-            onStreamFinished: {
-                var rawWorkspaces = JSON.parse(workspacesCollector.text);
-                // Filter out invalid workspace ids (e.g. lock-screen temp workspace 2147483647 - N)
-                root.workspaces = rawWorkspaces.filter(ws => ws.id >= 1 && ws.id <= 100);
-                let tempWorkspaceById = {};
-                for (var i = 0; i < root.workspaces.length; ++i) {
-                    var ws = root.workspaces[i];
-                    tempWorkspaceById[ws.id] = ws;
-                }
-                root.workspaceById = tempWorkspaceById;
-                root.workspaceIds = root.workspaces.map(ws => ws.id);
-            }
-        }
     }
 
-    Process {
+    HyprlandJsonRequest {
         id: getActiveWorkspace
-        command: ["hyprctl", "activeworkspace", "-j"]
-        onExited: {
+        request: "activeworkspace"
+        onFailed: root.retryRefresh({ activeWorkspace: true })
+        onCompleted: response => {
+            root.resetRefreshRetry("activeWorkspace");
+            root.activeWorkspace = response;
             if (root.activeWorkspaceDirty) refreshCoalesceTimer.restart();
-        }
-        stdout: StdioCollector {
-            id: activeWorkspaceCollector
-            onStreamFinished: {
-                root.activeWorkspace = JSON.parse(activeWorkspaceCollector.text);
-            }
         }
     }
 }

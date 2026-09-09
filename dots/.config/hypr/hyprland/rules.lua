@@ -41,7 +41,18 @@ hl.window_rule({match = {class = ".*plasmawindowed.*" },                     flo
 hl.window_rule({match = {class = "kcm_.*" },                                  float = true})
 hl.window_rule({match = {class = ".*bluedevilwizard" },                      float = true})
 hl.window_rule({match = {title = ".*Welcome" },                              float = true})
-hl.window_rule({match = {title = "^(illogical-impulse Settings)$" },         float = true})
+hl.window_rule({
+    match = {
+        initial_class = "^(org\\.quickshell)$",
+        initial_title = "^(illogical-impulse Settings)$"
+    },
+    float = true,
+    center = true,
+    size = {1100, 750},
+    fullscreen_state = "0 0",
+    no_anim = true,
+    suppress_event = "fullscreen maximize"
+})
 hl.window_rule({match = {title = ".*Shell conflicts.*" },                    float = true})
 hl.window_rule({match = {class = "org.freedesktop.impl.portal.desktop.kde" }, float = true})
 hl.window_rule({match = {class = "org.freedesktop.impl.portal.desktop.kde" }, size = {"(monitor_w*0.60)", "(monitor_h*0.65)"} })
@@ -97,9 +108,9 @@ hl.layer_rule({ match = { namespace = "noanim" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "gtk-layer-shell" }, blur = true})
 hl.layer_rule({ match = { namespace = "gtk-layer-shell" }, ignore_alpha = 0})
 hl.layer_rule({ match = { namespace = "launcher" }, blur = true})
-hl.layer_rule({ match = { namespace = "launcher" }, ignore_alpha = 0.5})
+hl.layer_rule({ match = { namespace = "launcher" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "notifications" }, blur = true})
-hl.layer_rule({ match = { namespace = "notifications" }, ignore_alpha = 0.69})
+hl.layer_rule({ match = { namespace = "notifications" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "logout_dialog" }, blur = true}) -- wlogout
 
 -- ags
@@ -119,9 +130,9 @@ hl.layer_rule({ match = { namespace = "overview[0-9]*" }, ignore_alpha = 0.6})
 hl.layer_rule({ match = { namespace = "cheatsheet[0-9]*" }, blur = true})
 hl.layer_rule({ match = { namespace = "cheatsheet[0-9]*" }, ignore_alpha = 0.6})
 hl.layer_rule({ match = { namespace = "sideright[0-9]*" }, blur = true})
-hl.layer_rule({ match = { namespace = "sideright[0-9]*" }, ignore_alpha = 0.6})
+hl.layer_rule({ match = { namespace = "sideright[0-9]*" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "sideleft[0-9]*" }, blur = true})
-hl.layer_rule({ match = { namespace = "sideleft[0-9]*" }, ignore_alpha = 0.6})
+hl.layer_rule({ match = { namespace = "sideleft[0-9]*" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "indicator.*" }, blur = true})
 hl.layer_rule({ match = { namespace = "indicator.*" }, ignore_alpha = 0.6})
 hl.layer_rule({ match = { namespace = "osk[0-9]*" }, blur = true})
@@ -129,9 +140,8 @@ hl.layer_rule({ match = { namespace = "osk[0-9]*" }, ignore_alpha = 0.6})
 
 -- Quickshell
 -- Quickshell: illogical-impulse
-hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur_popups = true})
-hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur = true})
-hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.79})
+local overviewUsesHyprlandBlur = true
+hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.2})
 hl.layer_rule({ match = { namespace = "quickshell:bar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:actionCenter" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:cheatsheet" }, animation = "slide bottom"})
@@ -139,22 +149,36 @@ hl.layer_rule({ match = { namespace = "quickshell:dock" }, animation = "slide bo
 hl.layer_rule({ match = { namespace = "quickshell:screenCorners" }, animation = "popin 120%"})
 hl.layer_rule({ match = { namespace = "quickshell:lockWindowPusher" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, animation = "fade"})
+hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, blur = true})
+hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, xray = false})
+hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, ignore_alpha = 0.05})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "quickshell:overview" }, no_anim = true})
+if overviewUsesHyprlandBlur then
+    hl.layer_rule({ match = { namespace = "quickshell:overview" }, blur = true})
+end
+hl.layer_rule({ match = { namespace = "quickshell:overview" }, xray = false})
+hl.layer_rule({ match = { namespace = "quickshell:overview" }, ignore_alpha = overviewUsesHyprlandBlur and 0.05 or 1})
+hl.layer_rule({ match = { namespace = "quickshell:onScreenDisplay" }, xray = false})
+hl.layer_rule({ match = { namespace = "quickshell:onScreenDisplay" }, ignore_alpha = 0.5})
 hl.layer_rule({ match = { namespace = "quickshell:osk" }, animation = "slide bottom"})
 hl.layer_rule({ match = { namespace = "quickshell:polkit" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:popup" }, xray = false}) -- No weird color for bar tooltips (this in theory should suffice)
-hl.layer_rule({ match = { namespace = "quickshell:popup" }, ignore_alpha = 1}) -- No weird color for bar tooltips (but somehow this is necessary)
-hl.layer_rule({ match = { namespace = "quickshell:mediaControls" }, ignore_alpha = 1}) -- Same as above
+hl.layer_rule({ match = { namespace = "quickshell:popup" }, animation = "fade"})
+hl.layer_rule({ match = { namespace = "quickshell:popup" }, ignore_alpha = 0.5})
+hl.layer_rule({ match = { namespace = "quickshell:mediaControls" }, ignore_alpha = 0.2})
 hl.layer_rule({ match = { namespace = "quickshell:reloadPopup" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:regionSelector" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:screenshot" }, no_anim = true})
-hl.layer_rule({ match = { namespace = "quickshell:session" }, blur = true})
 hl.layer_rule({ match = { namespace = "quickshell:session" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:session" }, ignore_alpha = 0})
 hl.layer_rule({ match = { namespace = "quickshell:sidebarRight" }, animation = "slide right"})
+hl.layer_rule({ match = { namespace = "quickshell:sidebarRight" }, xray = false})
+hl.layer_rule({ match = { namespace = "quickshell:sidebarRight" }, ignore_alpha = 0.5})
 hl.layer_rule({ match = { namespace = "quickshell:sidebarLeft" }, animation = "slide left"})
+hl.layer_rule({ match = { namespace = "quickshell:sidebarLeft" }, xray = false})
+hl.layer_rule({ match = { namespace = "quickshell:sidebarLeft" }, ignore_alpha = 0.5})
 hl.layer_rule({ match = { namespace = "quickshell:verticalBar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:osk" }, order = -1})
 -- Quickshell: waffles

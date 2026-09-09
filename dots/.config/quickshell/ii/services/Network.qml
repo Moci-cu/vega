@@ -27,16 +27,11 @@ Singleton {
     property WifiAccessPoint wifiConnectTarget
     property bool scanAfterWifiEnabled: false
     property bool initialScanRequested: false
+    property int wifiScannerConsumers: 0
 
     property var wifiNetworks: []
     readonly property WifiAccessPoint active: wifiNetworks.find(network => network?.active) ?? null
-    readonly property var friendlyWifiNetworks: wifiNetworks.filter(network => network).sort((a, b) => {
-        if (a.active && !b.active)
-            return -1;
-        if (!a.active && b.active)
-            return 1;
-        return b.strength - a.strength;
-    })
+    readonly property var friendlyWifiNetworks: wifiNetworks.filter(network => (network?.ssid ?? "").length > 0)
 
     readonly property bool ethernet: devices.some(device => device.type === DeviceType.Wired && device.connected)
     readonly property string wifiStatus: {
@@ -122,6 +117,23 @@ Singleton {
         root.enableWifi(true);
     }
 
+    function acquireWifiScanner(): void {
+        root.wifiScannerConsumers++;
+        scannerStopTimer.stop();
+        if (!root.wifiEnabled || !root.wifiDevice) return;
+        if (!root.wifiDevice.scannerEnabled)
+            root.wifiDevice.scannerEnabled = true;
+        if (!root.wifiScanning) {
+            root.wifiScanning = true;
+            scanIndicatorTimer.restart();
+        }
+    }
+
+    function releaseWifiScanner(): void {
+        root.wifiScannerConsumers = Math.max(0, root.wifiScannerConsumers - 1);
+        if (root.wifiScannerConsumers === 0) scannerStopTimer.restart();
+    }
+
     function connectToWifiNetwork(accessPoint: WifiAccessPoint): void {
         if (!accessPoint?.backendNetwork) return;
         accessPoint.askingPassword = false;
@@ -177,12 +189,18 @@ Singleton {
             if (accessPoint) nextNetworks.push(accessPoint);
         }
 
+        // Keep ScriptModel rows stable while signal strength changes during scans.
+        nextNetworks.sort((a, b) => a.ssid.localeCompare(b.ssid) || a.securityType - b.securityType);
+
         for (const accessPoint of currentNetworks) {
             if (nextNetworks.includes(accessPoint)) continue;
             if (root.wifiConnectTarget === accessPoint) root.wifiConnectTarget = null;
             accessPoint.destroy();
         }
 
+        if (nextNetworks.length === currentNetworks.length
+                && nextNetworks.every((accessPoint, index) => accessPoint === currentNetworks[index]))
+            return;
         root.wifiNetworks = nextNetworks;
     }
 
@@ -212,7 +230,10 @@ Singleton {
 
     Component.onCompleted: root.handleWifiAvailability()
 
-    onWifiDeviceChanged: root.handleWifiAvailability()
+    onWifiDeviceChanged: {
+        root.initialScanRequested = false;
+        root.handleWifiAvailability();
+    }
 
     Connections {
         target: Networking
@@ -272,7 +293,7 @@ Singleton {
         interval: 15000
         repeat: false
         onTriggered: {
-            if (root.wifiDevice?.scannerEnabled)
+            if (root.wifiScannerConsumers === 0 && root.wifiDevice?.scannerEnabled)
                 root.wifiDevice.scannerEnabled = false;
         }
     }

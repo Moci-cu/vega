@@ -117,9 +117,6 @@ Item {
     }
 
 
-    StyledRectangularShadow {
-        target: overviewBackground
-    }
     Rectangle { // Background
         id: overviewBackground
         property real padding: 10
@@ -129,7 +126,8 @@ Item {
         implicitWidth: workspaceColumnLayout.implicitWidth + padding * 2
         implicitHeight: workspaceColumnLayout.implicitHeight + padding * 2
         radius: root.largeWorkspaceRadius + padding
-        color: Appearance.colors.colBackgroundSurfaceContainer
+        color: Appearance.colors.colGlassSurfaceContainer
+        antialiasing: true
 
         Column { // Workspaces
             id: workspaceColumnLayout

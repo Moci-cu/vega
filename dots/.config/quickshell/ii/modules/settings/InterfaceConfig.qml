@@ -9,7 +9,7 @@ import Quickshell.Io
 
 ContentPage {
     id: page
-    readonly property int index: 4
+    readonly property int index: 5
     property bool register: parent.register ?? false
     forceWidth: true
 
@@ -221,6 +221,19 @@ ContentPage {
     ContentSection {
         icon: "lock"
         title: Translation.tr("Lock screen")
+
+        ContentSubsection {
+            title: Translation.tr("Lock screen style")
+            enabled: !Config.options.lock.useHyprlock
+            ConfigSelectionArray {
+                currentValue: Config.options.lock.style
+                onSelected: newValue => { Config.options.lock.style = newValue; }
+                options: [
+                    { displayName: "Vega", icon: "lock", value: "vega" },
+                    { displayName: "Unit-4", icon: "grid_on", value: "unit4" }
+                ]
+            }
+        }
 
         ConfigSwitch {
             buttonIcon: "water_drop"

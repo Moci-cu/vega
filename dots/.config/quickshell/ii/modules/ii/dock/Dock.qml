@@ -269,7 +269,7 @@ Scope {
                                 anchors.centerIn: parent
                                 width: dockRoot.sizing.backgroundWidth
                                 height: dockRoot.sizing.backgroundHeight
-                                color: Appearance.colors.colLayer0
+                                color: Appearance.colors.colGlassSurface
                                 border.width: 1
                                 border.color: Appearance.colors.colLayer0Border
                                 radius: Appearance.rounding.large

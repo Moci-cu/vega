@@ -5,12 +5,21 @@ import QtQuick.Layouts
 
 MouseArea {
     id: root
+    property color foregroundColor: Appearance.colors.colOnLayer1
+    property var screen
+    property real parallaxWorkspaceValue: 0.5
+    property real parallaxSidebarBalance: 0
     implicitWidth: rowLayout.implicitWidth + rowLayout.anchors.leftMargin + rowLayout.anchors.rightMargin
     implicitHeight: Appearance.sizes.barHeight
-    hoverEnabled: !Config.options.bar.tooltips.clickToShow
-
     Component.onCompleted: ResourceUsage.activeInstances++
     Component.onDestruction: ResourceUsage.activeInstances = Math.max(0, ResourceUsage.activeInstances - 1)
+
+    component AdaptiveResource: Resource {
+        fallbackForegroundColor: root.foregroundColor
+        screen: root.screen
+        parallaxWorkspaceValue: root.parallaxWorkspaceValue
+        parallaxSidebarBalance: root.parallaxSidebarBalance
+    }
 
     RowLayout {
         id: rowLayout
@@ -20,14 +29,14 @@ MouseArea {
         anchors.leftMargin: 4
         anchors.rightMargin: 4
 
-        Resource {
+        AdaptiveResource {
             iconName: "memory"
             percentage: ResourceUsage.memoryUsedPercentage
             shown: true
             warningThreshold: Config.options.bar.resources.memoryWarningThreshold
         }
 
-        Resource {
+        AdaptiveResource {
             iconName: "planner_review"
             percentage: ResourceUsage.cpuUsage
             shown: true
@@ -35,7 +44,7 @@ MouseArea {
             warningThreshold: Config.options.bar.resources.cpuWarningThreshold
         }
 
-        Resource {
+        AdaptiveResource {
             iconName: "device_thermostat"
             percentage: ResourceUsage.cpuTempCelsius > 0 ? Math.min(ResourceUsage.cpuTempCelsius / 100, 1) : 0
             valueText: ResourceUsage.cpuTempCelsius > 0 ? `${ResourceUsage.cpuTempCelsius}°` : "--"
@@ -44,7 +53,7 @@ MouseArea {
             warningThreshold: 85
         }
 
-        Resource {
+        AdaptiveResource {
             iconName: "swap_horiz"
             percentage: ResourceUsage.swapUsedPercentage
             shown: true
@@ -52,9 +61,5 @@ MouseArea {
             warningThreshold: Config.options.bar.resources.swapWarningThreshold
         }
 
-    }
-
-    ResourcesPopup {
-        hoverTarget: root
     }
 }

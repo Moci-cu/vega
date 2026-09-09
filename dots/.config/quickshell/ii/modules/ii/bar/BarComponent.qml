@@ -1,3 +1,4 @@
+import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -18,12 +19,33 @@ Item {
     property var originalIndex: index
     property bool vertical: false
     property bool highlighted: false
+    property bool persistVisibility: true
+    property var screen: rootItem.QsWindow.window?.screen
+    readonly property int activeWorkspaceId: HyprlandData.monitors.find(monitor => monitor.name === screen?.name)?.activeWorkspace?.id ?? 1
+    property real parallaxWorkspaceValue: Appearance.barWorkspaceValue(activeWorkspaceId)
+    property real parallaxSidebarBalance: GlobalStates.effectiveRightOpen - GlobalStates.effectiveLeftOpen
+    readonly property real screenCenterX: {
+        width;
+        x;
+        let ancestor = parent;
+        while (ancestor) {
+            ancestor.x;
+            ancestor.width;
+            ancestor = ancestor.parent;
+        }
+        return mapToItem(null, width / 2, 0).x;
+    }
+    readonly property var adaptivePalette: Appearance.colors.transparentBar
+        ? Appearance.barPaletteAt(screenCenterX, width, screen, parallaxWorkspaceValue, parallaxSidebarBalance)
+        : ({ foreground: Appearance.colors.colOnLayer1 })
+    property color foregroundColor: Appearance.colors.transparentBar ? adaptivePalette.foreground : Appearance.colors.colOnLayer1
 
     implicitWidth: wrapper.implicitWidth
     implicitHeight: wrapper.implicitHeight
 
     function toggleVisible(visibility) {
         visible = visibility
+        if (!persistVisibility) return;
         if (barSection == 0) Config.options.bar.layouts.left[originalIndex].visible = visibility
         else if (barSection == 1) Config.options.bar.layouts.center[originalIndex].visible = visibility
         else if (barSection == 2) Config.options.bar.layouts.right[originalIndex].visible = visibility
@@ -50,6 +72,7 @@ Item {
         "policies_panel_button": [policiesPanelButton, policiesPanelButton],
         "dashboard_panel_button": [dashboardPanelButton, dashboardPanelButtonVert],
         "network_speed": [networkSpeedComp, networkSpeedComp],
+        "bongocat": [bongoCatComp, bongoCatComp],
     })
 
     property real startRadius: {
@@ -82,10 +105,11 @@ Item {
 
     readonly property int barGroupStyle: Config.options.bar.barGroupStyle
     readonly property int barBackgroundStyle: Config.options.bar.barBackgroundStyle
-    property color colBackground: barGroupStyle == 0 ? Appearance.colors.colLayer1 :
-                                   (barGroupStyle == 1 && barBackgroundStyle == 1) ? Appearance.colors.colLayer1 :
-                                   (barGroupStyle == 1) ? Appearance.m3colors.m3surfaceContainerLow :
-                                   "transparent";
+    readonly property color baseBackground: barGroupStyle == 0 ? Appearance.colors.colLayer1 :
+                                                (barGroupStyle == 1 && barBackgroundStyle == 1) ? Appearance.colors.colLayer1 :
+                                                (barGroupStyle == 1) ? Appearance.m3colors.m3surfaceContainerLow :
+                                                "transparent"
+    property color colBackground: rootItem.baseBackground
     
     property color colBackgroundHighlight: Appearance.colors.colPrimary
 
@@ -93,8 +117,8 @@ Item {
         id: wrapper
         vertical: rootItem.vertical
         anchors {
-            verticalCenter: root.vertical ? rootItem.verticalCenter : undefined
-            horizontalCenter: root.vertical ? undefined : rootItem.horizontalCenter
+            verticalCenter: rootItem.vertical ? rootItem.verticalCenter : undefined
+            horizontalCenter: rootItem.vertical ? undefined : rootItem.horizontalCenter
         }
         
         startRadius: rootItem.startRadius
@@ -131,7 +155,7 @@ Item {
     }
 
 
-    Component { id: weatherComp; WeatherBar { vertical: rootItem.vertical } }
+    Component { id: weatherComp; WeatherBar { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
 
     Component { id: timerComp; TimerWidget {} }
     Component { id: timerCompVert; Vertical.VerticalTimerWidget {} }
@@ -140,31 +164,32 @@ Item {
 
     Component { id: recordIndicatorComp; RecordIndicator { vertical: rootItem.vertical } }
 
-    Component { id: activeWindowComp; ActiveWindow { vertical: rootItem.vertical } }
+    Component { id: activeWindowComp; ActiveWindow { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
 
-    Component { id: systemMonitorComp; Resources {} }
+    Component { id: systemMonitorComp; Resources { foregroundColor: rootItem.foregroundColor; screen: rootItem.screen; parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue; parallaxSidebarBalance: rootItem.parallaxSidebarBalance } }
     Component { id: systemMonitorCompVert; Vertical.Resources {} }
 
     Component { id: musicPlayerCompVert; Vertical.VerticalMedia {} }
-    Component { id: musicPlayerComp; Media {} }
+    Component { id: musicPlayerComp; Media { foregroundColor: rootItem.foregroundColor } }
 
-    Component { id: utilityButtonsComp; UtilButtons { vertical: rootItem.vertical } }
+    Component { id: utilityButtonsComp; UtilButtons { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; containerScreenCenterX: rootItem.screenCenterX; screen: rootItem.screen; parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue; parallaxSidebarBalance: rootItem.parallaxSidebarBalance } }
 
-    Component { id: batteryComp; BatteryIndicator {} }
+    Component { id: batteryComp; BatteryIndicator { foregroundColor: rootItem.foregroundColor } }
     Component { id: batteryCompVert; Vertical.BatteryIndicator {} }
 
     Component { id: clockCompVert; Vertical.VerticalClockWidget {} }
-    Component { id: clockComp; ClockWidget {} }
+    Component { id: clockComp; ClockWidget { foregroundColor: rootItem.foregroundColor } }
 
-    Component { id: systemTrayComp; SysTray { vertical: rootItem.vertical } }
+    Component { id: systemTrayComp; SysTray { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
 
     Component { id: dateCompVert; Vertical.VerticalDateWidget {} }
 
-    Component { id: workspaceComp; Workspaces { vertical: rootItem.vertical } }
+    Component { id: workspaceComp; Workspaces { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor; screen: rootItem.screen; parallaxWorkspaceValue: rootItem.parallaxWorkspaceValue; parallaxSidebarBalance: rootItem.parallaxSidebarBalance } }
 
-    Component { id: policiesPanelButton; PoliciesPanelButton {} }
+    Component { id: policiesPanelButton; PoliciesPanelButton { foregroundColor: rootItem.foregroundColor } }
     
-    Component { id: dashboardPanelButton; DashboardPanelButton {} }
-    Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical } }
+    Component { id: dashboardPanelButton; DashboardPanelButton { foregroundColor: rootItem.foregroundColor } }
+    Component { id: networkSpeedComp; NetworkSpeed { vertical: rootItem.vertical; foregroundColor: rootItem.foregroundColor } }
+    Component { id: bongoCatComp; BongoCatWidget { vertical: rootItem.vertical } }
     Component { id: dashboardPanelButtonVert; VerticalDashboardPanelButton {} }
 }
